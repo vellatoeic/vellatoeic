@@ -38,3 +38,8 @@ create table if not exists settings (
 alter table applications enable row level security;
 alter table lectures enable row level security;
 alter table settings enable row level security;
+
+-- 홈페이지 서버(secret key = service_role)에 표 읽기·쓰기 권한 주기
+grant usage on schema public to service_role;
+grant select, insert, update, delete on all tables in schema public to service_role;
+alter default privileges in schema public grant select, insert, update, delete on tables to service_role;
