@@ -1,0 +1,11 @@
+node_modules
+.next
+.env*.local
+.env
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# 미리보기 사진·개인 설정
+Claude outputs/
+.mcp.json

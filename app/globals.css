@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@theme {
+  --color-sky-soft: #eaf6fd;   /* 배경 연하늘 */
+  --color-sky-main: #9fd8f5;   /* 대표 연하늘 */
+  --color-sky-deep: #2b8fc7;   /* 버튼·강조 */
+  --color-sky-ink: #12405c;    /* 제목 글자 */
+  --font-jua: "Jua", "Gowun Dodum", sans-serif;
+  --font-body: "Gowun Dodum", "Apple SD Gothic Neo", sans-serif;
+}
+
+html { background: var(--color-sky-soft); }
+body { font-family: var(--font-body); color: #1f2d3a; -webkit-font-smoothing: antialiased; word-break: keep-all; }
+.font-jua { font-family: var(--font-jua); letter-spacing: -0.01em; }
+
+.card { @apply rounded-3xl bg-white p-6 shadow-[0_4px_24px_rgba(43,143,199,0.10)]; }
+.btn { @apply inline-flex items-center justify-center rounded-2xl bg-sky-deep px-6 py-4 text-lg font-bold text-white transition hover:brightness-110 active:scale-[0.98] disabled:opacity-40; }
+.btn-ghost { @apply inline-flex items-center justify-center rounded-2xl border-2 border-sky-main bg-white px-5 py-3 font-bold text-sky-ink transition hover:bg-sky-soft; }
+.input { @apply w-full rounded-2xl border-2 border-sky-main/60 bg-white px-4 py-3 text-base outline-none focus:border-sky-deep; }
+.label { @apply mb-2 block font-bold text-sky-ink; }
+
+/* 둥근 글꼴: 굵은 글씨는 모두 Jua로 */
+b, strong, .font-bold, .btn, .btn-ghost, .label { font-family: var(--font-jua); font-weight: 400; }
+
+/* 구름이 천천히 떠다니는 효과 */
+@keyframes drift { 0%,100% { transform: translateX(0); } 50% { transform: translateX(14px); } }
+.cloud-a { animation: drift 9s ease-in-out infinite; }
+.cloud-b { animation: drift 12s ease-in-out infinite reverse; }
+@media (prefers-reduced-motion: reduce) { .cloud-a, .cloud-b { animation: none; } }
