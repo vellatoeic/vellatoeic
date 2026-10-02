@@ -1,7 +1,7 @@
 import { COURSES, KINDS, TRACKS, STATUS_LABEL, cohortLabel, pickupLabel, won, type Kind, type CourseId, type Track } from "@/lib/config";
 import { listApplications, getSetting, currentCohort, isPreview } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
-import { changeStatus, saveSettings, resetPin, changeClass } from "@/app/actions";
+import { changeStatus, saveSettings, resetPin, changeClass, removeApplication } from "@/app/actions";
 import LoginForm from "./LoginForm";
 import AdminTabs from "./AdminTabs";
 
@@ -165,6 +165,13 @@ export default async function Admin({
                   <input type="hidden" name="id" value={a.id} />
                   <input name="pin" placeholder="새 4자리" inputMode="numeric" maxLength={4} className="input !w-28 !py-2" />
                   <button className="btn-ghost !py-2">저장</button>
+                </form>
+              </details>
+              <details className="text-sm">
+                <summary className="cursor-pointer text-red-400">삭제</summary>
+                <form action={removeApplication} className="mt-2">
+                  <input type="hidden" name="id" value={a.id} />
+                  <button className="rounded-xl bg-red-50 px-3 py-2 font-bold text-red-600">정말 삭제 (되돌릴 수 없어요)</button>
                 </form>
               </details>
             </div>

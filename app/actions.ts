@@ -7,7 +7,7 @@ import {
   type BookId, type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
 } from "@/lib/config";
 import {
-  createApplication, getApplication, findApplicationsByName, updateApplication, setSetting, addLecture, deleteLecture, currentCohort,
+  createApplication, deleteApplication, getApplication, findApplicationsByName, updateApplication, setSetting, addLecture, deleteLecture, currentCohort,
 } from "@/lib/db";
 import {
   hashPin, checkPin, setStudent, clearStudent, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
@@ -151,5 +151,12 @@ export async function changeClass(fd: FormData) {
   if (!a) return;
   const books = COURSES[course].books[track];
   await updateApplication(id, { course, track, books, amount: calcAmount(books, a.pickup) });
+  revalidatePath("/admin");
+}
+
+// 테스트·중복 신청 삭제
+export async function removeApplication(fd: FormData) {
+  if (!(await isAdmin())) return;
+  await deleteApplication(clean(fd.get("id")));
   revalidatePath("/admin");
 }

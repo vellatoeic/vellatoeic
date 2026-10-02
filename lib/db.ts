@@ -110,6 +110,16 @@ export async function updateApplication(id: string, patch: Partial<Pick<Applicat
   if (a) Object.assign(a, patch);
 }
 
+export async function deleteApplication(id: string) {
+  if (!isUuid(id)) return;
+  if (sb) {
+    const { error } = await sb.from("applications").delete().eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  mem.apps = mem.apps.filter((x) => x.id !== id);
+}
+
 // ── 강의 ───────────────────────────────────────
 export async function listLectures(cohort?: string): Promise<Lecture[]> {
   if (sb) {
