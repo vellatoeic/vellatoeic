@@ -122,37 +122,45 @@ export function dayLabel(d: string) {
 }
 
 // ── 출석 가능 시간 ───────────────────────────────
-// 강의실에 붙여 둔 QR은 이 시간에만 출석으로 인정돼요. 수업 시간이 바뀌면 여기만 고치면 돼요.
-// days: 0=일 1=월 2=화 3=수 4=목 5=금 6=토
-export const KLASS_TIME: Record<Klass, { days: number[]; from: string; to: string }> = {
-  "start-daily": { days: [1, 2, 3, 4], from: "19:00", to: "21:00" },
-  "start-alt": { days: [2, 4], from: "19:00", to: "21:00" },
-  "solve-daily": { days: [1, 2, 3, 4], from: "21:00", to: "23:00" },
-  "solve-alt": { days: [2, 4], from: "21:00", to: "23:00" },
+// 강의실에 붙여 둔 QR은 이 시간에만 출석으로 인정돼요. 시간표가 바뀌면 여기만 고치면 돼요.
+// 반마다 오전반·저녁반이 있고, 둘 중 어느 쪽에 와도 출석으로 인정해요.
+//
+// 요일 제한은 일부러 두지 않았어요. 크게는 월~목이지만 매달 시간표가 바뀌어서,
+// 요일을 고정하면 바뀐 달에 수강생 출석이 막혀요. 그래서 매일 열어두고 시간대만 봐요.
+export type Slot = { label: string; from: string; to: string; detail: string };
+
+const START_TIME: Slot[] = [
+  { label: "오전반", from: "10:00", to: "12:10", detail: "RC 10:00~11:00 · LC 11:00~12:10" },
+  { label: "저녁반", from: "19:10", to: "21:20", detail: "LC 19:10~20:10 · RC 20:20~21:20" },
+];
+const SOLVE_TIME: Slot[] = [
+  { label: "오전반", from: "11:10", to: "13:20", detail: "LC 11:10~12:10 · RC 12:20~13:20" },
+  { label: "저녁반", from: "18:00", to: "20:10", detail: "RC 18:00~19:00 · LC 19:10~20:10" },
+];
+
+// 격일반은 같은 시간에 수업하고 수업 일수만 달라요
+export const KLASS_TIME: Record<Klass, Slot[]> = {
+  "start-daily": START_TIME,
+  "start-alt": START_TIME,
+  "solve-daily": SOLVE_TIME,
+  "solve-alt": SOLVE_TIME,
 };
 
 // 수업 시작 전·종료 후로 이만큼 여유를 둬요 (지각·늦은 로그인 대비)
 export const CHECK_GRACE_MIN = 20;
 
-const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 const toMin = (hhmm: string) => {
   const [h, m] = hhmm.split(":").map(Number);
   return h * 60 + m;
 };
 
-// "월~목 19:00~21:00" / "화·목 19:00~21:00"
+// "오전반 10:00~12:10 · 저녁반 19:10~21:20"
 export function klassTimeLabel(k: Klass) {
-  const { days, from, to } = KLASS_TIME[k];
-  const d = [...days].sort((a, b) => a - b);
-  const run = d.every((x, i) => i === 0 || x === d[i - 1] + 1);
-  const label = d.length > 2 && run ? `${DAY_NAMES[d[0]]}~${DAY_NAMES[d[d.length - 1]]}` : d.map((x) => DAY_NAMES[x]).join("·");
-  return `${label} ${from}~${to}`;
+  return KLASS_TIME[k].map((s) => `${s.label} ${s.from}~${s.to}`).join(" · ");
 }
 
 export function isCheckOpen(k: Klass, nowMs = Date.now()) {
-  const { days, from, to } = KLASS_TIME[k];
   const kst = new Date(nowMs + 9 * 3600 * 1000);
-  if (!days.includes(kst.getUTCDay())) return false;
   const now = kst.getUTCHours() * 60 + kst.getUTCMinutes();
-  return now >= toMin(from) - CHECK_GRACE_MIN && now <= toMin(to) + CHECK_GRACE_MIN;
+  return KLASS_TIME[k].some((s) => now >= toMin(s.from) - CHECK_GRACE_MIN && now <= toMin(s.to) + CHECK_GRACE_MIN);
 }

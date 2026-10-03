@@ -1,6 +1,6 @@
 import QRCode from "qrcode";
 import { headers } from "next/headers";
-import { KLASSES, klassTimeLabel, type Klass } from "@/lib/config";
+import { KLASSES, KLASS_TIME, type Klass } from "@/lib/config";
 import { isAdmin } from "@/lib/auth";
 import { isPreview } from "@/lib/db";
 import LoginForm from "../LoginForm";
@@ -48,8 +48,15 @@ export default async function QrPage() {
           <p className="font-jua text-3xl text-sky-ink">{KLASSES[k]} 출석 체크 ☁️</p>
           <p className="mt-1 text-slate-600">휴대폰 카메라로 QR을 찍으면 출석 스티커가 붙어요</p>
           <div className="mx-auto mt-4 aspect-square w-full max-w-xs" dangerouslySetInnerHTML={{ __html: svg }} />
-          <p className="font-jua mt-3 text-xl text-sky-deep">{klassTimeLabel(k)}</p>
-          <p className="mt-1 text-sm text-slate-500">이 시간에만 출석할 수 있어요</p>
+          <div className="mt-4 space-y-1">
+            {KLASS_TIME[k].map((s) => (
+              <p key={s.label}>
+                <b className="font-jua text-xl text-sky-deep">{s.label} {s.from}~{s.to}</b>
+                <span className="ml-2 text-sm text-slate-500">{s.detail}</span>
+              </p>
+            ))}
+          </div>
+          <p className="mt-2 text-sm text-slate-500">이 시간에만 출석할 수 있어요</p>
         </section>
       ))}
     </div>
