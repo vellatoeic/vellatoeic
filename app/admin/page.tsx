@@ -1,7 +1,7 @@
 import { COURSES, KINDS, TRACKS, STATUS_LABEL, cohortLabel, pickupLabel, won, type Kind, type CourseId, type Track } from "@/lib/config";
 import { listApplications, getSetting, currentCohort, isPreview } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
-import { changeStatus, saveSettings, resetPin, changeClass, removeApplication } from "@/app/actions";
+import { changeStatus, saveSettings, resetPin, changeClass, removeApplication, bulkChangeClass, bulkRemove } from "@/app/actions";
 import LoginForm from "./LoginForm";
 import AdminTabs from "./AdminTabs";
 
@@ -103,25 +103,57 @@ export default async function Admin({
 
       {list.length === 0 && <p className="card text-center text-slate-500">해당하는 신청이 없어요.</p>}
 
+      {list.length > 0 && (
+        <form id="bulk" action={bulkChangeClass} className="card flex flex-wrap items-center gap-2 !p-4 text-sm">
+          <span className="font-bold text-sky-ink">체크한 신청을</span>
+          <select name="class" className="input !w-44 !py-2">
+            {(Object.keys(COURSES) as CourseId[]).flatMap((co) =>
+              (Object.keys(TRACKS) as Track[]).map((t) => (
+                <option key={co + t} value={`${co}:${t}`}>
+                  {COURSES[co].label} {TRACKS[t]}
+                </option>
+              )),
+            )}
+          </select>
+          <button className="btn-ghost !py-2">으로 반 변경</button>
+          <details className="ml-auto">
+            <summary className="cursor-pointer text-red-400">선택 삭제</summary>
+            <button formAction={bulkRemove} className="mt-2 rounded-xl bg-red-50 px-3 py-2 font-bold text-red-600">
+              체크한 신청 모두 삭제 (되돌릴 수 없어요)
+            </button>
+          </details>
+        </form>
+      )}
+
       <ul className="space-y-3">
         {list.map((a) => (
           <li key={a.id} className="card !p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="font-bold text-sky-ink">
-                  {a.name}
-                  {a.depositor !== a.name && <span className="ml-2 text-sm font-normal text-slate-500">입금자 {a.depositor}</span>}
-                </p>
-                <p className="mt-1 text-sm text-slate-600">
-                  {KINDS[a.kind].short} · {COURSES[a.course].label} {TRACKS[a.track]} ·{" "}
-                  {a.kind === "online" ? pickupLabel(a.kind, a.pickup) : "첫날 일괄 지급"}
-                </p>
-                <p className="mt-1 text-sm text-slate-500">
-                  {[a.phone?.replace(/(\d{3})(\d{3,4})(\d{4})/, "$1-$2-$3"), a.address].filter(Boolean).join(" · ")}
-                </p>
-                <p className="mt-1 text-xs text-slate-400">
-                  {cohortLabel(a.cohort)} · {new Date(a.created_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}
-                </p>
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  form="bulk"
+                  name="ids"
+                  value={a.id}
+                  aria-label={`${a.name} 선택`}
+                  className="mt-1 h-5 w-5 shrink-0 accent-sky-deep"
+                />
+                <div>
+                  <p className="font-bold text-sky-ink">
+                    {a.name}
+                    {a.depositor !== a.name && <span className="ml-2 text-sm font-normal text-slate-500">입금자 {a.depositor}</span>}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {KINDS[a.kind].short} · {COURSES[a.course].label} {TRACKS[a.track]} ·{" "}
+                    {a.kind === "online" ? pickupLabel(a.kind, a.pickup) : "첫날 일괄 지급"}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {[a.phone?.replace(/(\d{3})(\d{3,4})(\d{4})/, "$1-$2-$3"), a.address].filter(Boolean).join(" · ")}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {cohortLabel(a.cohort)} · {new Date(a.created_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}
+                  </p>
+                </div>
               </div>
               <div className="text-right">
                 <p className="font-jua text-xl text-sky-ink">{won(a.amount)}</p>
