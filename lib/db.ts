@@ -40,10 +40,23 @@ const sb: SupabaseClient | null =
 
 export const isPreview = !sb;
 
-type Mem = { apps: Application[]; lectures: Lecture[]; settings: Record<string, string> };
+export type Stamp = { app_id: string; day: string };
+export type Homework = Stamp & { photo_path: string };
+
+type Mem = {
+  apps: Application[];
+  lectures: Lecture[];
+  settings: Record<string, string>;
+  attendance: Stamp[];
+  homework: Homework[];
+  photos: Record<string, string>;
+};
 const g = globalThis as unknown as { __vellaMem?: Mem };
-const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {} });
+const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {} });
 mem.lectures ??= [];
+mem.attendance ??= [];
+mem.homework ??= [];
+mem.photos ??= {};
 
 const isUuid = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
 
@@ -100,9 +113,7 @@ export async function listApplications(): Promise<Application[]> {
   return mem.apps;
 }
 
-type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "books" | "amount">>;
-
-export async function updateApplication(id: string, patch: ApplicationPatch) {
+export async function updateApplication(id: string, patch: Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "books" | "amount">>) {
   if (sb) {
     const { error } = await sb.from("applications").update(patch).eq("id", id);
     if (error) throw error;
@@ -120,29 +131,6 @@ export async function deleteApplication(id: string) {
     return;
   }
   mem.apps = mem.apps.filter((x) => x.id !== id);
-}
-
-// ── 명단에서 체크한 여러 건 한 번에 ───────────────
-export async function updateApplications(ids: string[], patch: ApplicationPatch) {
-  const ok = ids.filter(isUuid);
-  if (ok.length === 0) return;
-  if (sb) {
-    const { error } = await sb.from("applications").update(patch).in("id", ok);
-    if (error) throw error;
-    return;
-  }
-  for (const a of mem.apps) if (ok.includes(a.id)) Object.assign(a, patch);
-}
-
-export async function deleteApplications(ids: string[]) {
-  const ok = ids.filter(isUuid);
-  if (ok.length === 0) return;
-  if (sb) {
-    const { error } = await sb.from("applications").delete().in("id", ok);
-    if (error) throw error;
-    return;
-  }
-  mem.apps = mem.apps.filter((x) => !ok.includes(x.id));
 }
 
 // ── 강의 ───────────────────────────────────────
@@ -205,4 +193,79 @@ export async function setSetting(k: string, v: string) {
 // 현재 모집 기수 (관리 페이지에서 설정, 없으면 이번 달)
 export async function currentCohort() {
   return (await getSetting("current_cohort")) || thisMonthKST();
+}
+
+// ── 출석·숙제 스티커 ─────────────────────────────
+export async function addAttendance(app_id: string, day: string) {
+  if (sb) {
+    const { error } = await sb.from("attendance").upsert({ app_id, day }, { onConflict: "app_id,day", ignoreDuplicates: true });
+    if (error) throw error;
+    return;
+  }
+  if (!mem.attendance.some((x) => x.app_id === app_id && x.day === day)) mem.attendance.push({ app_id, day });
+}
+
+export async function listStamps(appIds: string[]): Promise<{ attendance: Stamp[]; homework: Homework[] }> {
+  const ok = appIds.filter(isUuid);
+  if (ok.length === 0) return { attendance: [], homework: [] };
+  if (sb) {
+    const [a, h] = await Promise.all([
+      sb.from("attendance").select("app_id, day").in("app_id", ok),
+      sb.from("homework").select("app_id, day, photo_path").in("app_id", ok),
+    ]);
+    if (a.error) throw a.error;
+    if (h.error) throw h.error;
+    return { attendance: a.data as Stamp[], homework: h.data as Homework[] };
+  }
+  return {
+    attendance: mem.attendance.filter((x) => ok.includes(x.app_id)),
+    homework: mem.homework.filter((x) => ok.includes(x.app_id)),
+  };
+}
+
+const BUCKET = "homework";
+
+export async function saveHomework(app: Application, day: string, jpeg: Buffer) {
+  const photo_path = `${app.cohort}/${app.id}/${day}.jpg`;
+  if (sb) {
+    const up = await sb.storage.from(BUCKET).upload(photo_path, jpeg, { contentType: "image/jpeg", upsert: true });
+    if (up.error) throw up.error;
+    const { error } = await sb.from("homework").upsert({ app_id: app.id, day, photo_path }, { onConflict: "app_id,day" });
+    if (error) throw error;
+    return;
+  }
+  mem.photos[photo_path] = "data:image/jpeg;base64," + jpeg.toString("base64");
+  mem.homework = mem.homework.filter((x) => !(x.app_id === app.id && x.day === day));
+  mem.homework.push({ app_id: app.id, day, photo_path });
+}
+
+export async function photoUrl(path: string): Promise<string | null> {
+  if (sb) {
+    const { data } = await sb.storage.from(BUCKET).createSignedUrl(path, 60 * 60);
+    return data?.signedUrl ?? null;
+  }
+  return mem.photos[path] ?? null;
+}
+
+// 지난 기수 숙제 사진 지우기 (스티커 기록은 남김)
+export async function deletePhotosBefore(cohort: string): Promise<number> {
+  let n = 0;
+  if (sb) {
+    const { data: folders } = await sb.storage.from(BUCKET).list("", { limit: 1000 });
+    for (const f of folders ?? []) {
+      if (!(f.name < cohort)) continue;
+      const { data: apps } = await sb.storage.from(BUCKET).list(f.name, { limit: 1000 });
+      for (const a of apps ?? []) {
+        const { data: files } = await sb.storage.from(BUCKET).list(`${f.name}/${a.name}`, { limit: 1000 });
+        const paths = (files ?? []).map((x) => `${f.name}/${a.name}/${x.name}`);
+        if (paths.length) {
+          await sb.storage.from(BUCKET).remove(paths);
+          n += paths.length;
+        }
+      }
+    }
+    return n;
+  }
+  for (const k of Object.keys(mem.photos)) if (k.split("/")[0] < cohort) { delete mem.photos[k]; n++; }
+  return n;
 }

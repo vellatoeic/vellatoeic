@@ -52,6 +52,7 @@ export default async function MyPage({ params }: { params: Promise<{ id: string 
             입금자명: <b>{a.depositor}</b>
           </p>
           <p className="text-xs text-slate-400">입금이 확인되면 이 화면이 &apos;납부 확인&apos;으로 바뀌어요.</p>
+          <p className="text-xs text-slate-400">입금 확인은 일괄처리됩니다.</p>
         </section>
       )}
 

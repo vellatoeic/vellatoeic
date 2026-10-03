@@ -21,10 +21,10 @@ export const BOOKS: Record<BookId, string> = {
 };
 
 export const TRACKS: Record<Track, string> = {
-  all: "주 4일(종합반)",
+  all: "종합 (RC+LC)",
   rc: "RC 단과",
   lc: "LC 단과",
-  alt: "주 2일(격일반)",
+  alt: "격일반 (RC+LC)",
 };
 
 // 반 × 수강 과목별 지급 교재 (일괄 지급)
@@ -99,4 +99,24 @@ export function youtubeId(url: string): string | null {
   const m =
     /(?:youtu\.be\/|[?&]v=|\/embed\/|\/shorts\/|\/live\/)([\w-]{11})/.exec(s);
   return m ? m[1] : null;
+}
+
+// ── 출석·숙제 스티커 ─────────────────────────────
+// 수업 단위: 시작반 / 시작반 격일반 / 문풀반 / 문풀반 격일반 (단과는 같은 시간 수업이라 매일반에 포함)
+export type Klass = "start-daily" | "start-alt" | "solve-daily" | "solve-alt";
+export const KLASSES: Record<Klass, string> = {
+  "start-daily": "시작반",
+  "start-alt": "시작반 격일반",
+  "solve-daily": "문풀반",
+  "solve-alt": "문풀반 격일반",
+};
+export function klassOf(a: { course: CourseId; track: Track }): Klass {
+  return `${a.course}-${a.track === "alt" ? "alt" : "daily"}` as Klass;
+}
+export function todayKST() {
+  return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+}
+export function dayLabel(d: string) {
+  const [, m, dd] = d.split("-");
+  return `${Number(m)}/${Number(dd)}`;
 }

@@ -5,14 +5,14 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { studentLogin, type FormState } from "@/app/actions";
 
-export default function StudentLogin() {
+export default function StudentLogin({ next, note }: { next?: string; note?: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(studentLogin, {});
   return (
     <div className="pt-12">
       <form onSubmit={keep(action)} className="card mx-auto max-w-sm space-y-4 text-center">
         <h1 className="font-jua text-3xl text-sky-ink">강의실 입장</h1>
-        <p className="text-sm text-slate-500">교재비 신청할 때 정한 비밀번호로 들어와요.</p>
-        <p className="rounded-2xl bg-sky-soft px-4 py-3 text-sm text-sky-deep">강의 영상은 개강일 이후부터 열람할 수 있어요.</p>
+        <p className="text-sm text-slate-500">{note ?? "교재비 신청할 때 정한 비밀번호로 들어와요."}</p>
+        {next && <input type="hidden" name="next" value={next} />}
         <input name="name" className="input text-center" placeholder="이름" autoComplete="name" />
         <input
           name="pin"

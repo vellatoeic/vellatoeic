@@ -3,14 +3,16 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
-  COURSES, TRACKS, PARTS, calcAmount, youtubeId,
+  COURSES, TRACKS, PARTS, KLASSES, calcAmount, youtubeId, todayKST, type Klass,
   type BookId, type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
 } from "@/lib/config";
 import {
-  createApplication, deleteApplication, deleteApplications, getApplication, getApplications, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, deleteLecture, currentCohort,
+  createApplication, deleteApplication, getApplication, getApplications, saveHomework, deletePhotosBefore, findApplicationsByName, updateApplication, setSetting, addLecture, deleteLecture, currentCohort,
 } from "@/lib/db";
+import { currentCode } from "@/lib/qr";
+import { canWatch } from "@/lib/access";
 import {
-  hashPin, checkPin, setStudent, clearStudent, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
+  hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
 } from "@/lib/auth";
 
 export type FormState = { error?: string; ok?: string };
@@ -71,7 +73,8 @@ export async function studentLogin(_: FormState, fd: FormData): Promise<FormStat
     return { error: "이름 또는 비밀번호가 맞지 않아요. 잊어버렸다면 Vella에게 문의해 주세요." };
   }
   await setStudent(mine.map((a) => a.id));
-  redirect("/class");
+  const next = clean(fd.get("next"));
+  redirect(next.startsWith("/check?") || next === "/class" ? next : "/class");
 }
 
 export async function studentLogout() {
@@ -161,26 +164,31 @@ export async function removeApplication(fd: FormData) {
   revalidatePath("/admin");
 }
 
-// ── 명단에서 체크한 여러 건 한 번에 ───────────────
-const checkedIds = (fd: FormData) => fd.getAll("ids").map(clean).filter(Boolean);
-
-export async function bulkRemove(fd: FormData) {
-  if (!(await isAdmin())) return;
-  await deleteApplications(checkedIds(fd));
-  revalidatePath("/admin");
+// ── 출석 QR (관리자 화면이 30초마다 새 코드를 받아감) ──
+export async function getQrCode(klass: Klass): Promise<string | null> {
+  if (!(await isAdmin()) || !Object.hasOwn(KLASSES, klass)) return null;
+  return currentCode(klass);
 }
 
-export async function bulkChangeClass(fd: FormData) {
+// ── 숙제 인증 ──────────────────────────────────
+export async function uploadHomework(_: FormState, fd: FormData): Promise<FormState> {
+  const id = clean(fd.get("app_id"));
+  const file = fd.get("photo");
+  const ids = await getStudentIds();
+  if (!ids.includes(id)) return { error: "강의실에 다시 로그인해 주세요." };
+  const [app] = await getApplications([id]);
+  if (!app || !canWatch(app) || app.cohort !== (await currentCohort())) return { error: "이번 기수 수강생만 인증할 수 있어요." };
+  if (!(file instanceof File) || file.size === 0) return { error: "숙제 사진을 골라 주세요." };
+  if (file.size > 4 * 1024 * 1024) return { error: "사진이 너무 커요. 다시 시도해 주세요." };
+  if (!file.type.startsWith("image/")) return { error: "사진 파일만 올릴 수 있어요." };
+  await saveHomework(app, todayKST(), Buffer.from(await file.arrayBuffer()));
+  revalidatePath("/class");
+  return { ok: "숙제 인증 완료! ⭐ 스티커가 붙었어요." };
+}
+
+// 지난 기수 숙제 사진 정리
+export async function cleanupPhotos(): Promise<void> {
   if (!(await isAdmin())) return;
-  const ids = checkedIds(fd);
-  const [course, track] = clean(fd.get("class")).split(":") as [CourseId, Track];
-  if (ids.length === 0 || !Object.hasOwn(COURSES, course) || !Object.hasOwn(TRACKS, track)) return;
-  const books = COURSES[course].books[track];
-  // 금액은 교재 수령 방법(택배비)에 따라 달라서 pickup 별로 묶어서 갱신해요.
-  const apps = await getApplications(ids);
-  for (const pickup of ["classroom", "delivery"] as Pickup[]) {
-    const group = apps.filter((a) => a.pickup === pickup).map((a) => a.id);
-    if (group.length > 0) await updateApplications(group, { course, track, books, amount: calcAmount(books, pickup) });
-  }
-  revalidatePath("/admin");
+  await deletePhotosBefore(await currentCohort());
+  revalidatePath("/admin/stamps");
 }
