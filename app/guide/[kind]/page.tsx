@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 import { CLASSROOM, KINDS, type Kind } from "@/lib/config";
+import { currentCohort, roundFor } from "@/lib/db";
 import ApplyForm from "./ApplyForm";
+
+// 교재 회차가 기수마다 바뀌어서 매번 새로 읽어요
+export const dynamic = "force-dynamic";
 
 // 필독 사항 문구 — 여기만 고치면 돼요.
 const NOTICE: Record<Kind, string[]> = {
@@ -18,13 +22,10 @@ const NOTICE: Record<Kind, string[]> = {
   ],
 };
 
-export function generateStaticParams() {
-  return [{ kind: "onsite" }, { kind: "online" }];
-}
-
 export default async function KindGuide({ params }: { params: Promise<{ kind: string }> }) {
   const { kind } = await params;
   if (kind !== "onsite" && kind !== "online") notFound();
+  const round = await roundFor(await currentCohort());
 
   return (
     <div className="space-y-6 pt-8">
@@ -54,7 +55,7 @@ export default async function KindGuide({ params }: { params: Promise<{ kind: st
         </ul>
       </section>
 
-      <ApplyForm kind={kind} />
+      <ApplyForm kind={kind} round={round} />
     </div>
   );
 }

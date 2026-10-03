@@ -3,11 +3,11 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
-  COURSES, TRACKS, PARTS, calcAmount, youtubeId, todayKST,
-  type BookId, type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
+  COURSES, PARTS, LECTURE_COURSES, booksFor, isAlt, calcAmount, youtubeId, todayKST,
+  type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
 } from "@/lib/config";
 import {
-  createApplication, deleteApplication, deleteApplications, getApplication, getApplications, saveHomework, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, deleteLecture, currentCohort,
+  createApplication, deleteApplication, deleteApplications, getApplication, getApplications, saveHomework, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, deleteLecture, currentCohort, roundFor,
 } from "@/lib/db";
 import { canWatch } from "@/lib/access";
 import {
@@ -25,8 +25,13 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   const course = clean(fd.get("course")) as CourseId;
   const pickup = (kind === "onsite" ? "classroom" : clean(fd.get("pickup"))) as Pickup;
   const track = clean(fd.get("track")) as Track;
-  // 교재는 반 × 수강 과목별로 일괄 지급
-  const books: BookId[] = Object.hasOwn(COURSES, course) && Object.hasOwn(TRACKS, track) ? COURSES[course].books[track] : [];
+  // 시작반 격일반만 "지난달에 이어 듣기"를 물어봐요
+  const continuing = course === "start" && isAlt(track) && !!fd.get("continuing");
+  const cohort = await currentCohort();
+  // 교재는 반·과정·회차로 자동 결정 (학생이 고르지 않아요)
+  const books = Object.hasOwn(COURSES, course) && COURSES[course].tracks.includes(track)
+    ? booksFor(course, track, await roundFor(cohort), continuing)
+    : [];
   const name = clean(fd.get("name"));
   const phone = clean(fd.get("phone")).replace(/[^0-9]/g, "");
   const depositor = clean(fd.get("depositor")) || name;
@@ -35,7 +40,7 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
 
   if (!["onsite", "online"].includes(kind)) return { error: "수강 형태를 선택해 주세요." };
   if (!Object.hasOwn(COURSES, course)) return { error: "수강 신청한 반을 선택해 주세요." };
-  if (!Object.hasOwn(TRACKS, track)) return { error: "수강 과목을 선택해 주세요." };
+  if (!COURSES[course].tracks.includes(track)) return { error: "수강 과정을 선택해 주세요." };
   if (!["classroom", "delivery"].includes(pickup)) return { error: "교재 수령 방법을 선택해 주세요." };
   if (!name) return { error: "이름을 입력해 주세요." };
   if (kind === "online" && !/^01[0-9]{8,9}$/.test(phone)) return { error: "연락처를 정확히 입력해 주세요. (예: 01012345678)" };
@@ -44,10 +49,11 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   if (!fd.get("agree")) return { error: "필독 사항 확인에 체크해 주세요." };
 
   const id = await createApplication({
-    cohort: await currentCohort(),
+    cohort,
     kind,
     course,
     track,
+    continuing,
     books,
     pickup,
     name,
@@ -117,6 +123,9 @@ export async function saveSettings(fd: FormData) {
   await setSetting("bank_account", clean(fd.get("bank_account")));
   const c = clean(fd.get("current_cohort"));
   if (/^\d{4}-\d{2}$/.test(c)) await setSetting("current_cohort", c);
+  // 교재 회차는 자동으로 번갈아 정해지고, 필요할 때만 여기서 바꿔요
+  const round = clean(fd.get("round"));
+  if (/^\d{4}-\d{2}$/.test(c) && (round === "1" || round === "2")) await setSetting(`round_${c}`, round);
   revalidatePath("/admin");
 }
 
@@ -128,7 +137,7 @@ export async function uploadLecture(_: FormState, fd: FormData): Promise<FormSta
   const title = clean(fd.get("title"));
   const yt = youtubeId(clean(fd.get("url")));
   if (!/^\d{4}-\d{2}$/.test(cohort)) return { error: "기수를 선택해 주세요." };
-  if (!Object.hasOwn(COURSES, course)) return { error: "반을 선택해 주세요." };
+  if (!LECTURE_COURSES.includes(course)) return { error: "반을 선택해 주세요." };
   if (!Object.hasOwn(PARTS, part)) return { error: "RC/LC를 선택해 주세요." };
   if (!title) return { error: "강의 제목을 입력해 주세요." };
   if (!yt) return { error: "유튜브 링크를 확인해 주세요." };
@@ -148,11 +157,12 @@ export async function changeClass(fd: FormData) {
   if (!(await isAdmin())) return;
   const id = clean(fd.get("id"));
   const [course, track] = clean(fd.get("class")).split(":") as [CourseId, Track];
-  if (!Object.hasOwn(COURSES, course) || !Object.hasOwn(TRACKS, track)) return;
+  if (!Object.hasOwn(COURSES, course) || !COURSES[course].tracks.includes(track)) return;
   const a = await getApplication(id);
   if (!a) return;
-  const books = COURSES[course].books[track];
-  await updateApplication(id, { course, track, books, amount: calcAmount(books, a.pickup) });
+  const continuing = course === "start" && isAlt(track) && a.continuing;
+  const books = booksFor(course, track, await roundFor(a.cohort), continuing);
+  await updateApplication(id, { course, track, continuing, books, amount: calcAmount(books, a.pickup) });
   revalidatePath("/admin");
 }
 
@@ -199,13 +209,13 @@ export async function bulkChangeClass(fd: FormData) {
   if (!(await isAdmin())) return;
   const ids = checkedIds(fd);
   const [course, track] = clean(fd.get("class")).split(":") as [CourseId, Track];
-  if (ids.length === 0 || !Object.hasOwn(COURSES, course) || !Object.hasOwn(TRACKS, track)) return;
-  const books = COURSES[course].books[track];
-  // 금액은 교재 수령 방법(택배비)에 따라 달라서 pickup 별로 묶어서 갱신해요.
+  if (ids.length === 0 || !Object.hasOwn(COURSES, course) || !COURSES[course].tracks.includes(track)) return;
+  // 교재는 기수 회차와 이어듣기 여부에 따라 달라서 신청별로 다시 계산해요.
   const apps = await getApplications(ids);
-  for (const pickup of ["classroom", "delivery"] as Pickup[]) {
-    const group = apps.filter((a) => a.pickup === pickup).map((a) => a.id);
-    if (group.length > 0) await updateApplications(group, { course, track, books, amount: calcAmount(books, pickup) });
+  for (const a of apps) {
+    const continuing = course === "start" && isAlt(track) && a.continuing;
+    const books = booksFor(course, track, await roundFor(a.cohort), continuing);
+    await updateApplication(a.id, { course, track, continuing, books, amount: calcAmount(books, a.pickup) });
   }
   revalidatePath("/admin");
 }

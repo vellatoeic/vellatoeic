@@ -1,5 +1,5 @@
-import { COURSES, KINDS, TRACKS, STATUS_LABEL, cohortLabel, pickupLabel, won, type Kind, type CourseId, type Track } from "@/lib/config";
-import { listApplications, getSetting, currentCohort, isPreview } from "@/lib/db";
+import { BOOKS, COURSES, KINDS, TRACKS, STATUS_LABEL, cohortLabel, pickupLabel, won, type Kind, type CourseId } from "@/lib/config";
+import { listApplications, getSetting, currentCohort, roundFor, isPreview } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { changeStatus, saveSettings, resetPin, changeClass, removeApplication, bulkChangeClass, bulkRemove } from "@/app/actions";
 import LoginForm from "./LoginForm";
@@ -27,6 +27,7 @@ export default async function Admin({
   const { f = "all", q = "", c = now } = await searchParams;
   const everything = await listApplications();
   const account = await getSetting("bank_account");
+  const round = await roundFor(now);
   const cohorts = [...new Set([now, ...everything.map((a) => a.cohort)])].sort().reverse();
   const all = c === "all" ? everything : everything.filter((a) => a.cohort === c);
 
@@ -51,10 +52,17 @@ export default async function Admin({
     <div className="space-y-6 pt-8">
       <AdminTabs active="apps" />
 
-      <form action={saveSettings} className="card grid gap-4 sm:grid-cols-[10rem_1fr_auto] sm:items-end">
+      <form action={saveSettings} className="card grid gap-4 sm:grid-cols-[10rem_7rem_1fr_auto] sm:items-end">
         <label>
           <span className="label">현재 모집 기수</span>
           <input type="month" name="current_cohort" defaultValue={now} className="input" />
+        </label>
+        <label>
+          <span className="label">교재 회차</span>
+          <select name="round" defaultValue={String(round)} className="input">
+            <option value="1">1회차</option>
+            <option value="2">2회차</option>
+          </select>
         </label>
         <label>
           <span className="label">학생에게 보여줄 입금 계좌</span>
@@ -106,9 +114,9 @@ export default async function Admin({
       {list.length > 0 && (
         <form id="bulk" action={bulkChangeClass} className="card flex flex-wrap items-center gap-2 !p-4 text-sm">
           <span className="font-bold text-sky-ink">체크한 신청을</span>
-          <select name="class" className="input !w-44 !py-2">
+          <select name="class" className="input !w-56 !py-2">
             {(Object.keys(COURSES) as CourseId[]).flatMap((co) =>
-              (Object.keys(TRACKS) as Track[]).map((t) => (
+              COURSES[co].tracks.map((t) => (
                 <option key={co + t} value={`${co}:${t}`}>
                   {COURSES[co].label} {TRACKS[t]}
                 </option>
@@ -144,9 +152,11 @@ export default async function Admin({
                     {a.depositor !== a.name && <span className="ml-2 text-sm font-normal text-slate-500">입금자 {a.depositor}</span>}
                   </p>
                   <p className="mt-1 text-sm text-slate-600">
-                    {KINDS[a.kind].short} · {COURSES[a.course].label} {TRACKS[a.track]} ·{" "}
+                    {KINDS[a.kind].short} · {COURSES[a.course].label} {TRACKS[a.track]}
+                    {a.continuing && " · 이어듣기"} ·{" "}
                     {a.kind === "online" ? pickupLabel(a.kind, a.pickup) : "첫날 일괄 지급"}
                   </p>
+                  <p className="mt-1 text-xs text-slate-500">{a.books.map((b) => BOOKS[b]).join(" · ")}</p>
                   <p className="mt-1 text-sm text-slate-500">
                     {[a.phone?.replace(/(\d{3})(\d{3,4})(\d{4})/, "$1-$2-$3"), a.address].filter(Boolean).join(" · ")}
                   </p>
@@ -179,9 +189,14 @@ export default async function Admin({
                 <summary className="cursor-pointer text-slate-500">반 변경</summary>
                 <form action={changeClass} className="mt-2 flex gap-2">
                   <input type="hidden" name="id" value={a.id} />
-                  <select name="class" defaultValue={`${a.course}:${a.track}`} className="input !w-44 !py-2">
+                  <select name="class" defaultValue={`${a.course}:${a.track}`} className="input !w-56 !py-2">
+                    {a.track === "alt" && (
+                      <option value={`${a.course}:alt`}>
+                        {COURSES[a.course].label} {TRACKS.alt}
+                      </option>
+                    )}
                     {(Object.keys(COURSES) as CourseId[]).flatMap((co) =>
-                      (Object.keys(TRACKS) as Track[]).map((t) => (
+                      COURSES[co].tracks.map((t) => (
                         <option key={co + t} value={`${co}:${t}`}>
                           {COURSES[co].label} {TRACKS[t]}
                         </option>

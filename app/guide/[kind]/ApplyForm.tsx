@@ -4,22 +4,32 @@ import { keep } from "@/lib/keep";
 import { useActionState, useState } from "react";
 import { submitApplication, type FormState } from "@/app/actions";
 import {
-  BOOKS, COURSES, KINDS, TRACKS, PICKUPS, SHIPPING_FEE, BOOK_PRICE, calcAmount, won,
+  BOOKS, COURSES, KINDS, TRACKS, PICKUPS, SHIPPING_FEE, booksFor, isAlt, calcAmount, won,
   type CourseId, type Kind, type Pickup, type Track,
 } from "@/lib/config";
 
 const choice = (on: boolean) =>
   `rounded-2xl border-2 p-4 text-left transition ${on ? "border-sky-deep bg-sky-soft" : "border-sky-main/50 bg-white"}`;
 
-export default function ApplyForm({ kind }: { kind: Kind }) {
+export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 }) {
   const [state, action, pending] = useActionState<FormState, FormData>(submitApplication, {});
   const [course, setCourse] = useState<CourseId | null>(null);
   const [track, setTrack] = useState<Track>("all");
+  const [continuing, setContinuing] = useState<boolean | null>(null);
   const [pickup, setPickup] = useState<Pickup>(kind === "onsite" ? "classroom" : "delivery");
 
-  const books = course ? COURSES[course].books[track] : [];
+  // 시작반 격일반만 "지난달에 이어 듣기"를 물어봐요
+  const askContinuing = course === "start" && isAlt(track);
+  const books = course ? booksFor(course, track, round, askContinuing && continuing === true) : [];
   const amount = calcAmount(books, pickup);
   const online = kind === "online";
+  const blocked = !course || (askContinuing && continuing === null);
+
+  const pickCourse = (c: CourseId) => {
+    setCourse(c);
+    setContinuing(null);
+    if (!COURSES[c].tracks.includes(track)) setTrack(COURSES[c].tracks[0]);
+  };
 
   return (
     <form onSubmit={keep(action)} className="card space-y-6">
@@ -27,12 +37,13 @@ export default function ApplyForm({ kind }: { kind: Kind }) {
       <input type="hidden" name="pickup" value={pickup} />
       <input type="hidden" name="track" value={track} />
       {course && <input type="hidden" name="course" value={course} />}
+      {askContinuing && continuing === true && <input type="hidden" name="continuing" value="1" />}
 
       <div>
         <p className="label">1. 수강 신청한 반</p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           {(Object.keys(COURSES) as CourseId[]).map((c) => (
-            <button type="button" key={c} onClick={() => setCourse(c)} className={`${choice(course === c)} text-center`}>
+            <button type="button" key={c} onClick={() => pickCourse(c)} className={`${choice(course === c)} text-center`}>
               <p className="font-jua text-xl text-sky-ink">{COURSES[c].label}</p>
             </button>
           ))}
@@ -41,24 +52,39 @@ export default function ApplyForm({ kind }: { kind: Kind }) {
 
       {course && (
         <div>
-          <p className="label">2. 수강 과목</p>
+          <p className="label">2. 수강 과정</p>
           <div className="space-y-2">
-            {(Object.keys(TRACKS) as Track[]).map((t) => {
-              const b = COURSES[course].books[t];
-              return (
-                <button type="button" key={t} onClick={() => setTrack(t)} className={`${choice(track === t)} flex w-full items-center justify-between gap-3`}>
-                  <span>
-                    <span className="font-jua block text-lg text-sky-ink">
-                      {COURSES[course].label} {TRACKS[t]}
-                    </span>
-                    <span className="mt-0.5 block text-sm text-slate-600">
-                      교재 {b.length}권 · {b.map((x) => BOOKS[x]).join(" + ")}
-                    </span>
-                  </span>
-                  <span className="font-jua shrink-0 text-lg text-sky-deep">{won(b.length * BOOK_PRICE)}</span>
-                </button>
-              );
-            })}
+            {COURSES[course].tracks.map((t) => (
+              <button
+                type="button"
+                key={t}
+                onClick={() => {
+                  setTrack(t);
+                  setContinuing(null);
+                }}
+                className={`${choice(track === t)} block w-full`}
+              >
+                <span className="font-jua text-lg text-sky-ink">
+                  {COURSES[course].label} {TRACKS[t]}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {askContinuing && (
+        <div>
+          <p className="label">지난달에도 시작반 격일반을 들었어요?</p>
+          <div className="grid grid-cols-2 gap-3">
+            <button type="button" onClick={() => setContinuing(true)} className={`${choice(continuing === true)} text-center`}>
+              <span className="font-jua text-lg text-sky-ink">예</span>
+              <span className="mt-1 block text-sm text-slate-600">LC 교재만 받아요</span>
+            </button>
+            <button type="button" onClick={() => setContinuing(false)} className={`${choice(continuing === false)} text-center`}>
+              <span className="font-jua text-lg text-sky-ink">아니요</span>
+              <span className="mt-1 block text-sm text-slate-600">처음 듣는 과정이에요</span>
+            </button>
           </div>
         </div>
       )}
@@ -113,21 +139,26 @@ export default function ApplyForm({ kind }: { kind: Kind }) {
         {course && (
           <p className="mb-2 rounded-full bg-sky-soft px-3 py-1 text-sm font-bold text-sky-ink">
             {KINDS[kind].label} · {COURSES[course].label} {TRACKS[track]}
+            {askContinuing && continuing === true && " · 이어듣기"}
           </p>
         )}
-        <p className="text-sm text-slate-500">납부할 교재비</p>
-        <p className="font-jua mt-1 text-4xl text-sky-ink">{won(amount)}</p>
-        {books.length > 0 && (
-          <p className="mt-1 text-xs text-slate-500">
-            교재 {books.length}권 {won(books.length * BOOK_PRICE)}
-            {pickup === "delivery" && ` + 택배비 ${won(SHIPPING_FEE)}`}
-          </p>
+        {books.length > 0 ? (
+          <>
+            <p className="font-jua text-2xl text-sky-ink">교재 {books.length}권</p>
+            <p className="font-jua mt-1 text-4xl text-sky-ink">{won(amount)}</p>
+            <p className="mt-2 text-xs text-slate-500">
+              {books.map((b) => BOOKS[b]).join(" · ")}
+              {pickup === "delivery" && ` + 택배비 ${won(SHIPPING_FEE)}`}
+            </p>
+          </>
+        ) : (
+          <p className="text-slate-500">반과 과정을 고르면 교재와 금액이 자동으로 나와요.</p>
         )}
       </div>
 
       {state.error && <p className="rounded-xl bg-red-50 p-3 text-center font-bold text-red-600">{state.error}</p>}
 
-      <button className="btn w-full" disabled={pending}>
+      <button className="btn w-full" disabled={pending || blocked}>
         {pending ? "제출 중…" : "신청하고 계좌 확인하기"}
       </button>
     </form>

@@ -1,4 +1,4 @@
-import { COURSES, PARTS, cohortLabel, type CourseId, type Part } from "@/lib/config";
+import { COURSES, PARTS, LECTURE_COURSES, cohortLabel, type Part } from "@/lib/config";
 import { listLectures, currentCohort, isPreview } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { removeLecture } from "@/app/actions";
@@ -34,7 +34,7 @@ export default async function Lectures() {
         return (
           <section key={c} className="card">
             <h2 className="font-jua text-2xl text-sky-ink">{cohortLabel(c)}</h2>
-            {(Object.keys(COURSES) as CourseId[]).map((course) =>
+            {LECTURE_COURSES.map((course) =>
               (Object.keys(PARTS) as Part[]).map((part) => {
                 const list = ls.filter((l) => l.course === course && l.part === part);
                 if (list.length === 0) return null;
