@@ -29,10 +29,10 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
 
       <div className="card flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="font-jua text-xl text-sky-ink">수업 시작할 때</p>
-          <p className="text-sm text-slate-500">QR 화면을 강의실 화면·라이브 방송에 띄워두면 끝. 30초마다 자동으로 바뀌어요.</p>
+          <p className="font-jua text-xl text-sky-ink">출석 QR</p>
+          <p className="text-sm text-slate-500">반별로 한 장씩 출력해 강의실에 붙여 두면 끝. 수업 시간에만 출석이 열려요.</p>
         </div>
-        <Link href="/admin/qr" target="_blank" className="btn !py-3">출석 QR 띄우기</Link>
+        <Link href="/admin/qr" target="_blank" className="btn !py-3">출석 QR 인쇄하기</Link>
       </div>
 
       <div className="flex flex-wrap gap-2">

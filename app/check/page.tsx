@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { KLASSES, klassOf, todayKST, type Klass } from "@/lib/config";
+import { KLASSES, klassOf, klassTimeLabel, isCheckOpen, todayKST, type Klass } from "@/lib/config";
 import { getApplications, addAttendance, currentCohort, listStamps } from "@/lib/db";
 import { getStudentIds } from "@/lib/auth";
 import { canWatch } from "@/lib/access";
-import { verifyCode } from "@/lib/qr";
 import StudentLogin from "../class/StudentLogin";
 
 export const dynamic = "force-dynamic";
@@ -21,23 +20,30 @@ function Box({ title, children }: { title: string; children: React.ReactNode }) 
   );
 }
 
-export default async function Check({ searchParams }: { searchParams: Promise<{ k?: string; t?: string }> }) {
-  const { k = "", t = "" } = await searchParams;
-  if (!Object.hasOwn(KLASSES, k)) return <Box title="잘못된 QR이에요"><p className="text-slate-600">화면의 QR을 다시 찍어 주세요.</p></Box>;
+export default async function Check({ searchParams }: { searchParams: Promise<{ k?: string }> }) {
+  const { k = "" } = await searchParams;
+  if (!Object.hasOwn(KLASSES, k)) return <Box title="잘못된 QR이에요"><p className="text-slate-600">강의실에 붙어 있는 QR을 다시 찍어 주세요.</p></Box>;
   const klass = k as Klass;
 
   const apps = await getApplications(await getStudentIds());
   if (apps.length === 0) {
     return (
       <StudentLogin
-        next={`/check?k=${klass}&t=${encodeURIComponent(t)}`}
+        next={`/check?k=${klass}`}
         note="출석하려면 먼저 로그인해 주세요. (처음 한 번만)"
       />
     );
   }
 
-  if (!verifyCode(klass, t)) {
-    return <Box title="QR이 만료됐어요"><p className="text-slate-600">화면에 떠 있는 새 QR을 다시 찍어 주세요.</p></Box>;
+  // 붙여 둔 QR은 바뀌지 않으니, 수업 시간에만 출석으로 인정해요.
+  if (!isCheckOpen(klass)) {
+    return (
+      <Box title="지금은 출석 시간이 아니에요">
+        <p className="text-slate-600">
+          {KLASSES[klass]} 출석은 <b>{klassTimeLabel(klass)}</b>에 할 수 있어요.
+        </p>
+      </Box>
+    );
   }
 
   const cohort = await currentCohort();

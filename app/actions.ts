@@ -3,13 +3,12 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
-  COURSES, TRACKS, PARTS, KLASSES, calcAmount, youtubeId, todayKST, type Klass,
+  COURSES, TRACKS, PARTS, calcAmount, youtubeId, todayKST,
   type BookId, type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
 } from "@/lib/config";
 import {
   createApplication, deleteApplication, deleteApplications, getApplication, getApplications, saveHomework, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, deleteLecture, currentCohort,
 } from "@/lib/db";
-import { currentCode } from "@/lib/qr";
 import { canWatch } from "@/lib/access";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
@@ -162,12 +161,6 @@ export async function removeApplication(fd: FormData) {
   if (!(await isAdmin())) return;
   await deleteApplication(clean(fd.get("id")));
   revalidatePath("/admin");
-}
-
-// ── 출석 QR (관리자 화면이 30초마다 새 코드를 받아감) ──
-export async function getQrCode(klass: Klass): Promise<string | null> {
-  if (!(await isAdmin()) || !Object.hasOwn(KLASSES, klass)) return null;
-  return currentCode(klass);
 }
 
 // ── 숙제 인증 ──────────────────────────────────

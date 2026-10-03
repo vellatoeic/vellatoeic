@@ -120,3 +120,39 @@ export function dayLabel(d: string) {
   const [, m, dd] = d.split("-");
   return `${Number(m)}/${Number(dd)}`;
 }
+
+// ── 출석 가능 시간 ───────────────────────────────
+// 강의실에 붙여 둔 QR은 이 시간에만 출석으로 인정돼요. 수업 시간이 바뀌면 여기만 고치면 돼요.
+// days: 0=일 1=월 2=화 3=수 4=목 5=금 6=토
+export const KLASS_TIME: Record<Klass, { days: number[]; from: string; to: string }> = {
+  "start-daily": { days: [1, 2, 3, 4], from: "19:00", to: "21:00" },
+  "start-alt": { days: [2, 4], from: "19:00", to: "21:00" },
+  "solve-daily": { days: [1, 2, 3, 4], from: "21:00", to: "23:00" },
+  "solve-alt": { days: [2, 4], from: "21:00", to: "23:00" },
+};
+
+// 수업 시작 전·종료 후로 이만큼 여유를 둬요 (지각·늦은 로그인 대비)
+export const CHECK_GRACE_MIN = 20;
+
+const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+const toMin = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+};
+
+// "월~목 19:00~21:00" / "화·목 19:00~21:00"
+export function klassTimeLabel(k: Klass) {
+  const { days, from, to } = KLASS_TIME[k];
+  const d = [...days].sort((a, b) => a - b);
+  const run = d.every((x, i) => i === 0 || x === d[i - 1] + 1);
+  const label = d.length > 2 && run ? `${DAY_NAMES[d[0]]}~${DAY_NAMES[d[d.length - 1]]}` : d.map((x) => DAY_NAMES[x]).join("·");
+  return `${label} ${from}~${to}`;
+}
+
+export function isCheckOpen(k: Klass, nowMs = Date.now()) {
+  const { days, from, to } = KLASS_TIME[k];
+  const kst = new Date(nowMs + 9 * 3600 * 1000);
+  if (!days.includes(kst.getUTCDay())) return false;
+  const now = kst.getUTCHours() * 60 + kst.getUTCMinutes();
+  return now >= toMin(from) - CHECK_GRACE_MIN && now <= toMin(to) + CHECK_GRACE_MIN;
+}
