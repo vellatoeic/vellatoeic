@@ -21,10 +21,10 @@ export const BOOKS: Record<BookId, string> = {
 };
 
 export const TRACKS: Record<Track, string> = {
-  all: "종합 (RC+LC)",
+  all: "주 4일(종합반)",
   rc: "RC 단과",
   lc: "LC 단과",
-  alt: "격일반 (RC+LC)",
+  alt: "주 2일(격일반)",
 };
 
 // 반 × 수강 과목별 지급 교재 (일괄 지급)

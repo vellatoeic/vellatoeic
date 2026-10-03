@@ -46,6 +46,8 @@ export default async function ClassRoom() {
         </form>
       </div>
 
+      <p className="rounded-2xl bg-sky-soft px-4 py-3 text-sm text-sky-deep">강의 영상은 개강일 이후부터 열람할 수 있어요.</p>
+
       {paid.length === 0 && (
         <div className="card text-center">
           <p className="font-jua text-xl text-sky-ink">납부 확인 후 강의실이 열려요</p>

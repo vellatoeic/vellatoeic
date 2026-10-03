@@ -7,7 +7,7 @@ import {
   type BookId, type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
 } from "@/lib/config";
 import {
-  createApplication, deleteApplication, getApplication, getApplications, saveHomework, deletePhotosBefore, findApplicationsByName, updateApplication, setSetting, addLecture, deleteLecture, currentCohort,
+  createApplication, deleteApplication, deleteApplications, getApplication, getApplications, saveHomework, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, deleteLecture, currentCohort,
 } from "@/lib/db";
 import { currentCode } from "@/lib/qr";
 import { canWatch } from "@/lib/access";
@@ -191,4 +191,28 @@ export async function cleanupPhotos(): Promise<void> {
   if (!(await isAdmin())) return;
   await deletePhotosBefore(await currentCohort());
   revalidatePath("/admin/stamps");
+}
+
+// ── 명단에서 체크한 여러 건 한 번에 ───────────────
+const checkedIds = (fd: FormData) => fd.getAll("ids").map(clean).filter(Boolean);
+
+export async function bulkRemove(fd: FormData) {
+  if (!(await isAdmin())) return;
+  await deleteApplications(checkedIds(fd));
+  revalidatePath("/admin");
+}
+
+export async function bulkChangeClass(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const ids = checkedIds(fd);
+  const [course, track] = clean(fd.get("class")).split(":") as [CourseId, Track];
+  if (ids.length === 0 || !Object.hasOwn(COURSES, course) || !Object.hasOwn(TRACKS, track)) return;
+  const books = COURSES[course].books[track];
+  // 금액은 교재 수령 방법(택배비)에 따라 달라서 pickup 별로 묶어서 갱신해요.
+  const apps = await getApplications(ids);
+  for (const pickup of ["classroom", "delivery"] as Pickup[]) {
+    const group = apps.filter((a) => a.pickup === pickup).map((a) => a.id);
+    if (group.length > 0) await updateApplications(group, { course, track, books, amount: calcAmount(books, pickup) });
+  }
+  revalidatePath("/admin");
 }

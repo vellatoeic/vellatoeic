@@ -113,7 +113,9 @@ export async function listApplications(): Promise<Application[]> {
   return mem.apps;
 }
 
-export async function updateApplication(id: string, patch: Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "books" | "amount">>) {
+type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "books" | "amount">>;
+
+export async function updateApplication(id: string, patch: ApplicationPatch) {
   if (sb) {
     const { error } = await sb.from("applications").update(patch).eq("id", id);
     if (error) throw error;
@@ -131,6 +133,29 @@ export async function deleteApplication(id: string) {
     return;
   }
   mem.apps = mem.apps.filter((x) => x.id !== id);
+}
+
+// ── 명단에서 체크한 여러 건 한 번에 ───────────────
+export async function updateApplications(ids: string[], patch: ApplicationPatch) {
+  const ok = ids.filter(isUuid);
+  if (ok.length === 0) return;
+  if (sb) {
+    const { error } = await sb.from("applications").update(patch).in("id", ok);
+    if (error) throw error;
+    return;
+  }
+  for (const a of mem.apps) if (ok.includes(a.id)) Object.assign(a, patch);
+}
+
+export async function deleteApplications(ids: string[]) {
+  const ok = ids.filter(isUuid);
+  if (ok.length === 0) return;
+  if (sb) {
+    const { error } = await sb.from("applications").delete().in("id", ok);
+    if (error) throw error;
+    return;
+  }
+  mem.apps = mem.apps.filter((x) => !ok.includes(x.id));
 }
 
 // ── 강의 ───────────────────────────────────────
