@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { thisMonthKST, roundOf, type BookId, type CourseId, type Kind, type Part, type Pickup, type Status, type Track } from "./config";
+import { thisMonthKST, roundOf, type BookId, type CourseId, type Kind, type Part, type Pickup, type Status, type TimeSlot, type Track } from "./config";
 
 export type Application = {
   id: string;
@@ -9,6 +9,7 @@ export type Application = {
   course: CourseId;
   track: Track;
   continuing: boolean; // 격일반을 지난달에 이어 듣는 수강생 (LC만 새로 받음)
+  slot: TimeSlot | null; // 수강 시간 (오전반/저녁반). 시간 추가 전 신청은 비어 있어요.
   books: BookId[];
   pickup: Pickup;
   name: string;
@@ -148,7 +149,7 @@ export async function listApplications(): Promise<Application[]> {
   return mem.apps;
 }
 
-type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "continuing" | "books" | "amount">>;
+type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "continuing" | "slot" | "books" | "amount">>;
 
 export async function updateApplication(id: string, patch: ApplicationPatch) {
   if (sb) {

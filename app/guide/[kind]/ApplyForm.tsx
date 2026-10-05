@@ -4,8 +4,8 @@ import { keep } from "@/lib/keep";
 import { useActionState, useState } from "react";
 import { submitApplication, type FormState } from "@/app/actions";
 import {
-  BOOKS, COURSES, KINDS, TRACKS, PICKUPS, SHIPPING_FEE, booksFor, isAlt, calcAmount, won,
-  type CourseId, type Kind, type Pickup, type Track,
+  BOOKS, COURSES, KINDS, TRACKS, PICKUPS, SHIPPING_FEE, TIME_SLOTS, booksFor, isAlt, calcAmount, slotLabel, won,
+  type CourseId, type Kind, type Pickup, type TimeSlot, type Track,
 } from "@/lib/config";
 
 const choice = (on: boolean) =>
@@ -16,6 +16,7 @@ export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 })
   const [course, setCourse] = useState<CourseId | null>(null);
   const [track, setTrack] = useState<Track>("all");
   const [continuing, setContinuing] = useState<boolean | null>(null);
+  const [slot, setSlot] = useState<TimeSlot | null>(null);
   const [pickup, setPickup] = useState<Pickup>(kind === "onsite" ? "classroom" : "delivery");
 
   // 시작반 격일반만 지난달 이어듣기 여부를 확인해요
@@ -23,7 +24,7 @@ export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 })
   const books = course ? booksFor(course, track, round, askContinuing && continuing === true) : [];
   const amount = calcAmount(books, pickup);
   const online = kind === "online";
-  const blocked = !course || (askContinuing && continuing === null);
+  const blocked = !course || !slot || (askContinuing && continuing === null);
 
   const pickCourse = (c: CourseId) => {
     setCourse(c);
@@ -38,6 +39,7 @@ export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 })
       <input type="hidden" name="track" value={track} />
       {course && <input type="hidden" name="course" value={course} />}
       {askContinuing && continuing === true && <input type="hidden" name="continuing" value="1" />}
+      {slot && <input type="hidden" name="slot" value={slot} />}
 
       <div>
         <p className="label">1. 수강 신청한 반</p>
@@ -89,9 +91,26 @@ export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 })
         </div>
       )}
 
+      {course && (
+        <div>
+          <p className="label">3. 수강 시간</p>
+          <div className="grid grid-cols-2 gap-3">
+            {(Object.keys(TIME_SLOTS) as TimeSlot[]).map((s) => {
+              const [name, time] = slotLabel({ course, track }, s).split(" ");
+              return (
+                <button type="button" key={s} onClick={() => setSlot(s)} className={`${choice(slot === s)} text-center`}>
+                  <span className="font-jua block text-lg text-sky-ink">{name}</span>
+                  <span className="mt-1 block text-sm text-slate-600">{time}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {online && (
         <div>
-          <p className="label">3. 교재 수령 방법</p>
+          <p className="label">4. 교재 수령 방법</p>
           <div className="grid grid-cols-2 gap-3">
             {(Object.keys(PICKUPS) as Pickup[]).map((p) => (
               <button type="button" key={p} onClick={() => setPickup(p)} className={`${choice(pickup === p)} text-center`}>
@@ -140,6 +159,7 @@ export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 })
         {course && (
           <p className="mb-2 rounded-full bg-sky-soft px-3 py-1 text-sm font-bold text-sky-ink">
             {KINDS[kind].label} · {COURSES[course].label} {TRACKS[track]}
+            {slot && ` · ${TIME_SLOTS[slot]}`}
             {askContinuing && continuing === true && " · 이어듣기"}
           </p>
         )}

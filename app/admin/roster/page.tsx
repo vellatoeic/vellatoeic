@@ -1,4 +1,4 @@
-import { BOOKS, CLASSROOM, COURSES, TRACKS, cohortLabel, type BookId, type CourseId, type Track } from "@/lib/config";
+import { BOOKS, CLASSROOM, COURSES, TIME_SLOTS, TRACKS, cohortLabel, type BookId, type CourseId, type TimeSlot, type Track } from "@/lib/config";
 import { listApplications, currentCohort, isPreview, type Application } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import LoginForm from "../LoginForm";
@@ -75,18 +75,20 @@ export default async function Roster() {
       </div>
 
       {(Object.keys(COURSES) as CourseId[]).flatMap((co) =>
-        (Object.keys(TRACKS) as Track[]).map((t) => {
-          const list = onsite.filter((a) => a.course === co && a.track === t);
-          if (list.length === 0) return null;
-          return (
-            <section key={co + t} className="card break-inside-avoid">
-              <h3 className="font-jua text-xl text-sky-ink">
-                {COURSES[co].label} {TRACKS[t]} <span className="text-base text-slate-400">· {list.length}명</span>
-              </h3>
-              <Table apps={list} />
-            </section>
-          );
-        }),
+        (Object.keys(TRACKS) as Track[]).flatMap((t) =>
+          ([...Object.keys(TIME_SLOTS), null] as (TimeSlot | null)[]).map((slot) => {
+            const list = onsite.filter((a) => a.course === co && a.track === t && (a.slot ?? null) === slot);
+            if (list.length === 0) return null;
+            return (
+              <section key={`${co}${t}${slot}`} className="card break-inside-avoid">
+                <h3 className="font-jua text-xl text-sky-ink">
+                  {COURSES[co].label} {TRACKS[t]} · {slot ? TIME_SLOTS[slot] : "시간 미정"} <span className="text-base text-slate-400">· {list.length}명</span>
+                </h3>
+                <Table apps={list} />
+              </section>
+            );
+          }),
+        ),
       )}
       {onsite.length === 0 && <p className="card text-center text-slate-500">이번 기수 현장 신청자가 아직 없어요.</p>}
 

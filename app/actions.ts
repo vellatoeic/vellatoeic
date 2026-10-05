@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
-  COURSES, PARTS, LECTURE_COURSES, booksFor, isAlt, calcAmount, youtubeId, todayKST,
+  COURSES, PARTS, LECTURE_COURSES, booksFor, isAlt, isTimeSlot, calcAmount, youtubeId, todayKST,
   type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
 } from "@/lib/config";
 import {
@@ -49,10 +49,12 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   const depositor = clean(fd.get("depositor")) || name;
   const address = clean(fd.get("address"));
   const pin = clean(fd.get("pin"));
+  const slot = clean(fd.get("slot"));
 
   if (!["onsite", "online"].includes(kind)) return { error: "수강 형태를 선택해 주세요." };
   if (!Object.hasOwn(COURSES, course)) return { error: "수강 신청한 반을 선택해 주세요." };
   if (!COURSES[course].tracks.includes(track)) return { error: "수강 과정을 선택해 주세요." };
+  if (!isTimeSlot(slot)) return { error: "수강 시간(오전반/저녁반)을 선택해 주세요." };
   if (!["classroom", "delivery"].includes(pickup)) return { error: "교재 수령 방법을 선택해 주세요." };
   if (!name) return { error: "이름을 입력해 주세요." };
   if (kind === "online" && !/^01[0-9]{8,9}$/.test(phone)) return { error: "연락처를 정확히 입력해 주세요. (예: 01012345678)" };
@@ -75,6 +77,7 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
     course,
     track,
     continuing,
+    slot,
     books,
     pickup,
     name,
@@ -342,6 +345,15 @@ export async function changeClass(fd: FormData) {
   revalidatePath("/admin");
 }
 
+// 수강 시간(오전반/저녁반) 바꾸기. 비우면 '시간 미정'이 돼요.
+export async function changeSlot(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const slot = clean(fd.get("slot"));
+  await updateApplication(clean(fd.get("id")), { slot: isTimeSlot(slot) ? slot : null });
+  revalidatePath("/admin");
+  revalidatePath("/admin/roster");
+}
+
 // 테스트·중복 신청 삭제
 export async function removeApplication(fd: FormData) {
   if (!(await isAdmin())) return;
@@ -438,6 +450,14 @@ export async function bulkMarkBooksDone(fd: FormData) {
   await updateApplications(ready, { status: "shipped" });
   revalidatePath("/admin/delivery");
   revalidatePath("/admin");
+}
+
+export async function bulkChangeSlot(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const slot = clean(fd.get("slot"));
+  await updateApplications(checkedIds(fd), { slot: isTimeSlot(slot) ? slot : null });
+  revalidatePath("/admin");
+  revalidatePath("/admin/roster");
 }
 
 export async function bulkChangeClass(fd: FormData) {

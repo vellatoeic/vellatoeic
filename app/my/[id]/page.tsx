@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BOOKS, CLASSROOM, COURSES, KINDS, TRACKS, cohortLabel, pickupLabel, won } from "@/lib/config";
+import { BOOKS, CLASSROOM, COURSES, KINDS, TRACKS, cohortLabel, pickupLabel, slotLabel, won } from "@/lib/config";
 import { getApplication, getSetting } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -94,6 +94,7 @@ export default async function MyPage({ params, searchParams }: { params: Promise
           <dt className="text-slate-500">기수</dt><dd>{cohortLabel(a.cohort)}</dd>
           <dt className="text-slate-500">수강 형태</dt><dd>{KINDS[a.kind].label}</dd>
           <dt className="text-slate-500">반</dt><dd>{COURSES[a.course].label} {TRACKS[a.track]}</dd>
+          {a.slot && (<><dt className="text-slate-500">수강 시간</dt><dd>{slotLabel(a, a.slot)}</dd></>)}
           <dt className="text-slate-500">교재</dt><dd>{a.books.map((b) => BOOKS[b]).join(", ")}</dd>
           <dt className="text-slate-500">수령 방법</dt><dd>{pickupLabel(a.kind, a.pickup)}</dd>
           {a.address && (<><dt className="text-slate-500">주소</dt><dd>{a.address}</dd></>)}

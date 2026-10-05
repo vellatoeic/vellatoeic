@@ -1,7 +1,7 @@
-import { BOOKS, COURSES, KINDS, TRACKS, bookStatusLabel, cohortLabel, pickupLabel, won, type CourseId, type Track } from "@/lib/config";
+import { BOOKS, COURSES, KINDS, TRACKS, TIME_SLOTS, bookStatusLabel, cohortLabel, won, type CourseId, type TimeSlot, type Track } from "@/lib/config";
 import { listApplications, getSetting, currentCohort, roundFor, isPreview, type Application } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
-import { changeStatus, saveSettings, resetPin, changeClass, removeApplication, bulkChangeClass, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove } from "@/app/actions";
+import { changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove } from "@/app/actions";
 import LoginForm from "./LoginForm";
 import AdminTabs from "./AdminTabs";
 import SelectAll from "./SelectAll";
@@ -9,10 +9,12 @@ import SelectAll from "./SelectAll";
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
 
-type Filters = { k: string; p: string; b: string; q: string; c: string };
+type Filters = { k: string; p: string; b: string; t: string; q: string; c: string };
 
 const KIND_FILTERS = [["all", "전체"], ["onsite", "현장"], ["online", "불라방"]] as const;
 const PAY_FILTERS = [["all", "전체"], ["pending", "미납"], ["paid", "납부 완료"]] as const;
+const TIME_FILTERS = [["all", "전체"], ["am", "오전반"], ["pm", "저녁반"], ["none", "시간 미정"]] as const;
+const SLOT_ORDER: (TimeSlot | null)[] = ["am", "pm", null];
 const BOOK_FILTERS = [["all", "전체"], ["todo", "수령·발송 대기"], ["done", "수령·발송 완료"]] as const;
 
 const bookTodo = (a: Application) => a.kind === "online" && a.status === "paid";
@@ -64,6 +66,15 @@ function Row({ a, group }: { a: Application; group: string }) {
                 </button>
               )}
             </form>
+            <form action={changeSlot} className="flex items-center gap-2">
+              <input type="hidden" name="id" value={a.id} />
+              <select name="slot" defaultValue={a.slot ?? ""} className="input !w-32 !py-1.5 text-sm">
+                <option value="">시간 미정</option>
+                <option value="am">오전반</option>
+                <option value="pm">저녁반</option>
+              </select>
+              <button className="btn-ghost !py-1.5 text-sm">시간 저장</button>
+            </form>
             <details className="text-sm">
               <summary className="cursor-pointer text-slate-500">반 변경</summary>
               <form action={changeClass} className="mt-2 flex gap-2">
@@ -111,7 +122,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
 
   const now = await currentCohort();
-  const { k = "all", p = "all", b = "all", q = "", c = now } = await searchParams;
+  const { k = "all", p = "all", b = "all", t = "all", q = "", c = now } = await searchParams;
   const everything = await listApplications();
   const [account, liveStartAm, liveStartPm, liveSolveAm, liveSolvePm, cafeHomeworkUrl] = await Promise.all([
     getSetting("bank_account"),
@@ -129,6 +140,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
     if (k !== "all" && a.kind !== k) return false;
     if (p === "pending" && a.status !== "pending") return false;
     if (p === "paid" && a.status === "pending") return false;
+    if (t === "none" ? a.slot : t !== "all" && a.slot !== t) return false;
     if (b === "todo" && !bookTodo(a)) return false;
     if (b === "done" && !(a.kind === "online" && a.status === "shipped")) return false;
     if (q && !`${a.name} ${a.depositor} ${a.phone ?? ""}`.includes(q)) return false;
@@ -138,19 +150,22 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   const count = (fn: (a: Application) => boolean) => all.filter(fn).length;
   const link = (patch: Partial<Filters>) => {
     const params = new URLSearchParams();
-    for (const [key, value] of Object.entries({ c, k, p, b, q, ...patch })) {
+    for (const [key, value] of Object.entries({ c, k, p, b, t, q, ...patch })) {
       if (value && (value !== "all" || key === "c")) params.set(key, value);
     }
     return `/admin?${params}`;
   };
 
+  // 반 → 시간(오전·저녁·미정) 순서로 묶어요.
   const groups = (Object.keys(COURSES) as CourseId[]).flatMap((co) =>
-    (Object.keys(TRACKS) as Track[]).map((t) => {
-      const items = list
-        .filter((a) => a.course === co && a.track === t)
-        .sort((x, y) => Number(y.status === "pending") - Number(x.status === "pending") || x.kind.localeCompare(y.kind) || x.name.localeCompare(y.name, "ko"));
-      return { key: `${co}-${t}`, title: `${COURSES[co].label} ${TRACKS[t]}`, items };
-    }).filter((g) => g.items.length > 0),
+    (Object.keys(TRACKS) as Track[]).flatMap((tr) =>
+      SLOT_ORDER.map((slot) => {
+        const items = list
+          .filter((a) => a.course === co && a.track === tr && (a.slot ?? null) === slot)
+          .sort((x, y) => Number(y.status === "pending") - Number(x.status === "pending") || x.kind.localeCompare(y.kind) || x.name.localeCompare(y.name, "ko"));
+        return { key: `${co}-${tr}-${slot ?? "none"}`, title: `${COURSES[co].label} ${TRACKS[tr]}`, slot, items };
+      }),
+    ).filter((g) => g.items.length > 0),
   );
 
   const chip = (on: boolean) => `rounded-full px-3 py-1.5 text-sm font-bold ${on ? "bg-sky-deep text-white" : "bg-white text-sky-ink"}`;
@@ -226,6 +241,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
       <div className="card space-y-2 !p-4 text-sm">
         {[
           { name: "수강 형태", key: "k" as const, value: k, items: KIND_FILTERS },
+          { name: "수강 시간", key: "t" as const, value: t, items: TIME_FILTERS },
           { name: "납부", key: "p" as const, value: p, items: PAY_FILTERS },
           { name: "불라방 교재", key: "b" as const, value: b, items: BOOK_FILTERS },
         ].map((row) => (
@@ -240,6 +256,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
           {k !== "all" && <input type="hidden" name="k" value={k} />}
           {p !== "all" && <input type="hidden" name="p" value={p} />}
           {b !== "all" && <input type="hidden" name="b" value={b} />}
+          {t !== "all" && <input type="hidden" name="t" value={t} />}
           <input name="q" defaultValue={q} placeholder="이름·입금자·번호" className="input !w-48 !py-2 text-sm" />
           {q && <a href={link({ q: "" })} className="text-slate-400 underline">지우기</a>}
         </form>
@@ -268,6 +285,17 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
               <button formAction={bulkChangeClass} className="btn-ghost whitespace-nowrap !py-2">변경</button>
             </div>
           </details>
+          <details className="relative">
+            <summary className="btn-ghost cursor-pointer list-none !py-2 text-sm">시간 변경</summary>
+            <div className="absolute left-0 z-20 mt-1 flex gap-2 rounded-2xl bg-white p-3 shadow-lg">
+              <select name="slot" className="input !w-36 !py-2">
+                <option value="am">오전반</option>
+                <option value="pm">저녁반</option>
+                <option value="">시간 미정</option>
+              </select>
+              <button formAction={bulkChangeSlot} className="btn-ghost whitespace-nowrap !py-2">변경</button>
+            </div>
+          </details>
           <details className="relative ml-auto">
             <summary className="cursor-pointer list-none text-red-400">선택 삭제</summary>
             <button formAction={bulkRemove} className="absolute right-0 z-20 mt-1 whitespace-nowrap rounded-xl bg-red-50 px-3 py-2 font-bold text-red-600 shadow-lg">
@@ -286,7 +314,9 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-sky-main pb-2">
               <label className="flex items-center gap-2">
                 <SelectAll group={g.key} />
-                <h3 className="font-jua text-xl text-sky-ink">{g.title}</h3>
+                <h3 className="font-jua text-xl text-sky-ink">
+                  {g.title} · <span className={g.slot ? "" : "text-amber-600"}>{g.slot ? TIME_SLOTS[g.slot] : "시간 미정"}</span>
+                </h3>
               </label>
               <span className="text-sm text-slate-500">{g.items.length}명 · 현장 {onsite} · 불라방 {g.items.length - onsite}</span>
               {pending > 0 && <Badge tone="amber">미납 {pending}명</Badge>}

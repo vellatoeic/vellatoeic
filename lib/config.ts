@@ -13,6 +13,7 @@ export type Track = "all" | "rc" | "lc" | "alt_mw" | "alt_tt" | "alt";
 export type Kind = "onsite" | "online";
 export type Pickup = "classroom" | "delivery";
 export type Status = "pending" | "paid" | "shipped";
+export type TimeSlot = "am" | "pm";
 
 // 매달 같은 책: 개념집, 시작반 RC / 달마다 번갈아 바뀌는 책: 문풀반 RC 1·2, LC 1·2
 // LC는 시작반·문풀반 공통 수업이라 교재도 하나예요.
@@ -213,6 +214,15 @@ export const KLASS_TIME: Record<Klass, Slot[]> = {
     { label: "저녁 공통 LC", from: "19:10", to: "20:10", detail: "시작반·문풀반 공통 수업" },
   ],
 };
+
+// 수강 시간 (신청서에서 오전반/저녁반 선택)
+export const TIME_SLOTS: Record<TimeSlot, string> = { am: "오전반", pm: "저녁반" };
+export const isTimeSlot = (v: string): v is TimeSlot => v === "am" || v === "pm";
+// 예: "오전반 10:00~12:10"
+export function slotLabel(a: { course: CourseId; track: Track }, slot: TimeSlot) {
+  const s = KLASS_TIME[klassOf(a)][slot === "am" ? 0 : 1];
+  return `${TIME_SLOTS[slot]} ${s.from}~${s.to}`;
+}
 
 // 수업 시작 전·종료 후로 이만큼 여유를 둬요 (지각·늦은 로그인 대비)
 export const CHECK_GRACE_MIN = 20;
