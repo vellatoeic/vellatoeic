@@ -112,7 +112,7 @@ export async function studentLogin(_: FormState, fd: FormData): Promise<FormStat
   const mine = (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash));
   if (mine.length === 0) {
     await sleep(800);
-    return { error: "이름 또는 비밀번호가 맞지 않아요. 잊어버렸다면 Vella에게 문의해 주세요." };
+    return { error: "이름 또는 비밀번호가 맞지 않아요." };
   }
   await setStudent(mine.map((a) => a.id));
   const next = clean(fd.get("next"));
@@ -281,7 +281,7 @@ export async function specialLogin(_: FormState, fd: FormData): Promise<FormStat
   const mine = (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash));
   if (mine.length === 0) {
     await sleep(800);
-    return { error: "이름 또는 강의실 비밀번호가 맞지 않아요. 잊어버렸다면 Vella에게 문의해 주세요." };
+    return { error: "이름 또는 강의실 비밀번호가 맞지 않아요." };
   }
   await setStudent(mine.map((a) => a.id));
   redirect("/special");
