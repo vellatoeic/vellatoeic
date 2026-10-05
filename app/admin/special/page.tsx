@@ -1,7 +1,6 @@
 import { isAdmin } from "@/lib/auth";
 import { listSpecialLectures, listSpecialMaterials, listSpecialRegistrations, isPreview, type SpecialLecture, type SpecialRegistration } from "@/lib/db";
 import { addSpecialLecture, removeSpecialLecture, removeSpecialMaterial, removeSpecialRegistration, saveSpecialLecture } from "@/app/actions";
-import { phoneLabel } from "@/lib/csv";
 import { specialWhen } from "@/lib/special";
 import AdminTabs from "../AdminTabs";
 import LoginForm from "../LoginForm";
@@ -25,7 +24,7 @@ function LectureFields({ event }: { event?: SpecialLecture }) {
   );
 }
 
-function Roster({ title, items, online }: { title: string; items: SpecialRegistration[]; online?: boolean }) {
+function Roster({ title, items }: { title: string; items: SpecialRegistration[] }) {
   const sorted = [...items].sort((a, b) => a.name.localeCompare(b.name, "ko"));
   return (
     <div className="mt-3">
@@ -34,10 +33,7 @@ function Roster({ title, items, online }: { title: string; items: SpecialRegistr
         <ul className="divide-y divide-sky-soft">
           {sorted.map((r) => (
             <li key={r.id} className="flex items-center justify-between gap-3 py-2 text-[15px]">
-              <span>
-                <b className="text-sky-ink">{r.name}</b>
-                {online && <span className="ml-2 text-sm text-slate-600">{phoneLabel(r.phone)}</span>}
-              </span>
+              <b className="text-sky-ink">{r.name}</b>
               <details className="text-sm">
                 <summary className="cursor-pointer text-red-400">삭제</summary>
                 <form action={removeSpecialRegistration} className="mt-1">
@@ -106,7 +102,7 @@ export default async function SpecialAdminPage() {
 
             <div className="rounded-2xl border border-sky-main/60 p-4">
               <h3 className="font-jua text-lg text-sky-ink">불라방 자료 · 유튜브</h3>
-              <p className="mt-1 text-sm text-slate-500">불라방 신청자가 이름·비밀번호로 확인하면 [특강 신청] 페이지에서 볼 수 있어요.</p>
+              <p className="mt-1 text-sm text-slate-500">불라방 신청자가 강의실 이름·비밀번호로 로그인하면 [특강 신청] 페이지에서 볼 수 있어요.</p>
               <p className="mt-2 text-sm">
                 유튜브: {event.youtube_id
                   ? <a href={`https://youtu.be/${event.youtube_id}`} target="_blank" rel="noreferrer" className="text-sky-deep underline">youtu.be/{event.youtube_id}</a>
@@ -134,7 +130,7 @@ export default async function SpecialAdminPage() {
                 <a href={`/admin/special/csv?id=${event.id}`} className="btn-ghost !py-2 text-sm">CSV 받기</a>
               </div>
               <Roster title="현장" items={onsite} />
-              <Roster title="불라방" items={online} online />
+              <Roster title="불라방" items={online} />
             </div>
           </section>
         );

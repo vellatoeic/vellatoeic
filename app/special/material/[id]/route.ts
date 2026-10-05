@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
-import { getSpecialIds, isAdmin } from "@/lib/auth";
-import { getSpecialMaterial, getSpecialRegistrations, specialMaterialUrl } from "@/lib/db";
+import { getStudentIds, isAdmin } from "@/lib/auth";
+import { getSpecialMaterial, getSpecialRegistrationsFor, specialMaterialUrl } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-// 불라방으로 신청한 사람(이름+비밀번호 확인)과 관리자만 자료를 받을 수 있어요.
+// 불라방으로 신청한 수강생(강의실 로그인)과 관리자만 자료를 받을 수 있어요.
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const material = await getSpecialMaterial(id);
   if (!material) return new NextResponse("자료를 찾을 수 없어요.", { status: 404 });
 
-  const allowed = (await isAdmin()) || (await getSpecialRegistrations(await getSpecialIds()))
+  const allowed = (await isAdmin()) || (await getSpecialRegistrationsFor(await getStudentIds()))
     .some((r) => r.mode === "online" && r.special_lecture_id === material.special_lecture_id);
   if (!allowed) return new NextResponse("불라방 특강 신청 확인 후 자료를 받을 수 있어요.", { status: 403 });
 

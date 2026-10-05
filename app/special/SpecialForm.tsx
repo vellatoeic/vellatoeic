@@ -1,14 +1,13 @@
 "use client";
 
 import { keep } from "@/lib/keep";
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import { registerSpecialLecture, type FormState } from "@/app/actions";
 
 type Option = { id: string; title: string; when: string };
 
 export default function SpecialForm({ events }: { events: Option[] }) {
   const [state, action, pending] = useActionState<FormState, FormData>(registerSpecialLecture, {});
-  const [mode, setMode] = useState("");
 
   if (state.ok) {
     return (
@@ -38,22 +37,21 @@ export default function SpecialForm({ events }: { events: Option[] }) {
         <p className="label">2. 참여 방법</p>
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="flex items-start gap-3 rounded-xl bg-sky-soft p-3">
-            <input type="radio" name="mode" value="onsite" required onChange={() => setMode("onsite")} className="mt-1 accent-sky-deep" />
+            <input type="radio" name="mode" value="onsite" required className="mt-1 accent-sky-deep" />
             <span><b className="block text-sky-ink">현장</b><span className="text-sm text-slate-600">703호에서 들어요.</span></span>
           </label>
           <label className="flex items-start gap-3 rounded-xl bg-sky-soft p-3">
-            <input type="radio" name="mode" value="online" required onChange={() => setMode("online")} className="mt-1 accent-sky-deep" />
+            <input type="radio" name="mode" value="online" required className="mt-1 accent-sky-deep" />
             <span><b className="block text-sky-ink">불라방</b><span className="text-sm text-slate-600">유튜브 라이브로 들어요.</span></span>
           </label>
         </div>
       </div>
 
       <div className="space-y-3">
-        <p className="label">3. 신청자 정보</p>
+        <p className="label">3. 강의실 로그인 정보</p>
         <input name="name" className="input" placeholder="이름" autoComplete="name" />
         <input name="pin" className="input tracking-[0.3em]" placeholder="강의실 비밀번호 4자리" inputMode="numeric" maxLength={4} type="password" />
-        {mode === "online" && <input name="phone" className="input" placeholder="연락처 (예: 01012345678)" inputMode="tel" autoComplete="tel" />}
-        <p className="text-xs text-slate-500">교재비 신청할 때 정한 이름과 강의실 비밀번호를 입력해 주세요.<br />특강은 그 달 수강생(납부 완료)만 신청할 수 있어요.</p>
+        <p className="text-xs text-slate-500">교재비 신청할 때 정한 이름과 강의실 비밀번호를 입력해 주세요.<br />특강은 그 달 수강생만 신청할 수 있어요.</p>
       </div>
 
       {state.error && <p className="text-sm font-bold text-red-600">{state.error}</p>}

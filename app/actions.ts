@@ -8,13 +8,13 @@ import {
 } from "@/lib/config";
 import {
   createApplication, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  createSpecialLecture, createSpecialRegistration, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, findSpecialRegistrationsByName, getSpecialLecture, listSpecialRegistrations, updateSpecialLecture,
+  createSpecialLecture, createSpecialRegistration, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
 } from "@/lib/db";
 import { canWatch } from "@/lib/access";
 import { SCHEDULE_CLASSES, holidayKey, homeworkAssignmentDays, parseHolidays, parseSchoolDays, previousMonth, scheduleKey, scheduleClassFor, schoolDaysFor, shiftSchoolDays, type ScheduleClass } from "@/lib/schedule";
 import { specialRegistrationOpen } from "@/lib/special";
 import {
-  hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin, getSpecialIds, setSpecialIds, clearSpecialIds,
+  hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
 } from "@/lib/auth";
 
 export type FormState = { error?: string; ok?: string };
@@ -220,31 +220,25 @@ export async function registerSpecialLecture(_: FormState, fd: FormData): Promis
   const mode = clean(fd.get("mode"));
   const name = clean(fd.get("name"));
   const pin = clean(fd.get("pin"));
-  const phone = clean(fd.get("phone")).replace(/[^0-9]/g, "");
   const event = await getSpecialLecture(eventId);
   if (!event) return { error: "신청할 특강을 선택해 주세요." };
   if (!specialRegistrationOpen(event.event_date, event.starts_at)) return { error: "신청 기간이 끝난 특강이에요." };
   if (mode !== "onsite" && mode !== "online") return { error: "현장 또는 불라방을 선택해 주세요." };
-  if (!name) return { error: "이름을 입력해 주세요." };
-  if (!/^\d{4}$/.test(pin)) return { error: "비밀번호를 숫자 4자리로 정해 주세요." };
-  if (mode === "online" && !/^01[0-9]{8,9}$/.test(phone)) return { error: "연락처를 정확히 입력해 주세요. (예: 01012345678)" };
-  const month = event.event_date.slice(0, 7);
-  const enrolled = (await findApplicationsByName(name)).filter((a) => a.cohort === month && checkPin(pin, a.pin_hash));
-  if (enrolled.length === 0) {
+  if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 강의실 비밀번호 4자리를 입력해 주세요." };
+
+  const mine = (await findApplicationsByName(name)).filter((a) => checkPin(pin, a.pin_hash));
+  const month = mine.filter((a) => a.cohort === event.event_date.slice(0, 7));
+  if (month.length === 0) {
     await sleep(800);
     return { error: "이름 또는 강의실 비밀번호가 맞지 않아요. 특강은 그 달 수강생만 신청할 수 있어요." };
   }
-  if (!enrolled.some(canWatch)) return { error: "교재비 납부가 확인된 뒤에 특강을 신청할 수 있어요." };
+  const paid = month.filter(canWatch);
+  if (paid.length === 0) return { error: "수강 신청 후에 특강을 신청할 수 있어요." };
 
-  const already = (await listSpecialRegistrations(eventId)).find((r) => r.name === name && checkPin(pin, r.pin_hash));
-  const id = already?.id ?? await createSpecialRegistration({
-    special_lecture_id: eventId,
-    mode,
-    name,
-    phone: mode === "online" ? phone : null,
-    pin_hash: hashPin(pin),
-  });
-  await setSpecialIds([...(await getSpecialIds()), id]);
+  // 특강 신청 후에는 강의실 로그인 상태가 돼서 이 페이지에서 바로 신청 내용을 볼 수 있어요.
+  await setStudent(mine.map((a) => a.id));
+  const already = (await getSpecialRegistrationsFor(paid.map((a) => a.id))).some((r) => r.special_lecture_id === eventId);
+  if (!already) await createSpecialRegistration({ special_lecture_id: eventId, application_id: paid[0].id, mode, name: paid[0].name });
   revalidatePath("/special");
   if (already) return { ok: "이미 신청한 특강이에요. 아래에서 신청 내용을 확인해 주세요." };
   return {
@@ -254,21 +248,22 @@ export async function registerSpecialLecture(_: FormState, fd: FormData): Promis
   };
 }
 
+// 특강 페이지에서 강의실 계정으로 로그인 (강의실과 같은 이름·비밀번호)
 export async function specialLogin(_: FormState, fd: FormData): Promise<FormState> {
   const name = clean(fd.get("name"));
   const pin = clean(fd.get("pin"));
-  if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 비밀번호 4자리를 입력해 주세요." };
-  const mine = (await findSpecialRegistrationsByName(name)).filter((r) => checkPin(pin, r.pin_hash));
+  if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 강의실 비밀번호 4자리를 입력해 주세요." };
+  const mine = (await findApplicationsByName(name)).filter((a) => checkPin(pin, a.pin_hash));
   if (mine.length === 0) {
     await sleep(800);
-    return { error: "이름 또는 비밀번호가 맞지 않아요. 특강 신청할 때 정한 비밀번호를 입력해 주세요." };
+    return { error: "이름 또는 강의실 비밀번호가 맞지 않아요. 잊어버렸다면 Vella에게 문의해 주세요." };
   }
-  await setSpecialIds([...(await getSpecialIds()), ...mine.map((r) => r.id)]);
+  await setStudent(mine.map((a) => a.id));
   redirect("/special");
 }
 
 export async function specialLogout() {
-  await clearSpecialIds();
+  await clearStudent();
   redirect("/special");
 }
 

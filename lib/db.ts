@@ -46,10 +46,9 @@ export type SpecialLecture = {
 export type SpecialRegistration = {
   id: string;
   special_lecture_id: string;
+  application_id: string | null;
   mode: "onsite" | "online";
   name: string;
-  phone: string | null;
-  pin_hash: string;
   created_at: string;
 };
 
@@ -303,27 +302,19 @@ export async function listSpecialRegistrations(special_lecture_id?: string): Pro
   return mem.specialRegistrations.filter((registration) => !special_lecture_id || registration.special_lecture_id === special_lecture_id);
 }
 
-export async function getSpecialRegistrations(ids: string[]): Promise<SpecialRegistration[]> {
-  const ok = ids.filter(isUuid);
+// 강의실 로그인한 학생(수강 신청 id 목록)의 특강 신청
+export async function getSpecialRegistrationsFor(application_ids: string[]): Promise<SpecialRegistration[]> {
+  const ok = application_ids.filter(isUuid);
   if (ok.length === 0) return [];
   if (sb) {
-    const { data, error } = await sb.from("special_lecture_registrations").select("*").in("id", ok);
+    const { data, error } = await sb.from("special_lecture_registrations").select("*").in("application_id", ok);
     if (error) throw error;
     return data as SpecialRegistration[];
   }
-  return mem.specialRegistrations.filter((registration) => ok.includes(registration.id));
+  return mem.specialRegistrations.filter((registration) => registration.application_id && ok.includes(registration.application_id));
 }
 
-export async function findSpecialRegistrationsByName(name: string): Promise<SpecialRegistration[]> {
-  if (sb) {
-    const { data, error } = await sb.from("special_lecture_registrations").select("*").eq("name", name);
-    if (error) throw error;
-    return data as SpecialRegistration[];
-  }
-  return mem.specialRegistrations.filter((registration) => registration.name === name);
-}
-
-export async function createSpecialRegistration(registration: Pick<SpecialRegistration, "special_lecture_id" | "mode" | "name" | "phone" | "pin_hash">): Promise<string> {
+export async function createSpecialRegistration(registration: Pick<SpecialRegistration, "special_lecture_id" | "application_id" | "mode" | "name">): Promise<string> {
   if (sb) {
     const { data, error } = await sb.from("special_lecture_registrations").insert(registration).select("id").single();
     if (error) throw error;

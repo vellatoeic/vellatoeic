@@ -1,5 +1,5 @@
-import { getSpecialIds } from "@/lib/auth";
-import { getSpecialRegistrations, listSpecialLectures, listSpecialMaterials } from "@/lib/db";
+import { getStudentIds } from "@/lib/auth";
+import { getSpecialRegistrationsFor, listSpecialLectures, listSpecialMaterials } from "@/lib/db";
 import { CLASSROOM } from "@/lib/config";
 import { specialLogout } from "@/app/actions";
 import { specialRegistrationOpen, specialWhen } from "@/lib/special";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "특강 신청 · vella_toeic", robots: { index: false } };
 
 export default async function SpecialPage() {
-  const [events, mine] = await Promise.all([listSpecialLectures(), getSpecialIds().then(getSpecialRegistrations)]);
+  const [events, mine] = await Promise.all([listSpecialLectures(), getStudentIds().then(getSpecialRegistrationsFor)]);
   const open = events.filter((event) => specialRegistrationOpen(event.event_date, event.starts_at));
   const eventById = new Map(events.map((event) => [event.id, event]));
   const myRows = await Promise.all(
@@ -63,7 +63,7 @@ export default async function SpecialPage() {
             </div>
           ))}
           <form action={specialLogout} className="text-center">
-            <button className="text-sm text-slate-500 underline">다른 이름으로 확인하기</button>
+            <button className="text-sm text-slate-500 underline">로그아웃 (다른 이름으로 확인하기)</button>
           </form>
         </section>
       ) : (
