@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { bulkMarkShipped } from "@/app/actions";
+import { bulkMarkBooksDone } from "@/app/actions";
 
 type Row = { id: string; name: string; phone: string; address: string; books: string; status: "pending" | "paid" | "shipped" };
 
@@ -22,7 +22,7 @@ export default function DeliveryList({ rows }: { rows: Row[] }) {
   }
 
   return (
-    <form action={bulkMarkShipped} className="mt-3">
+    <form action={bulkMarkBooksDone} className="mt-3">
       <div className="flex flex-wrap items-center gap-2 print:hidden">
         <button type="button" onClick={copy} disabled={waiting.length === 0} className="btn-ghost !py-2 text-sm">
           발송 대기 {waiting.length}명 이름·연락처·주소 복사

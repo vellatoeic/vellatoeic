@@ -93,6 +93,15 @@ export function pickupLabel(kind: Kind, pickup: Pickup) {
   return PICKUPS[pickup].label;
 }
 
+// 불라방 교재 진행 상태 (현장은 첫 수업 날 일괄 지급이라 따로 없어요)
+export function bookStatusLabel(a: { kind: Kind; pickup: Pickup; status: Status }) {
+  if (a.kind === "onsite") return "첫날 지급";
+  const delivery = a.pickup === "delivery";
+  if (a.status === "pending") return "납부 후 진행";
+  if (a.status === "paid") return delivery ? "발송 대기" : "수령 대기";
+  return delivery ? "발송 완료" : "수령 완료";
+}
+
 export const STATUS_LABEL: Record<Status, string> = {
   pending: "입금 확인 중",
   paid: "납부 완료",

@@ -428,13 +428,13 @@ export async function bulkConfirmPayment(fd: FormData) {
   revalidatePath("/admin");
 }
 
-// 불라방 택배: 체크한 학생 중 납부 완료 상태만 발송 완료로 바꿔요.
-export async function bulkMarkShipped(fd: FormData) {
+// 불라방 교재: 체크한 학생 중 납부 완료 상태만 수령·발송 완료로 바꿔요.
+export async function bulkMarkBooksDone(fd: FormData) {
   if (!(await isAdmin())) return;
   const ids = checkedIds(fd);
   if (ids.length === 0) return;
   const apps = await getApplications(ids);
-  const ready = apps.filter((app) => app.status === "paid" && app.kind === "online" && app.pickup === "delivery").map((app) => app.id);
+  const ready = apps.filter((app) => app.status === "paid" && app.kind === "online").map((app) => app.id);
   await updateApplications(ready, { status: "shipped" });
   revalidatePath("/admin/delivery");
   revalidatePath("/admin");

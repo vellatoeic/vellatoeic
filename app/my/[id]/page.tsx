@@ -12,17 +12,17 @@ export default async function MyPage({ params, searchParams }: { params: Promise
   if (!a) notFound();
   const account = await getSetting("bank_account");
 
-  const steps =
-    a.pickup === "delivery"
-      ? ["신청서 제출", "납부 확인", "교재 발송"]
-      : ["신청서 제출", "납부 확인", "수업 준비 완료"];
-  const done = a.status === "pending" ? 1 : a.status === "paid" ? (a.pickup === "delivery" ? 2 : 3) : 3;
+  const online = a.kind === "online";
+  const steps = !online
+    ? ["신청서 제출", "납부 확인", "수업 준비 완료"]
+    : ["신청서 제출", "납부 확인", a.pickup === "delivery" ? "교재 발송" : "교재 수령"];
+  const done = a.status === "pending" ? 1 : a.status === "paid" && online ? 2 : 3;
 
   return (
     <div className="space-y-6 pt-8">
       <div className="text-center">
         <h1 className="font-jua text-4xl text-sky-ink">
-          {a.status === "pending" ? "아직 납부 전이에요" : a.pickup === "delivery" && a.status === "paid" ? "납부 확인 완료!" : "모든 준비 완료!"}
+          {a.status === "pending" ? "아직 납부 전이에요" : online && a.status === "paid" ? "납부 확인 완료!" : "모든 준비 완료!"}
         </h1>
         <p className="mt-2 text-slate-600">{a.name}님, 이 페이지를 즐겨찾기 해두면 진행 상황을 확인할 수 있어요.</p>
       </div>
@@ -77,7 +77,9 @@ export default async function MyPage({ params, searchParams }: { params: Promise
                 : "납부가 확인됐어요. 교재를 순서대로 발송할게요."
               : a.kind === "onsite"
                 ? <>납부가 확인됐어요.<br />첫 수업 날 {CLASSROOM}에서 교재를 일괄 지급해요.<br />수강 시간에 맞춰 등원해 주세요!</>
-                : "납부가 확인됐어요. 1층 데스크에서 교재를 받아 가세요!"}
+                : a.status === "shipped"
+                  ? "교재 수령이 확인됐어요. 수업 준비 완료!"
+                  : "납부가 확인됐어요. 1층 데스크에서 교재를 받아 가세요!"}
           </p>
         </section>
       )}
