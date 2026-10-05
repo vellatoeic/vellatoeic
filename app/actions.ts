@@ -10,7 +10,7 @@ import {
   createApplication, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
 } from "@/lib/db";
 import { canWatch } from "@/lib/access";
-import { SCHEDULE_CLASSES, defaultSchoolDays, holidayKey, parseHolidays, parseSchoolDays, previousMonth, scheduleKey, scheduleClassFor, shiftSchoolDays, type ScheduleClass } from "@/lib/schedule";
+import { SCHEDULE_CLASSES, defaultSchoolDays, holidayKey, homeworkWindowDays, parseHolidays, parseSchoolDays, previousMonth, scheduleKey, scheduleClassFor, shiftSchoolDays, type ScheduleClass } from "@/lib/schedule";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
 } from "@/lib/auth";
@@ -235,13 +235,13 @@ export async function markHomeworkDone(fd: FormData) {
   const id = clean(fd.get("app_id"));
   const day = clean(fd.get("day"));
   const ids = await getStudentIds();
-  if (!ids.includes(id) || day !== todayKST()) return;
+  if (!ids.includes(id) || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
   const [app] = await getApplications([id]);
   if (!app || !canWatch(app) || app.cohort !== (await currentCohort())) return;
   const klass = scheduleClassFor(app.course, app.track);
   const rawDays = await getSetting(scheduleKey(app.cohort, klass));
   const savedDays = rawDays ? parseSchoolDays(rawDays, app.cohort) : defaultSchoolDays(app.cohort, klass);
-  if (!savedDays.includes(day)) return;
+  if (!homeworkWindowDays(klass, savedDays).includes(day)) return;
   await addHomeworkSticker(app.id, day);
   revalidatePath("/class");
 }
@@ -250,13 +250,13 @@ export async function cancelMyHomeworkDone(fd: FormData) {
   const id = clean(fd.get("app_id"));
   const day = clean(fd.get("day"));
   const ids = await getStudentIds();
-  if (!ids.includes(id) || day !== todayKST()) return;
+  if (!ids.includes(id) || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
   const [app] = await getApplications([id]);
   if (!app || !canWatch(app) || app.cohort !== (await currentCohort())) return;
   const klass = scheduleClassFor(app.course, app.track);
   const rawDays = await getSetting(scheduleKey(app.cohort, klass));
   const savedDays = rawDays ? parseSchoolDays(rawDays, app.cohort) : defaultSchoolDays(app.cohort, klass);
-  if (!savedDays.includes(day)) return;
+  if (!homeworkWindowDays(klass, savedDays).includes(day)) return;
   await deleteHomeworkSticker(app.id, day);
   revalidatePath("/class");
 }

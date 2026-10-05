@@ -14,6 +14,7 @@ export default function StickerBoard({
   className: _className,
   klass,
   scheduleDays,
+  homeworkWindowDays,
   holidays,
   attendance,
   homework,
@@ -27,6 +28,7 @@ export default function StickerBoard({
   className: string;
   klass: ScheduleClass;
   scheduleDays: string[];
+  homeworkWindowDays: string[];
   holidays: Record<string, string>;
   attendance: StampAttendance[];
   homework: string[];
@@ -60,8 +62,9 @@ export default function StickerBoard({
           : klass === "solve-mw" ? "문풀반 격일 (월·수)"
             : klass === "solve-tt" ? "문풀반 격일 (화·목)" : "속성반";
   const classSummary = `${displayClass} · ${startDate} 개강 · 총 ${total}회`;
-  const todayIsLesson = lessonDays.has(today);
-  const todayHomeworkDone = homeworkDays.has(today);
+  const homeworkDueDay = homeworkWindowDays.find((day) => !homeworkDays.has(day)) ?? null;
+  const completedHomeworkDay = [...homeworkWindowDays].reverse().find((day) => homeworkDays.has(day)) ?? null;
+  const homeworkActionDay = homeworkDueDay ?? completedHomeworkDay;
 
   const badgeStates = [
     { id: "attendance", title: "출석", count: `${attendanceCount}/${total}`, earned: attendanceCount > 0, icon: "cloud" as const, color: "#d9f0fd" },
@@ -221,13 +224,13 @@ export default function StickerBoard({
           </div>
         )}
 
-        {active && todayIsLesson && (
-          todayHomeworkDone ? (
+        {active && homeworkActionDay && (
+          homeworkDueDay === null ? (
             <div className="mt-[14px] rounded-[22px] border-2 border-[#ffe9a3] bg-[#fffbea] px-4 py-3 text-center text-[#a7741a]">
-              <p className="font-jua text-base">오늘 숙제 제출 완료! ⭐</p>
+              <p className="font-jua text-base">숙제 제출 완료! ⭐</p>
               <form action={cancelMyHomeworkDone} className="mt-1">
                 <input type="hidden" name="app_id" value={appId} />
-                <input type="hidden" name="day" value={today} />
+                <input type="hidden" name="day" value={homeworkActionDay} />
                 <button className="rounded-full px-3 py-1 text-xs text-[#a7741a]/70 underline underline-offset-2">잘못 눌렀어요 · 스티커 취소</button>
               </form>
             </div>
@@ -236,7 +239,7 @@ export default function StickerBoard({
               <a href={cafeUrl || undefined} target="_blank" rel="noreferrer" aria-disabled={!cafeUrl} className={`block w-full rounded-2xl bg-[#ffd23f] px-3 py-[13px] text-center font-jua text-lg text-[#5a3b00] shadow-[0_4px_0_#e0b400] ${cafeUrl ? "" : "pointer-events-none opacity-50"}`}>📝 숙제 제출하러 가기</a>
               <form action={markHomeworkDone} className="mt-2">
                 <input type="hidden" name="app_id" value={appId} />
-                <input type="hidden" name="day" value={today} />
+                <input type="hidden" name="day" value={homeworkDueDay} />
                 <button className="block w-full rounded-2xl border-2 border-dashed border-[#e0b400] bg-white px-3 py-2.5 font-jua text-[15px] text-[#a7741a]">숙제 제출했어요 ✓ 스티커 받기</button>
               </form>
             </div>

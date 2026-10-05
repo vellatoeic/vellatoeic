@@ -92,6 +92,23 @@ export function defaultSchoolDays(cohort: string, klass: ScheduleClass): string[
   return days;
 }
 
+// 첫 수업에는 숙제가 없고, 이후 수업 숙제는 해당 수업일부터 다음 수업 시작 전까지 제출할 수 있어요.
+export function homeworkWindowDays(klass: ScheduleClass, scheduleDays: string[], nowMs = Date.now()): string[] {
+  const days = [...new Set(scheduleDays)].sort();
+  if (days.length < 2) return [];
+
+  const nowKst = new Date(nowMs + 9 * 60 * 60 * 1000);
+  const currentDay = nowKst.toISOString().slice(0, 10);
+  const currentMinute = nowKst.getUTCHours() * 60 + nowKst.getUTCMinutes();
+  const nextClassStart = klass.startsWith("solve-") ? 11 * 60 + 10 : 10 * 60;
+
+  return days.filter((day, index) => {
+    if (index === 0 || currentDay < day) return false;
+    const nextDay = days[index + 1] ?? new Date(Date.parse(`${day}T00:00:00Z`) + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    return currentDay < nextDay || (currentDay === nextDay && currentMinute < nextClassStart);
+  });
+}
+
 export function weekDaysInMonth(cohort: string): (string | null)[][] {
   const match = /^(\d{4})-(\d{2})$/.exec(cohort);
   if (!match) return [];
