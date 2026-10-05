@@ -299,6 +299,16 @@ export async function bulkRemove(fd: FormData) {
   revalidatePath("/admin");
 }
 
+export async function bulkConfirmPayment(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const ids = checkedIds(fd);
+  if (ids.length === 0) return;
+  const apps = await getApplications(ids);
+  const pendingIds = apps.filter((app) => app.status === "pending").map((app) => app.id);
+  await updateApplications(pendingIds, { status: "paid" });
+  revalidatePath("/admin");
+}
+
 export async function bulkChangeClass(fd: FormData) {
   if (!(await isAdmin())) return;
   const ids = checkedIds(fd);

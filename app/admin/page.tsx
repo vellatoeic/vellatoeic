@@ -1,7 +1,7 @@
 import { BOOKS, COURSES, KINDS, TRACKS, STATUS_LABEL, cohortLabel, pickupLabel, won, type Kind, type CourseId } from "@/lib/config";
 import { listApplications, getSetting, currentCohort, roundFor, isPreview } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
-import { changeStatus, saveSettings, resetPin, changeClass, removeApplication, bulkChangeClass, bulkRemove } from "@/app/actions";
+import { changeStatus, saveSettings, resetPin, changeClass, removeApplication, bulkChangeClass, bulkConfirmPayment, bulkRemove } from "@/app/actions";
 import LoginForm from "./LoginForm";
 import AdminTabs from "./AdminTabs";
 
@@ -144,6 +144,8 @@ export default async function Admin({
             )}
           </select>
           <button className="btn-ghost !py-2">으로 반 변경</button>
+          <button formAction={bulkConfirmPayment} className="btn !py-2 !text-sm">선택 납부 확인</button>
+          <span className="w-full text-xs text-slate-500">선택한 신청 중 입금 대기 상태인 학생만 납부 완료로 바뀌어요.</span>
           <details className="ml-auto">
             <summary className="cursor-pointer text-red-400">선택 삭제</summary>
             <button formAction={bulkRemove} className="mt-2 rounded-xl bg-red-50 px-3 py-2 font-bold text-red-600">
