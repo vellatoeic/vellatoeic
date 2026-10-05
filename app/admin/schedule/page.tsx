@@ -1,6 +1,6 @@
 import { isAdmin } from "@/lib/auth";
 import { currentCohort, getSetting, isPreview } from "@/lib/db";
-import { defaultSchoolDays, holidayKey, parseHolidays, parseSchoolDays, scheduleKey, SCHEDULE_CLASSES, type ScheduleClass } from "@/lib/schedule";
+import { defaultHolidays, defaultSchoolDays, holidayKey, parseHolidays, parseSchoolDays, scheduleKey, SCHEDULE_CLASSES, type ScheduleClass } from "@/lib/schedule";
 import AdminTabs from "../AdminTabs";
 import LoginForm from "../LoginForm";
 import ScheduleEditor from "./ScheduleEditor";
@@ -19,7 +19,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
     getSetting(holidayKey(cohort)),
   ]);
   const initialDays = savedDays ? parseSchoolDays(savedDays, cohort) : defaultSchoolDays(cohort, klass);
-  const initialHolidays = parseHolidays(savedHolidays, cohort);
+  const initialHolidays = savedHolidays ? parseHolidays(savedHolidays, cohort) : defaultHolidays(cohort);
 
   return (
     <div className="space-y-6 pt-8">

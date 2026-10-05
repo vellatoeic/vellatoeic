@@ -35,6 +35,14 @@ export function holidayKey(cohort: string) {
   return `holidays_${cohort}`;
 }
 
+export function defaultHolidays(cohort: string): Record<string, string> {
+  if (cohort !== "2026-10") return {};
+  return {
+    "2026-10-05": "공휴일",
+    "2026-10-09": "한글날",
+  };
+}
+
 export function parseSchoolDays(value: string, cohort: string): string[] {
   try {
     const result: unknown = JSON.parse(value);
@@ -58,6 +66,15 @@ export function parseHolidays(value: string, cohort: string): Record<string, str
 }
 
 export function defaultSchoolDays(cohort: string, klass: ScheduleClass): string[] {
+  // 2026년 10월은 개강일과 공휴일 조정으로 일반 월~목 패턴이 아니에요.
+  if (cohort === "2026-10" && !klass.endsWith("-mw") && !klass.endsWith("-tt")) {
+    return [
+      "2026-10-06", "2026-10-07", "2026-10-08",
+      "2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16",
+      "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22",
+      "2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29",
+    ];
+  }
   const match = /^(\d{4})-(\d{2})$/.exec(cohort);
   if (!match) return [];
   const year = Number(match[1]);
