@@ -9,3 +9,4 @@ next-env.d.ts
 # 미리보기 사진·개인 설정
 Claude outputs/
 .mcp.json
+sticker_board_mockup.html

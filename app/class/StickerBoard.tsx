@@ -2,15 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { markHomeworkDone } from "@/app/actions";
-import { cohortLabel, dayLabel } from "@/lib/config";
 import { weekDaysInMonth, type ScheduleClass } from "@/lib/schedule";
 import Cloud from "@/components/Cloud";
+
+type StampAttendance = { day: string; late: boolean };
 
 export default function StickerBoard({
   appId,
   name,
   cohort,
-  className,
+  className: _className,
   klass,
   scheduleDays,
   holidays,
@@ -27,7 +28,7 @@ export default function StickerBoard({
   klass: ScheduleClass;
   scheduleDays: string[];
   holidays: Record<string, string>;
-  attendance: { day: string; late: boolean }[];
+  attendance: StampAttendance[];
   homework: string[];
   cafeUrl: string;
   today: string;
@@ -47,31 +48,49 @@ export default function StickerBoard({
   const alternating = klass.endsWith("-mw") || klass.endsWith("-tt");
   const stickerGoal = alternating ? 10 : 20;
   const complete = total > 0 && attendanceCount === total && homeworkCount === total;
-  const finishedLessons = total > 0 && attendanceCount === total;
+  const monthNumber = Number(cohort.slice(5));
+  const monthName = `${monthNumber}월`;
   const firstName = name.length > 1 ? name.slice(1) : name;
-  const monthName = `${Number(cohort.slice(5))}월`;
+  const [year, month] = cohort.split("-").map(Number);
+  const startDate = scheduleDays[0] ? `${Number(scheduleDays[0].slice(5, 7))}/${Number(scheduleDays[0].slice(8, 10))}` : `${monthNumber}/1`;
+  const displayClass = klass === "start-all" ? "시작반 종합"
+    : klass === "start-mw" ? "시작반 격일 (월·수)"
+      : klass === "start-tt" ? "시작반 격일 (화·목)"
+        : klass === "solve-all" ? "문풀반 종합"
+          : klass === "solve-mw" ? "문풀반 격일 (월·수)"
+            : klass === "solve-tt" ? "문풀반 격일 (화·목)" : "속성반";
+  const classSummary = `${displayClass} · ${startDate} 개강 · 총 ${total}회`;
+  const todayIsLesson = lessonDays.has(today);
+  const todayHomeworkDone = homeworkDays.has(today);
+
   const badgeStates = [
-    { id: "attendance", title: "출석", value: `${attendanceCount}/${total}`, earned: total > 0 && attendanceCount === total },
-    { id: "homework", title: "숙제", value: `${homeworkCount}/${total}`, earned: total > 0 && homeworkCount === total },
-    { id: "stickers", title: "스티커", value: `${stickerCount}개`, earned: stickerCount >= stickerGoal },
-    { id: "course", title: `${monthName} 강의`, value: finishedLessons ? "완주!" : "도전 중", earned: finishedLessons },
+    { id: "attendance", title: "출석", count: `${attendanceCount}/${total}`, earned: attendanceCount > 0, icon: "cloud" as const, color: "#d9f0fd" },
+    { id: "homework", title: "숙제", count: `${homeworkCount}/${total}`, earned: homeworkCount > 0, icon: "star" as const, color: "#fff3c4" },
+    { id: "stickers", title: `스티커 ${stickerGoal}개`, count: `${Math.min(stickerCount, stickerGoal)}/${stickerGoal}`, earned: stickerCount >= stickerGoal, icon: "medal" as const, color: "#ffe1ea" },
+    { id: "course", title: `${monthNumber}월 강의`, count: `${attendanceCount}/${total}`, earned: complete, icon: "rainbow" as const, color: "linear-gradient(135deg,#ffd6e0,#fff1b8,#cdeffd,#d9d2ff)" },
   ];
 
   useEffect(() => {
-    const badgeKey = `vella-badges:${appId}:${cohort}`;
-    const seenBadges = new Set<string>(JSON.parse(localStorage.getItem(badgeKey) ?? "[]"));
-    const freshlyEarned = badgeStates.filter((badge) => badge.earned && !seenBadges.has(badge.id)).map((badge) => badge.id);
-    badgeStates.filter((badge) => badge.earned).forEach((badge) => seenBadges.add(badge.id));
-    localStorage.setItem(badgeKey, JSON.stringify([...seenBadges]));
-    setNewBadges(freshlyEarned);
+    try {
+      const badgeKey = `vella-badges:${appId}:${cohort}`;
+      const storedBadges: unknown = JSON.parse(localStorage.getItem(badgeKey) ?? "[]");
+      const seenBadges = new Set(Array.isArray(storedBadges) ? storedBadges.filter((v): v is string => typeof v === "string") : []);
+      const freshlyEarned = badgeStates.filter((badge) => badge.earned && !seenBadges.has(badge.id)).map((badge) => badge.id);
+      badgeStates.filter((badge) => badge.earned).forEach((badge) => seenBadges.add(badge.id));
+      localStorage.setItem(badgeKey, JSON.stringify([...seenBadges]));
+      setNewBadges(freshlyEarned);
 
-    const stickerKey = `vella-stickers:${appId}:${cohort}`;
-    const seenStickers = new Set<string>(JSON.parse(localStorage.getItem(stickerKey) ?? "[]"));
-    const presentToday = [attendanceByDay.has(today) ? `${today}:attendance` : "", homeworkDays.has(today) ? `${today}:homework` : ""].filter(Boolean);
-    setNewStickers(presentToday.filter((key) => !seenStickers.has(key)));
-    presentToday.forEach((key) => seenStickers.add(key));
-    localStorage.setItem(stickerKey, JSON.stringify([...seenStickers]));
-  // New earned items are evaluated once on entry, including after the server action refreshes this page.
+      const stickerKey = `vella-stickers:${appId}:${cohort}`;
+      const storedStickers: unknown = JSON.parse(localStorage.getItem(stickerKey) ?? "[]");
+      const seenStickers = new Set(Array.isArray(storedStickers) ? storedStickers.filter((v): v is string => typeof v === "string") : []);
+      const presentToday = [attendanceByDay.has(today) ? `${today}:attendance` : "", homeworkDays.has(today) ? `${today}:homework` : ""].filter(Boolean);
+      setNewStickers(presentToday.filter((key) => !seenStickers.has(key)));
+      presentToday.forEach((key) => seenStickers.add(key));
+      localStorage.setItem(stickerKey, JSON.stringify([...seenStickers]));
+    } catch {
+      setNewBadges([]);
+      setNewStickers([]);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appId, cohort, today, attendanceCount, homeworkCount]);
 
@@ -82,73 +101,84 @@ export default function StickerBoard({
     canvas.height = 1920;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const gradient = ctx.createLinearGradient(0, 0, 1080, 1920);
+    const fullGradient = ctx.createLinearGradient(0, 0, 0, 1920);
     if (complete) {
-      gradient.addColorStop(0, "#fff1fb");
-      gradient.addColorStop(0.5, "#e8f8ff");
-      gradient.addColorStop(1, "#fff8dd");
+      fullGradient.addColorStop(0, "#ffd9e4");
+      fullGradient.addColorStop(0.35, "#fff3c4");
+      fullGradient.addColorStop(0.7, "#d6f1ff");
+      fullGradient.addColorStop(1, "#fff");
     } else {
-      gradient.addColorStop(0, "#eaf6fd");
-      gradient.addColorStop(1, "#ffffff");
+      fullGradient.addColorStop(0, "#bfe6fb");
+      fullGradient.addColorStop(0.6, "#e9f7ff");
+      fullGradient.addColorStop(1, "#fff");
     }
-    ctx.fillStyle = gradient;
+    ctx.fillStyle = fullGradient;
     ctx.fillRect(0, 0, 1080, 1920);
+    drawStoryCloud(ctx, -40, 250, 135, "rgba(255,255,255,.7)");
+    drawStoryCloud(ctx, 810, 600, 120, "rgba(255,255,255,.7)");
+    drawStoryCloud(ctx, 800, 1500, 135, "rgba(255,255,255,.7)");
     ctx.textAlign = "center";
-    ctx.fillStyle = "#12405c";
-    ctx.font = "bold 68px Jua, sans-serif";
-    ctx.fillText(`${firstName}의 ${monthName} 스티커판`, 540, 150);
-    ctx.font = "40px Jua, sans-serif";
-    ctx.fillStyle = "#2b8fc7";
-    ctx.fillText(className, 540, 220);
-    if (complete) {
-      ctx.font = "bold 56px Jua, sans-serif";
-      ctx.fillText(`🌈 ${monthName} 강의 완주! 🌈`, 540, 315);
-    }
+    ctx.fillStyle = "#1f5a80";
+    ctx.font = "72px Jua, sans-serif";
+    ctx.fillText(`${firstName}의 ${monthName} 스티커판`, 540, 210);
+    ctx.fillStyle = "#5b88a6";
+    ctx.font = "34px 'Gowun Dodum', sans-serif";
+    ctx.fillText(classSummary, 540, 275);
 
-    const left = 94;
-    const top = complete ? 430 : 355;
-    const cellW = 178;
-    const cellH = 205;
-    const gap = 20;
-    ctx.font = "34px Jua, sans-serif";
-    ["월", "화", "수", "목", "금"].forEach((label, i) => {
-      ctx.fillStyle = i === 4 ? "#e87979" : "#52768b";
-      ctx.fillText(label, left + i * (cellW + gap) + cellW / 2, top - 28);
-    });
+    const cols = 5;
+    const colGap = 18;
+    const side = 76;
+    const contentWidth = 1080 - side * 2;
+    const cellWidth = (contentWidth - colGap * (cols - 1)) / cols;
+    const gridTop = 365;
+    const cellHeight = 138;
+    const rowGap = 14;
+    const gridRows = weeks.length;
+    roundRect(ctx, side, gridTop - 20, contentWidth, gridRows * cellHeight + (gridRows - 1) * rowGap + 40, 44, "#fff", "#cde8f8", 4);
     weeks.forEach((week, row) => week.forEach((day, col) => {
       if (!day) return;
-      const x = left + col * (cellW + gap);
-      const y = top + row * (cellH + gap);
-      const schoolDay = lessonDays.has(day);
-      const holiday = holidays[day];
-      ctx.fillStyle = schoolDay ? "rgba(255,255,255,.96)" : "rgba(255,255,255,.54)";
-      ctx.beginPath();
-      ctx.roundRect(x, y, cellW, cellH, 28);
-      ctx.fill();
-      ctx.fillStyle = holiday ? "#e35e66" : schoolDay ? "#12405c" : "#aabac3";
+      const x = side + col * (cellWidth + colGap);
+      const y = gridTop + row * (cellHeight + rowGap);
+      const isLesson = lessonDays.has(day);
+      const isHoliday = !!holidays[day];
+      ctx.fillStyle = isLesson ? "#fff" : "#f4fbff";
+      roundRect(ctx, x, y, cellWidth, cellHeight, 26, ctx.fillStyle, isLesson ? "#c9e4f5" : "transparent", 2, isLesson ? [10, 8] : []);
+      ctx.textAlign = "center";
       ctx.font = "36px Jua, sans-serif";
-      ctx.textAlign = "left";
-      ctx.fillText(String(Number(day.slice(-2))), x + 22, y + 48);
-      if (holiday) {
-        ctx.font = "22px Jua, sans-serif";
-        ctx.fillText(holiday.slice(0, 8), x + 20, y + 83);
-      }
-      if (schoolDay) {
+      ctx.fillStyle = isHoliday ? "#e5707e" : isLesson ? "#5b88a6" : "#c6dceb";
+      ctx.fillText(String(Number(day.slice(-2))), x + cellWidth / 2, y + 51);
+      if (isLesson) {
         const att = attendanceByDay.get(day);
-        ctx.textAlign = "center";
-        ctx.font = "55px sans-serif";
-        ctx.fillText(att ? (att.late ? "🟠☁️" : "☁️") : "☁️", x + 60, y + 132);
-        ctx.fillText(homeworkDays.has(day) ? "⭐" : "☆", x + 132, y + 132);
+        const homeworkDone = homeworkDays.has(day);
+        if (att) drawStoryCloud(ctx, x + cellWidth / 2 - 49, y + 71, 42, att.late ? "#ffb685" : "#79c6ef", true);
+        else drawStoryCircle(ctx, x + cellWidth / 2 - 45, y + 104, 13);
+        if (homeworkDone) drawStoryStar(ctx, x + cellWidth / 2 + 10, y + 78, 48);
+        else drawStoryCircle(ctx, x + cellWidth / 2 + 25, y + 104, 13);
+      } else if (isHoliday) {
+        ctx.font = "22px Jua, sans-serif";
+        ctx.fillText(holidays[day], x + cellWidth / 2, y + 91);
       }
     }));
 
+    if (complete) {
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#e0567a";
+      ctx.font = "58px Jua, sans-serif";
+      ctx.fillText(`🌈 ${monthName} 강의 완주! 🌈`, 540, 1395);
+    }
     ctx.textAlign = "center";
-    ctx.fillStyle = "#12405c";
-    ctx.font = "bold 42px Jua, sans-serif";
-    ctx.fillText(`출석 ${attendanceCount}/${total}  ·  숙제 ${homeworkCount}/${total}`, 540, 1605);
-    ctx.font = "34px Jua, sans-serif";
+    ctx.fillStyle = "#1f5a80";
+    ctx.font = "44px Jua, sans-serif";
+    ctx.fillText(`☁️ 출석 ${attendanceCount}     ⭐ 숙제 ${homeworkCount}`, 540, 1515);
+    ctx.font = "42px Jua, sans-serif";
+    ctx.fillText(displayClass, 540, 1600);
+    ctx.font = "38px Jua, sans-serif";
     ctx.fillStyle = "#2b8fc7";
-    ctx.fillText("토익의 시작  @vella_toeic", 540, 1790);
+    ctx.fillText("토익의 시작", 540, 1770);
+    ctx.font = "30px Jua, sans-serif";
+    ctx.fillStyle = "#7aa3bd";
+    ctx.fillText("@vella_toeic ☁️", 540, 1815);
+
     const link = document.createElement("a");
     link.download = `${firstName}_${cohort}_sticker-board.png`;
     link.href = canvas.toDataURL("image/png");
@@ -156,102 +186,248 @@ export default function StickerBoard({
   };
 
   return (
-    <section className={`sticker-board relative mt-4 overflow-hidden rounded-[2rem] border border-sky-main/60 p-4 shadow-[0_8px_30px_rgba(43,143,199,0.12)] sm:p-6 ${complete ? "sticker-rainbow" : "bg-white"}`}>
-      {complete && <div className="sticker-confetti" aria-hidden="true">{Array.from({ length: 24 }, (_, index) => <span key={index} style={{ left: `${(index * 37) % 100}%`, animationDelay: `${(index % 8) * -0.7}s`, color: ["#f28b82", "#f7c96b", "#74c9aa", "#8db9f5", "#c49bea"][index % 5] }}>✦</span>)}</div>}
-      <div className="relative z-[1]">
+    <section className="sticker-phone relative mx-auto mt-4 w-full max-w-[390px] overflow-hidden rounded-[36px] border-[10px] border-white bg-[#eef8fe] shadow-[0_18px_40px_rgba(31,90,128,.18)]">
+      {complete && <Confetti />}
+      <header className="relative z-[1] flex items-center justify-between border-b border-[#cfe9f8] bg-[#eef8fe]/95 px-4 py-3">
+        <div>
+          <small className="block font-jua text-[11px] text-[#7aa3bd]">토익의 시작</small>
+          <strong className="font-jua text-[21px] font-normal text-[#1f5a80]">vella_toeic ☁️</strong>
+        </div>
+        <span className="rounded-full bg-[#9fd8f5] px-3 py-2 text-[13px] font-bold text-[#1f5a80]">강의실</span>
+      </header>
+
+      <main className="relative z-[1] px-[14px] pb-[22px] pt-[18px]">
+        <h2 className="text-center font-jua text-[26px] font-normal text-[#1f5a80]">{firstName}님의 {monthName} 스티커판</h2>
+        <p className="mt-1 text-center text-[13px] text-[#6b93ad]">{classSummary}</p>
+
         {complete ? (
-          <div className="mb-4 rounded-2xl bg-white/75 px-4 py-4 text-center shadow-sm">
-            <p className="font-jua text-2xl text-sky-ink">🎉 {monthName} 스티커판 완성!</p>
-            <p className="mt-1 font-jua text-sky-deep">{total}회 강의 + 숙제 {total}개 완주</p>
-            <p className="mt-1 text-slate-700">{firstName}님 정말 대단해요 🌈</p>
+          <div className="sticker-complete mt-[14px] rounded-[22px] px-4 py-4 text-center">
+            <b className="block font-jua text-2xl font-normal">🎉 {monthName} 스티커판 완성!</b>
+            <span className="mt-1 block text-[13.5px]">{total}회 강의 + 숙제 {total}개 완주<br />{firstName}님 정말 대단해요 🌈</span>
           </div>
         ) : (
-          <>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs text-sky-deep">{cohortLabel(cohort)} · {className}</p>
-                <h3 className="font-jua text-2xl text-sky-ink">{firstName}의 스티커판 ☁️</h3>
-              </div>
-              <span className="rounded-full bg-sky-soft px-3 py-1 text-sm font-bold text-sky-ink">{monthName}</span>
+          <div className="mt-[14px] rounded-[22px] bg-white p-4 shadow-[0_2px_0_#d5ecf9]">
+            <div className="mb-1.5 flex items-baseline justify-between text-sm">
+              <span>☁️ 출석</span>
+              <span><b className="font-jua text-lg font-normal">{attendanceCount}</b> / {total} {lateCount > 0 && <small className="text-[#e08a4e]">(지각 {lateCount})</small>}</span>
             </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <Progress label={`출석 ${attendanceCount}/${total} (지각 ${lateCount})`} value={attendanceCount} total={total} tone="sky" />
-              <Progress label={`숙제 ${homeworkCount}/${total}`} value={homeworkCount} total={total} tone="amber" />
+            <Progress value={attendanceCount} total={total} color="#79c6ef" />
+            <div className="mb-1.5 mt-3 flex items-baseline justify-between text-sm">
+              <span>⭐ 숙제</span>
+              <span><b className="font-jua text-lg font-normal">{homeworkCount}</b> / {total}</span>
             </div>
-            <p className="mt-3 text-center font-jua text-sky-ink">강의 완주까지 {Math.max(0, total - attendanceCount)}번 남았어요! 조금만 더 🔥</p>
-          </>
-        )}
-
-        <div className="mt-4 grid grid-cols-4 gap-2">
-          {badgeStates.map((badge) => (
-            <div key={badge.id} className={`relative rounded-2xl px-1 py-3 text-center transition ${badge.earned ? "bg-sky-soft text-sky-ink" : "bg-slate-100 text-slate-400 grayscale"}`}>
-              {newBadges.includes(badge.id) && <span className="absolute -right-1 -top-2 rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-bold text-white">NEW</span>}
-              <span className="block text-xl">{badge.id === "attendance" ? "☁️" : badge.id === "homework" ? "⭐" : badge.id === "stickers" ? "💎" : "🏅"}</span>
-              <span className="mt-1 block text-[10px] font-bold leading-tight">{badge.title}</span>
-              <span className="mt-0.5 block text-[10px]">{badge.value}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-4 grid grid-cols-5 gap-1 text-center text-xs font-bold text-slate-500">
-          {["월", "화", "수", "목", "금"].map((day) => <div key={day} className="py-1">{day}</div>)}
-          {weeks.flatMap((week, weekIndex) => week.map((day, dayIndex) => {
-            if (!day) return <div key={`empty-${weekIndex}-${dayIndex}`} />;
-            const schoolDay = lessonDays.has(day);
-            const holiday = holidays[day];
-            const att = attendanceByDay.get(day);
-            const didHomework = homeworkDays.has(day);
-            const isNewAttendance = newStickers.includes(`${day}:attendance`);
-            const isNewHomework = newStickers.includes(`${day}:homework`);
-            const rotation = ((Number(day.slice(-2)) % 5) - 2) * 3;
-            return (
-              <div key={day} className={`relative flex min-h-[76px] flex-col items-center rounded-xl p-1 sm:min-h-[92px] ${schoolDay ? "border-2 border-dashed border-sky-main bg-sky-soft/70" : holiday ? "bg-red-50" : "bg-slate-50/70"} ${day === today ? "ring-2 ring-sky-deep" : ""}`}>
-                <span className={`self-start text-[11px] ${holiday ? "font-bold text-red-500" : schoolDay ? "text-sky-ink" : "text-slate-300"}`}>{Number(day.slice(-2))}</span>
-                {holiday && <span className="w-full truncate text-[9px] leading-tight text-red-500">{holiday}</span>}
-                {schoolDay && <div className="mt-1 flex h-7 items-center justify-center gap-1 sm:gap-2">
-                  <span className={`relative inline-flex ${isNewAttendance ? "sticker-pop" : ""}`} style={{ transform: `rotate(${rotation}deg)` }} title={att?.late ? "지각 출석" : att ? "출석" : "출석 기다리는 중"}>
-                    <Cloud className={`h-6 w-7 ${att ? att.late ? "fill-orange-300" : "fill-sky-main" : "fill-white"}`} />
-                    {att?.late && <span className="absolute -right-1 -top-1 text-[9px]">⏰</span>}
-                  </span>
-                  <span className={`inline-block text-base leading-none ${didHomework ? "text-amber-400" : "text-white"} ${isNewHomework ? "sticker-pop" : ""}`} style={{ transform: `rotate(${-rotation}deg)` }} title={didHomework ? "숙제 완료" : "숙제 기다리는 중"}>{didHomework ? "★" : "☆"}</span>
-                </div>}
-                {!schoolDay && !holiday && <span className="mt-2 text-sm text-slate-200">·</span>}
-              </div>
-            );
-          }))}
-        </div>
-
-        {active && (
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            {cafeUrl ? (
-              <a href={cafeUrl} target="_blank" rel="noreferrer" className="btn-ghost !py-3">📝 숙제 제출하러 가기</a>
-            ) : (
-              <button type="button" disabled className="btn-ghost !py-3">📝 숙제 제출하러 가기</button>
-            )}
-            {homeworkDays.has(today) ? (
-              <div className="flex items-center justify-center rounded-2xl bg-amber-50 px-3 py-3 text-center font-jua text-amber-700">오늘 숙제 제출 완료! ⭐</div>
-            ) : (
-              <form action={markHomeworkDone}>
-                <input type="hidden" name="app_id" value={appId} />
-                <input type="hidden" name="day" value={today} />
-                <button type="submit" disabled={!lessonDays.has(today)} className="btn w-full !py-3">숙제 제출했어요 ✓ 스티커 받기</button>
-              </form>
-            )}
+            <Progress value={homeworkCount} total={total} color="#ffd23f" />
+            <p className="mt-3 rounded-[14px] bg-[#fff7d6] px-2 py-[9px] text-center font-jua text-base text-[#a7741a]">강의 완주까지 {Math.max(0, total - attendanceCount)}번 남았어요! 조금만 더 🔥</p>
           </div>
         )}
-        <button type="button" onClick={downloadBoard} className="btn-ghost mt-3 w-full !py-3">📸 스티커판 이미지로 저장</button>
-      </div>
+
+        {!complete && active && todayIsLesson && (
+          todayHomeworkDone ? (
+            <div className="mt-[14px] rounded-[22px] border-2 border-[#ffe9a3] bg-[#fffbea] px-4 py-4 text-center font-jua text-base text-[#a7741a]">오늘 숙제 제출 완료! ⭐</div>
+          ) : (
+            <div className="mt-[14px] rounded-[22px] border-2 border-[#ffe58a] bg-gradient-to-br from-[#fff9e0] to-white p-4 shadow-[0_2px_0_#d5ecf9]">
+              <a href={cafeUrl || undefined} target="_blank" rel="noreferrer" aria-disabled={!cafeUrl} className={`block w-full rounded-2xl bg-[#ffd23f] px-3 py-[13px] text-center font-jua text-lg text-[#5a3b00] shadow-[0_4px_0_#e0b400] ${cafeUrl ? "" : "pointer-events-none opacity-50"}`}>📝 숙제 제출하러 가기</a>
+              <form action={markHomeworkDone} className="mt-2">
+                <input type="hidden" name="app_id" value={appId} />
+                <input type="hidden" name="day" value={today} />
+                <button className="block w-full rounded-2xl border-2 border-dashed border-[#e0b400] bg-white px-3 py-2.5 font-jua text-[15px] text-[#a7741a]">숙제 제출했어요 ✓ 스티커 받기</button>
+              </form>
+            </div>
+          )
+        )}
+
+        <div className="mt-[14px] rounded-[22px] bg-white p-4 shadow-[0_2px_0_#d5ecf9]">
+          <div className="grid grid-cols-4 gap-1.5 text-center">
+            {badgeStates.map((badge) => (
+              <div key={badge.id}>
+                <div className={`relative mx-auto mb-1 grid h-[58px] w-[58px] place-items-center rounded-full border-[3px] border-white shadow-[0_2px_6px_rgba(31,90,128,.2)] ${badge.earned ? "" : "opacity-55 grayscale"}`} style={{ background: badge.earned ? badge.color : "#eef2f5" }}>
+                  <BadgeIcon type={badge.icon} />
+                  {newBadges.includes(badge.id) && <span className="absolute -mt-[60px] ml-[42px] rounded-full bg-[#ff6b8a] px-1.5 py-0.5 font-jua text-[10px] text-white">NEW</span>}
+                </div>
+                <p className="m-0 font-jua text-xs leading-[1.3] text-[#1f5a80]">{badge.title}<br /><small className="font-body text-[11px] text-[#7aa3bd]">{badge.count}</small></p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-[14px] rounded-[22px] bg-white p-4 shadow-[0_2px_0_#d5ecf9]">
+          <div className="mb-1.5 grid grid-cols-5 gap-[5px] text-center font-jua text-[13px] text-[#7aa3bd]">
+            {["월", "화", "수", "목", "금"].map((day) => <span key={day}>{day}</span>)}
+          </div>
+          <div className="grid grid-cols-5 gap-[5px]">
+            {weeks.flatMap((week, weekIndex) => week.map((day, dayIndex) => {
+              if (!day) return <div key={`blank-${weekIndex}-${dayIndex}`} className="invisible min-h-[74px]" />;
+              const isLesson = lessonDays.has(day);
+              const holiday = holidays[day];
+              const isToday = day === today;
+              const att = attendanceByDay.get(day);
+              const didHomework = homeworkDays.has(day);
+              const future = isLesson && day > today;
+              const missed = isLesson && day <= today && !att;
+              const rotation = ((Number(day.slice(-2)) * 7) % 25) - 12;
+              const cloudNew = newStickers.includes(`${day}:attendance`);
+              const starNew = newStickers.includes(`${day}:homework`);
+              return (
+                <div key={day} className={`relative min-h-[74px] min-w-0 rounded-[14px] border-2 px-px pb-1 pt-1 ${holiday ? "sticker-day-holiday" : !isLesson ? "border-2 border-transparent bg-transparent" : future || missed ? "border-dashed border-[#c4e2f4] bg-white" : isToday ? "border-[#2b8fc7] bg-[#eaf6fd]" : "border-[#e1f1fb] bg-[#f7fcff]"}`}>
+                  {isToday && <span className="absolute -right-1 -top-2 rounded-full bg-[#2b8fc7] px-1.5 py-0.5 font-jua text-[10px] text-white">오늘</span>}
+                  <div className={`pl-1 text-left font-jua text-sm ${holiday ? "text-[#e5707e]" : isToday ? "text-[#2b8fc7]" : isLesson ? "text-[#5b88a6]" : "text-[#c6dceb]"}`}>{Number(day.slice(-2))}</div>
+                  {holiday && <div className="mt-2 truncate font-jua text-[10px] text-[#e5707e]">{holiday}</div>}
+                  {isLesson && <div className="mt-[3px] flex h-[30px] justify-center">
+                    <div className="grid w-7 place-items-center">
+                      {att ? <span className={cloudNew ? "mock-pop" : ""} style={{ display: "inline-block", transform: `rotate(${rotation}deg)`, ["--r" as string]: `${rotation}deg` } as React.CSSProperties}><CloudSticker fill={att.late ? "#ffb685" : "#79c6ef"} size={27} /></span> : <EmptySlot />}
+                    </div>
+                    <div className="grid w-7 place-items-center">
+                      {didHomework ? <span className={starNew ? "mock-pop" : ""} style={{ display: "inline-block", transform: `rotate(${-rotation}deg)`, ["--r" as string]: `${-rotation}deg` } as React.CSSProperties}><StarSticker size={23} /></span> : future ? <EmptySlot /> : missed ? <EmptySlot /> : null}
+                    </div>
+                  </div>}
+                </div>
+              );
+            }))}
+          </div>
+          <div className="mt-3 flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-[#5b88a6]">
+            <span className="flex items-center gap-[3px]"><CloudSticker fill="#79c6ef" size={22} />출석</span>
+            <span className="flex items-center gap-[3px]"><CloudSticker fill="#ffb685" size={22} />지각 출석</span>
+            <span className="flex items-center gap-[3px]"><StarSticker size={18} />숙제</span>
+          </div>
+        </div>
+
+        <button type="button" onClick={downloadBoard} className="mt-[14px] block w-full rounded-[18px] bg-[#2b8fc7] px-3 py-3.5 font-jua text-lg text-white shadow-[0_4px_0_#1f6f9d]">📸 스티커판 이미지로 저장</button>
+      </main>
     </section>
   );
 }
 
-function Progress({ label, value, total, tone }: { label: string; value: number; total: number; tone: "sky" | "amber" }) {
+function Progress({ value, total, color }: { value: number; total: number; color: string }) {
+  return <div className="mb-3 h-3 overflow-hidden rounded-full bg-[#e6f4fc]"><i className="block h-full rounded-full transition-all" style={{ width: `${total ? Math.min(100, value / total * 100) : 0}%`, background: color }} /></div>;
+}
+
+function BadgeIcon({ type }: { type: "cloud" | "star" | "medal" | "rainbow" }) {
+  if (type === "cloud") return <CloudSticker fill="#79c6ef" size={34} face={false} />;
+  if (type === "star") return <StarSticker size={32} face={false} />;
+  return <span className="text-[26px]">{type === "medal" ? "🏅" : "🌈"}</span>;
+}
+
+function CloudSticker({ fill, size, face = true }: { fill: string; size: number; face?: boolean }) {
   return (
-    <div className="rounded-xl bg-white/80 px-3 py-2">
-      <div className="flex justify-between text-xs font-bold text-slate-600"><span>{label}</span><span>{total ? Math.round(value / total * 100) : 0}%</span></div>
-      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
-        <div className={`h-full rounded-full transition-all ${tone === "sky" ? "bg-sky-deep" : "bg-amber-400"}`} style={{ width: `${total ? Math.min(100, value / total * 100) : 0}%` }} />
-      </div>
-    </div>
+    <svg width={size} height={size * 0.78} viewBox="0 0 64 50" aria-hidden="true" className="shrink-0">
+      <g fill="white" stroke="white" strokeWidth="7" strokeLinejoin="round"><CloudParts /></g>
+      <g fill={fill}><CloudParts /></g>
+      {face && <g fill="#24445c">
+        <circle cx="26" cy="31" r="2" /><circle cx="38" cy="31" r="2" />
+        <path d="M29 35q3 3 6 0" stroke="#24445c" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+        <ellipse cx="21" cy="35" rx="3" ry="1.8" fill="#ff9fb4" opacity=".8" /><ellipse cx="43" cy="35" rx="3" ry="1.8" fill="#ff9fb4" opacity=".8" />
+      </g>}
+    </svg>
   );
+}
+
+function CloudParts() {
+  return <><circle cx="18" cy="30" r="10" /><circle cx="31" cy="22" r="13" /><circle cx="45" cy="29" r="10" /><rect x="9" y="27" width="46" height="14" rx="7" /></>;
+}
+
+function StarSticker({ size, face = true }: { size: number; face?: boolean }) {
+  const points = Array.from({ length: 10 }, (_, index) => {
+    const angle = -Math.PI / 2 + index * Math.PI / 5;
+    const radius = index % 2 ? 10.5 : 22;
+    return `${(25 + radius * Math.cos(angle)).toFixed(1)},${(27 + radius * Math.sin(angle)).toFixed(1)}`;
+  }).join(" ");
+  return (
+    <svg width={size} height={size} viewBox="0 0 50 50" aria-hidden="true" className="shrink-0">
+      <polygon points={points} fill="white" stroke="white" strokeWidth="7" strokeLinejoin="round" />
+      <polygon points={points} fill="#ffd23f" stroke="#f5b800" strokeWidth="1.2" strokeLinejoin="round" />
+      {face && <g fill="#5a3b00"><circle cx="21" cy="27" r="1.8" /><circle cx="29" cy="27" r="1.8" /><path d="M22.5 31q2.5 2.5 5 0" stroke="#5a3b00" strokeWidth="1.6" fill="none" strokeLinecap="round" /></g>}
+    </svg>
+  );
+}
+
+function EmptySlot() {
+  return <span className="h-[18px] w-[18px] rounded-full border-2 border-dashed border-[#cfe6f4]" />;
+}
+
+function Confetti() {
+  const colors = ["#ff8fab", "#ffd23f", "#79c6ef", "#b9a7ff", "#8fe3b0"];
+  return <div className="mock-confetti" aria-hidden="true">{Array.from({ length: 40 }, (_, index) => <i key={index} style={{ left: `${(index * 47 + 9) % 100}%`, background: colors[index % colors.length], animationDelay: `${-(index * 13 % 32) / 10}s`, animationDuration: `${2.6 + (index * 7 % 16) / 10}s` }} />)}</div>;
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number, fill: string, stroke = "transparent", lineWidth = 0, dash: number[] = []) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, radius);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  if (stroke !== "transparent") {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = lineWidth;
+    ctx.setLineDash(dash);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function drawStoryCloud(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, fill: string, face = false) {
+  const scale = size / 64;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = "white";
+  ctx.beginPath();
+  ctx.arc(18, 30, 10, 0, Math.PI * 2);
+  ctx.arc(31, 22, 13, 0, Math.PI * 2);
+  ctx.arc(45, 29, 10, 0, Math.PI * 2);
+  ctx.roundRect(9, 27, 46, 14, 7);
+  ctx.fill();
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.arc(18, 30, 10, 0, Math.PI * 2);
+  ctx.arc(31, 22, 13, 0, Math.PI * 2);
+  ctx.arc(45, 29, 10, 0, Math.PI * 2);
+  ctx.roundRect(9, 27, 46, 14, 7);
+  ctx.fill();
+  if (face) {
+    ctx.fillStyle = "#24445c";
+    ctx.beginPath();
+    ctx.arc(26, 31, 1.8, 0, Math.PI * 2);
+    ctx.arc(38, 31, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawStoryStar(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(size / 50, size / 50);
+  ctx.beginPath();
+  for (let index = 0; index < 10; index++) {
+    const angle = -Math.PI / 2 + index * Math.PI / 5;
+    const radius = index % 2 ? 10.5 : 22;
+    const px = 25 + radius * Math.cos(angle);
+    const py = 27 + radius * Math.sin(angle);
+    if (index === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fillStyle = "white";
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 7;
+  ctx.lineJoin = "round";
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#ffd23f";
+  ctx.strokeStyle = "#f5b800";
+  ctx.lineWidth = 1.2;
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawStoryCircle(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.strokeStyle = "#cfe6f4";
+  ctx.lineWidth = 4;
+  ctx.setLineDash([5, 5]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
 }
