@@ -60,6 +60,15 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   if (!/^\d{4}$/.test(pin)) return { error: "강의실 비밀번호를 숫자 4자리로 정해 주세요." };
   if (!fd.get("agree")) return { error: "필독 사항 확인에 체크해 주세요." };
 
+  // 같은 달에 같은 이름 + 같은 비밀번호로 이미 낸 신청이 있으면 새로 만들지 않고 그 신청 화면으로 보내요.
+  // 이름이 같아도 비밀번호가 다르면 동명이인으로 보고 새로 받아요.
+  const mine = (await findApplicationsByName(name)).filter((a) => checkPin(pin, a.pin_hash));
+  const existing = mine.find((a) => a.cohort === cohort);
+  if (existing) {
+    await setStudent(mine.map((a) => a.id));
+    redirect(`/my/${existing.id}?again=1`);
+  }
+
   const id = await createApplication({
     cohort,
     kind,

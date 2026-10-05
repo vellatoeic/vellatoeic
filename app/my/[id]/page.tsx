@@ -5,26 +5,38 @@ import { getApplication, getSetting } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-export default async function MyPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function MyPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ again?: string }> }) {
   const { id } = await params;
+  const { again } = await searchParams;
   const a = await getApplication(id);
   if (!a) notFound();
   const account = await getSetting("bank_account");
 
   const steps =
     a.pickup === "delivery"
-      ? ["신청 완료", "납부 확인", "교재 발송"]
-      : ["신청 완료", "납부 확인", "수업 준비 완료"];
+      ? ["신청서 제출", "납부 확인", "교재 발송"]
+      : ["신청서 제출", "납부 확인", "수업 준비 완료"];
   const done = a.status === "pending" ? 1 : a.status === "paid" ? (a.pickup === "delivery" ? 2 : 3) : 3;
 
   return (
     <div className="space-y-6 pt-8">
       <div className="text-center">
         <h1 className="font-jua text-4xl text-sky-ink">
-          {a.status === "pending" ? "신청 완료!" : a.pickup === "delivery" && a.status === "paid" ? "납부 확인 완료!" : "모든 준비 완료!"}
+          {a.status === "pending" ? "아직 납부 전이에요" : a.pickup === "delivery" && a.status === "paid" ? "납부 확인 완료!" : "모든 준비 완료!"}
         </h1>
         <p className="mt-2 text-slate-600">{a.name}님, 이 페이지를 즐겨찾기 해두면 진행 상황을 확인할 수 있어요.</p>
       </div>
+
+      {again && (
+        <p className="card !bg-sky-soft text-center font-bold text-sky-ink">이미 제출한 신청이 있어요.<br />다시 제출하지 않아도 돼요.</p>
+      )}
+
+      {a.status === "pending" && (
+        <div className="rounded-3xl border-2 border-red-300 bg-red-50 p-5 text-center">
+          <p className="font-jua text-2xl text-red-600">⚠️ 신청서만 제출된 상태예요</p>
+          <p className="mt-2 text-[15px] text-slate-700">아래 계좌로 <b>입금해야 신청이 완료</b>돼요.<br />입금이 확인되면 이 화면이 &apos;납부 확인&apos;으로 바뀌어요.</p>
+        </div>
+      )}
 
       <ol className="card flex items-center justify-between gap-2">
         {steps.map((s, i) => (

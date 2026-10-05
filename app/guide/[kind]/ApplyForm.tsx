@@ -160,8 +160,9 @@ export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 })
       {state.error && <p className="rounded-xl bg-red-50 p-3 text-center font-bold text-red-600">{state.error}</p>}
 
       <button className="btn w-full" disabled={pending || blocked}>
-        {pending ? "제출 중…" : "신청하고 계좌 확인하기"}
+        {pending ? "제출 중…" : "신청서 제출하기 (입금은 다음 단계)"}
       </button>
+      <p className="text-center text-sm text-slate-600">제출 후 나오는 계좌로 <b className="text-red-600">입금까지 해야</b> 신청이 완료돼요.<br />신청서는 한 번만 제출해 주세요.</p>
     </form>
   );
 }
