@@ -8,9 +8,11 @@ import {
 } from "@/lib/config";
 import {
   createApplication, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
+  createSpecialRegistration, getSpecialLecture, getSpecialRegistrationById, listSpecialRegistrations, updateSpecialLecture, updateSpecialRegistration,
 } from "@/lib/db";
 import { canWatch } from "@/lib/access";
 import { SCHEDULE_CLASSES, holidayKey, homeworkAssignmentDays, parseHolidays, parseSchoolDays, previousMonth, scheduleKey, scheduleClassFor, schoolDaysFor, shiftSchoolDays, type ScheduleClass } from "@/lib/schedule";
+import { specialRegistrationOpen } from "@/lib/special";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
 } from "@/lib/auth";
@@ -89,7 +91,7 @@ export async function studentLogin(_: FormState, fd: FormData): Promise<FormStat
   }
   await setStudent(mine.map((a) => a.id));
   const next = clean(fd.get("next"));
-  redirect(next.startsWith("/check?") || next === "/class" ? next : "/class");
+  redirect(next.startsWith("/check?") || next === "/class" || next === "/special" ? next : "/class");
 }
 
 export async function studentLogout() {
@@ -207,6 +209,66 @@ export async function removeLecture(fd: FormData) {
   if (!(await isAdmin())) return;
   await deleteLecture(clean(fd.get("id")));
   revalidatePath("/admin/lectures");
+}
+
+// ── 특강 신청·관리 ─────────────────────────────
+export async function registerSpecialLecture(fd: FormData) {
+  const eventId = clean(fd.get("event_id"));
+  const applicationId = clean(fd.get("application_id"));
+  const mode = clean(fd.get("mode"));
+  if (mode !== "onsite" && mode !== "online") return;
+  const studentIds = await getStudentIds();
+  if (!studentIds.includes(applicationId)) return;
+  const app = await getApplication(applicationId);
+  const event = await getSpecialLecture(eventId);
+  if (!app || !canWatch(app) || !event || app.cohort !== event.cohort || !specialRegistrationOpen(event.event_date, event.starts_at)) return;
+  const eventRegistrations = await listSpecialRegistrations(eventId);
+  if (eventRegistrations.some((registration) => studentIds.includes(registration.application_id))) return;
+  await createSpecialRegistration({ special_lecture_id: eventId, application_id: applicationId, mode });
+  revalidatePath("/special");
+}
+
+export async function saveSpecialLecture(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const id = clean(fd.get("id"));
+  const title = clean(fd.get("title"));
+  const startsAt = clean(fd.get("starts_at"));
+  const endsAt = clean(fd.get("ends_at"));
+  const youtube = clean(fd.get("youtube_url"));
+  const event = await getSpecialLecture(id);
+  if (!event || !title || !/^\d{2}:\d{2}$/.test(startsAt)) return;
+  if (endsAt && (!/^\d{2}:\d{2}$/.test(endsAt) || endsAt <= startsAt)) return;
+  const youtubeIdValue = youtube ? youtubeId(youtube) : null;
+  if (youtube && !youtubeIdValue) return;
+  await updateSpecialLecture(id, { title, starts_at: startsAt, ends_at: endsAt || null, youtube_id: youtubeIdValue });
+  revalidatePath("/admin/special");
+  revalidatePath("/special");
+}
+
+export async function confirmSpecialRegistration(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const id = clean(fd.get("id"));
+  const registration = await getSpecialRegistrationById(id);
+  if (!registration || registration.approved) return;
+  await updateSpecialRegistration(id, registration.mode === "onsite" ? { deposit_paid: true, approved: true } : { approved: true });
+  revalidatePath("/admin/special");
+  revalidatePath("/special");
+}
+
+export async function confirmSpecialAttendance(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const registration = await getSpecialRegistrationById(clean(fd.get("id")));
+  if (!registration?.approved || registration.attended) return;
+  await updateSpecialRegistration(registration.id, { attended: true });
+  revalidatePath("/admin/special");
+}
+
+export async function markSpecialRefunded(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const registration = await getSpecialRegistrationById(clean(fd.get("id")));
+  if (!registration || registration.mode !== "onsite" || !registration.deposit_paid || !registration.attended || registration.refunded) return;
+  await updateSpecialRegistration(registration.id, { refunded: true });
+  revalidatePath("/admin/special");
 }
 
 // 학생이 반을 잘못 고른 경우 Vella가 바로잡기 (교재·금액 자동 재계산)

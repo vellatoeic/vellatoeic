@@ -33,6 +33,37 @@ export type Lecture = {
   created_at: string;
 };
 
+export type SpecialLecture = {
+  id: string;
+  cohort: string;
+  event_date: string;
+  title: string;
+  starts_at: string;
+  ends_at: string | null;
+  youtube_id: string | null;
+  created_at: string;
+};
+
+export type SpecialRegistration = {
+  id: string;
+  special_lecture_id: string;
+  application_id: string;
+  mode: "onsite" | "online";
+  deposit_paid: boolean;
+  approved: boolean;
+  attended: boolean;
+  refunded: boolean;
+  created_at: string;
+};
+
+export type SpecialMaterial = {
+  id: string;
+  special_lecture_id: string;
+  file_name: string;
+  storage_path: string;
+  created_at: string;
+};
+
 // Supabase 연결 정보가 없으면(미리보기) 메모리에 임시 저장해요.
 const url = process.env.SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -52,9 +83,15 @@ type Mem = {
   attendance: Attendance[];
   homework: Homework[];
   photos: Record<string, string>;
+  specialLectures: SpecialLecture[];
+  specialRegistrations: SpecialRegistration[];
+  specialMaterials: SpecialMaterial[];
 };
 const g = globalThis as unknown as { __vellaMem?: Mem };
-const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {} });
+const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [] });
+mem.specialLectures ??= [];
+mem.specialRegistrations ??= [];
+mem.specialMaterials ??= [];
 mem.lectures ??= [];
 mem.attendance ??= [];
 mem.homework ??= [];
@@ -197,6 +234,130 @@ export async function deleteLecture(id: string) {
     return;
   }
   mem.lectures = mem.lectures.filter((l) => l.id !== id);
+}
+
+// ── 특강 ────────────────────────────────────────
+export async function listSpecialLectures(): Promise<SpecialLecture[]> {
+  if (sb) {
+    const { data, error } = await sb.from("special_lectures").select("*").order("event_date", { ascending: true });
+    if (error) throw error;
+    return data as SpecialLecture[];
+  }
+  return mem.specialLectures.sort((a, b) => a.event_date.localeCompare(b.event_date));
+}
+
+export async function getSpecialLecture(id: string): Promise<SpecialLecture | null> {
+  if (sb) {
+    const { data, error } = await sb.from("special_lectures").select("*").eq("id", id).maybeSingle();
+    if (error) throw error;
+    return (data as SpecialLecture) ?? null;
+  }
+  return mem.specialLectures.find((event) => event.id === id) ?? null;
+}
+
+export async function updateSpecialLecture(id: string, patch: Pick<SpecialLecture, "title" | "starts_at" | "ends_at" | "youtube_id">) {
+  if (sb) {
+    const { error } = await sb.from("special_lectures").update(patch).eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  const event = mem.specialLectures.find((item) => item.id === id);
+  if (event) Object.assign(event, patch);
+}
+
+export async function listSpecialRegistrations(special_lecture_id?: string): Promise<SpecialRegistration[]> {
+  if (sb) {
+    let query = sb.from("special_lecture_registrations").select("*").order("created_at", { ascending: true });
+    if (special_lecture_id) query = query.eq("special_lecture_id", special_lecture_id);
+    const { data, error } = await query;
+    if (error) throw error;
+    return data as SpecialRegistration[];
+  }
+  return mem.specialRegistrations.filter((registration) => !special_lecture_id || registration.special_lecture_id === special_lecture_id);
+}
+
+export async function getSpecialRegistration(special_lecture_id: string, application_id: string): Promise<SpecialRegistration | null> {
+  if (sb) {
+    const { data, error } = await sb.from("special_lecture_registrations").select("*").eq("special_lecture_id", special_lecture_id).eq("application_id", application_id).maybeSingle();
+    if (error) throw error;
+    return (data as SpecialRegistration) ?? null;
+  }
+  return mem.specialRegistrations.find((registration) => registration.special_lecture_id === special_lecture_id && registration.application_id === application_id) ?? null;
+}
+
+export async function getSpecialRegistrationById(id: string): Promise<SpecialRegistration | null> {
+  if (sb) {
+    const { data, error } = await sb.from("special_lecture_registrations").select("*").eq("id", id).maybeSingle();
+    if (error) throw error;
+    return (data as SpecialRegistration) ?? null;
+  }
+  return mem.specialRegistrations.find((registration) => registration.id === id) ?? null;
+}
+
+export async function createSpecialRegistration(registration: Pick<SpecialRegistration, "special_lecture_id" | "application_id" | "mode">) {
+  if (sb) {
+    const { error } = await sb.from("special_lecture_registrations").insert(registration);
+    if (error) throw error;
+    return;
+  }
+  if (await getSpecialRegistration(registration.special_lecture_id, registration.application_id)) return;
+  mem.specialRegistrations.push({ ...registration, id: crypto.randomUUID(), deposit_paid: false, approved: false, attended: false, refunded: false, created_at: new Date().toISOString() });
+}
+
+type SpecialRegistrationPatch = Partial<Pick<SpecialRegistration, "deposit_paid" | "approved" | "attended" | "refunded">>;
+
+export async function updateSpecialRegistration(id: string, patch: SpecialRegistrationPatch) {
+  if (sb) {
+    const { error } = await sb.from("special_lecture_registrations").update(patch).eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  const registration = mem.specialRegistrations.find((item) => item.id === id);
+  if (registration) Object.assign(registration, patch);
+}
+
+export async function listSpecialMaterials(special_lecture_id: string): Promise<SpecialMaterial[]> {
+  if (sb) {
+    const { data, error } = await sb.from("special_lecture_materials").select("*").eq("special_lecture_id", special_lecture_id).order("created_at", { ascending: true });
+    if (error) throw error;
+    return data as SpecialMaterial[];
+  }
+  return mem.specialMaterials.filter((material) => material.special_lecture_id === special_lecture_id);
+}
+
+export async function getSpecialMaterial(id: string): Promise<SpecialMaterial | null> {
+  if (sb) {
+    const { data, error } = await sb.from("special_lecture_materials").select("*").eq("id", id).maybeSingle();
+    if (error) throw error;
+    return (data as SpecialMaterial) ?? null;
+  }
+  return mem.specialMaterials.find((material) => material.id === id) ?? null;
+}
+
+export async function uploadSpecialMaterial(special_lecture_id: string, fileName: string, file: Buffer, contentType: string) {
+  const safeName = fileName.replace(/[^\p{L}\p{N}._-]/gu, "_").slice(-120) || "material";
+  const storagePath = `${special_lecture_id}/${crypto.randomUUID()}-${safeName}`;
+  if (sb) {
+    const upload = await sb.storage.from("special-lecture-materials").upload(storagePath, file, { contentType, upsert: false });
+    if (upload.error) throw upload.error;
+    const { error } = await sb.from("special_lecture_materials").insert({ special_lecture_id, file_name: fileName.slice(0, 200), storage_path: storagePath });
+    if (error) {
+      await sb.storage.from("special-lecture-materials").remove([storagePath]);
+      throw error;
+    }
+    return;
+  }
+  mem.photos[storagePath] = `data:${contentType};base64,${file.toString("base64")}`;
+  mem.specialMaterials.push({ id: crypto.randomUUID(), special_lecture_id, file_name: fileName.slice(0, 200), storage_path: storagePath, created_at: new Date().toISOString() });
+}
+
+export async function specialMaterialUrl(path: string): Promise<string | null> {
+  if (sb) {
+    const { data, error } = await sb.storage.from("special-lecture-materials").createSignedUrl(path, 60 * 10);
+    if (error) throw error;
+    return data?.signedUrl ?? null;
+  }
+  return mem.photos[path] ?? null;
 }
 
 // ── 설정 ───────────────────────────────────────
