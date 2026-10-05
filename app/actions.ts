@@ -23,6 +23,18 @@ const clean = (v: FormDataEntryValue | null) => String(v ?? "").trim().slice(0, 
 const largeField = (fd: FormData, key: string) => String(fd.get(key) ?? "").trim().slice(0, 6000);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// 한글 이름 사이 띄어쓰기는 지워서 같은 학생이 다른 이름으로 저장되지 않게 해요.
+function normName(raw: string) {
+  const name = raw.replace(/\s+/g, " ").trim();
+  return /^[가-힣 ]+$/.test(name) ? name.replace(/ /g, "") : name;
+}
+
+// 로그인할 때는 띄어 쓴 이름과 붙여 쓴 이름을 모두 찾아요 (예전 신청 대비).
+async function findByName(raw: string) {
+  const names = [...new Set([raw, normName(raw)])];
+  return (await Promise.all(names.map(findApplicationsByName))).flat();
+}
+
 function validCohort(value: string) {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
 }
@@ -44,7 +56,7 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   const books = Object.hasOwn(COURSES, course) && COURSES[course].tracks.includes(track)
     ? booksFor(course, track, await roundFor(cohort), continuing)
     : [];
-  const name = clean(fd.get("name"));
+  const name = normName(clean(fd.get("name")));
   const phone = clean(fd.get("phone")).replace(/[^0-9]/g, "");
   const depositor = clean(fd.get("depositor")) || name;
   const address = clean(fd.get("address"));
@@ -56,15 +68,16 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   if (!COURSES[course].tracks.includes(track)) return { error: "수강 과정을 선택해 주세요." };
   if (!isTimeSlot(slot)) return { error: "수강 시간(오전반/저녁반)을 선택해 주세요." };
   if (!["classroom", "delivery"].includes(pickup)) return { error: "교재 수령 방법을 선택해 주세요." };
-  if (!name) return { error: "이름을 입력해 주세요." };
+  if (!/^[가-힣a-zA-Z ]{2,20}$/.test(name)) return { error: "이름을 한글 또는 영문으로 정확히 입력해 주세요." };
   if (kind === "online" && !/^01[0-9]{8,9}$/.test(phone)) return { error: "연락처를 정확히 입력해 주세요. (예: 01012345678)" };
-  if (pickup === "delivery" && address.length < 5) return { error: "택배 받을 주소를 입력해 주세요." };
+  if (pickup === "delivery" && address.length < 10) return { error: "택배 받을 주소를 입력해 주세요." };
   if (!/^\d{4}$/.test(pin)) return { error: "강의실 비밀번호를 숫자 4자리로 정해 주세요." };
+  if (pin !== clean(fd.get("pin2"))) return { error: "비밀번호 확인이 맞지 않아요. 같은 숫자 4자리를 두 번 입력해 주세요." };
   if (!fd.get("agree")) return { error: "필독 사항 확인에 체크해 주세요." };
 
   // 같은 달에 같은 이름 + 같은 비밀번호로 이미 낸 신청이 있으면 새로 만들지 않고 그 신청 화면으로 보내요.
   // 이름이 같아도 비밀번호가 다르면 동명이인으로 보고 새로 받아요.
-  const mine = (await findApplicationsByName(name)).filter((a) => checkPin(pin, a.pin_hash));
+  const mine = (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash));
   const existing = mine.find((a) => a.cohort === cohort);
   if (existing) {
     await setStudent(mine.map((a) => a.id));
@@ -96,7 +109,7 @@ export async function studentLogin(_: FormState, fd: FormData): Promise<FormStat
   const name = clean(fd.get("name"));
   const pin = clean(fd.get("pin"));
   if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 비밀번호 4자리를 입력해 주세요." };
-  const mine = (await findApplicationsByName(name)).filter((a) => checkPin(pin, a.pin_hash));
+  const mine = (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash));
   if (mine.length === 0) {
     await sleep(800);
     return { error: "이름 또는 비밀번호가 맞지 않아요. 잊어버렸다면 Vella에게 문의해 주세요." };
@@ -238,7 +251,7 @@ export async function registerSpecialLecture(_: FormState, fd: FormData): Promis
   if (mode !== "onsite" && mode !== "online") return { error: "현장 또는 불라방을 선택해 주세요." };
   if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 강의실 비밀번호 4자리를 입력해 주세요." };
 
-  const mine = (await findApplicationsByName(name)).filter((a) => checkPin(pin, a.pin_hash));
+  const mine = (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash));
   const month = mine.filter((a) => a.cohort === event.event_date.slice(0, 7));
   if (month.length === 0) {
     await sleep(800);
@@ -265,7 +278,7 @@ export async function specialLogin(_: FormState, fd: FormData): Promise<FormStat
   const name = clean(fd.get("name"));
   const pin = clean(fd.get("pin"));
   if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 강의실 비밀번호 4자리를 입력해 주세요." };
-  const mine = (await findApplicationsByName(name)).filter((a) => checkPin(pin, a.pin_hash));
+  const mine = (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash));
   if (mine.length === 0) {
     await sleep(800);
     return { error: "이름 또는 강의실 비밀번호가 맞지 않아요. 잊어버렸다면 Vella에게 문의해 주세요." };

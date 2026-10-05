@@ -218,6 +218,11 @@ export const KLASS_TIME: Record<Klass, Slot[]> = {
 // 수강 시간 (신청서에서 오전반/저녁반 선택)
 export const TIME_SLOTS: Record<TimeSlot, string> = { am: "오전반", pm: "저녁반" };
 export const isTimeSlot = (v: string): v is TimeSlot => v === "am" || v === "pm";
+// 예: "시작반 주 4일(종합반) · 오전반"
+export function klassLabel(a: { course: CourseId; track: Track; slot: TimeSlot | null }) {
+  return `${COURSES[a.course].label} ${TRACKS[a.track]}${a.slot ? ` · ${TIME_SLOTS[a.slot]}` : ""}`;
+}
+
 // 예: "오전반 10:00~12:10"
 export function slotLabel(a: { course: CourseId; track: Track }, slot: TimeSlot) {
   const s = KLASS_TIME[klassOf(a)][slot === "am" ? 0 : 1];

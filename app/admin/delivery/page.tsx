@@ -1,4 +1,4 @@
-import { BOOKS, cohortLabel } from "@/lib/config";
+import { BOOKS, cohortLabel, klassLabel } from "@/lib/config";
 import { listApplications, currentCohort, isPreview } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { phoneLabel } from "@/lib/csv";
@@ -29,10 +29,10 @@ export default async function DeliveryPage() {
           전체 {delivery.length}명 · 발송 대기 {count("paid")}명 · 미납 {count("pending")}명 · 발송 완료 {count("shipped")}명
         </p>
       </div>
-      <section className="card">
+      <section className="card !p-4 sm:!p-6">
         {delivery.length > 0 ? (
           <DeliveryList
-            rows={delivery.map((a) => ({ id: a.id, name: a.name, phone: phoneLabel(a.phone), address: a.address ?? "", books: a.books.map((b) => BOOKS[b]).join(", "), status: a.status }))}
+            rows={delivery.map((a) => ({ id: a.id, name: a.name, klass: klassLabel(a), phone: phoneLabel(a.phone), address: a.address ?? "", books: a.books.map((b) => BOOKS[b]).join(", "), status: a.status }))}
           />
         ) : <p className="text-center text-slate-500">이번 기수 택배 신청자가 아직 없어요.</p>}
       </section>
