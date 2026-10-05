@@ -53,6 +53,14 @@ export function parseSchoolDays(value: string, cohort: string): string[] {
   }
 }
 
+export function schoolDaysFor(value: string, cohort: string, klass: ScheduleClass): string[] {
+  const days = value ? parseSchoolDays(value, cohort) : defaultSchoolDays(cohort, klass);
+  if (cohort !== "2026-10" || (klass !== "start-mw" && klass !== "solve-mw")) return days;
+
+  // 10/5 공휴일 수업을 조정해 월수반은 10/16(금)에 보강해요.
+  return [...new Set([...days.filter((day) => day !== "2026-10-05"), "2026-10-16"])].sort();
+}
+
 export function parseHolidays(value: string, cohort: string): Record<string, string> {
   try {
     const result: unknown = JSON.parse(value);
@@ -66,6 +74,12 @@ export function parseHolidays(value: string, cohort: string): Record<string, str
 }
 
 export function defaultSchoolDays(cohort: string, klass: ScheduleClass): string[] {
+  if (cohort === "2026-10" && (klass === "start-mw" || klass === "solve-mw")) {
+    return [
+      "2026-10-07", "2026-10-12", "2026-10-14", "2026-10-16",
+      "2026-10-19", "2026-10-21", "2026-10-26", "2026-10-28",
+    ];
+  }
   // 2026년 10월은 개강일과 공휴일 조정으로 일반 월~목 패턴이 아니에요.
   if (cohort === "2026-10" && !klass.endsWith("-mw") && !klass.endsWith("-tt")) {
     return [

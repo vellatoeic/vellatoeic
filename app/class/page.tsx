@@ -6,7 +6,7 @@ import { canWatch, covers } from "@/lib/access";
 import { studentLogout } from "@/app/actions";
 import StudentLogin from "./StudentLogin";
 import StickerBoard from "./StickerBoard";
-import { defaultHolidays, defaultSchoolDays, holidayKey, parseHolidays, parseSchoolDays, scheduleClassFor, scheduleKey } from "@/lib/schedule";
+import { defaultHolidays, holidayKey, parseHolidays, schoolDaysFor, scheduleClassFor, scheduleKey } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "강의실 · vella_toeic", robots: { index: false } };
@@ -44,7 +44,7 @@ export default async function ClassRoom() {
       getSetting(holidayKey(appCohort)),
     ]);
     return [`${appCohort}:${klass}`, {
-      days: rawDays ? parseSchoolDays(rawDays, appCohort) : defaultSchoolDays(appCohort, klass),
+      days: schoolDaysFor(rawDays, appCohort, klass),
       holidays: rawHolidays ? parseHolidays(rawHolidays, appCohort) : defaultHolidays(appCohort),
     }] as const;
   })));
