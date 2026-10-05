@@ -51,9 +51,9 @@ export default function SpecialForm({ events }: { events: Option[] }) {
       <div className="space-y-3">
         <p className="label">3. 신청자 정보</p>
         <input name="name" className="input" placeholder="이름" autoComplete="name" />
-        <input name="pin" className="input tracking-[0.3em]" placeholder="비밀번호 4자리 (신청 확인용)" inputMode="numeric" maxLength={4} type="password" />
+        <input name="pin" className="input tracking-[0.3em]" placeholder="강의실 비밀번호 4자리" inputMode="numeric" maxLength={4} type="password" />
         {mode === "online" && <input name="phone" className="input" placeholder="연락처 (예: 01012345678)" inputMode="tel" autoComplete="tel" />}
-        <p className="text-xs text-slate-500">비밀번호는 이 페이지에서 신청 내용{mode === "online" ? "과 자료" : ""}를 확인할 때 써요.</p>
+        <p className="text-xs text-slate-500">교재비 신청할 때 정한 이름과 강의실 비밀번호를 입력해 주세요.<br />특강은 그 달 수강생(납부 완료)만 신청할 수 있어요.</p>
       </div>
 
       {state.error && <p className="text-sm font-bold text-red-600">{state.error}</p>}

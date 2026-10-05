@@ -29,7 +29,7 @@ export default async function SpecialPage() {
       <div className="text-center">
         <span className="rounded-full bg-sky-main px-4 py-1.5 text-sm font-bold text-sky-ink">토요 특강</span>
         <h1 className="font-jua mt-3 text-4xl text-sky-ink">특강 신청</h1>
-        <p className="mt-2 text-slate-600">현장 또는 불라방으로 신청할 수 있어요.</p>
+        <p className="mt-2 text-slate-600">그 달 수강생만 현장 또는 불라방으로 신청할 수 있어요.</p>
       </div>
 
       {open.length > 0

@@ -211,7 +211,7 @@ export async function removeLecture(fd: FormData) {
   revalidatePath("/admin/lectures");
 }
 
-// ── 특강 신청 (수강생이 아니어도 이름 + 비밀번호로 신청) ──────
+// ── 특강 신청 (그 달 납부 완료 수강생만, 이름 + 강의실 비밀번호로 확인) ──────
 const validTime = (v: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
 const validDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
 
@@ -228,6 +228,13 @@ export async function registerSpecialLecture(_: FormState, fd: FormData): Promis
   if (!name) return { error: "이름을 입력해 주세요." };
   if (!/^\d{4}$/.test(pin)) return { error: "비밀번호를 숫자 4자리로 정해 주세요." };
   if (mode === "online" && !/^01[0-9]{8,9}$/.test(phone)) return { error: "연락처를 정확히 입력해 주세요. (예: 01012345678)" };
+  const month = event.event_date.slice(0, 7);
+  const enrolled = (await findApplicationsByName(name)).filter((a) => a.cohort === month && checkPin(pin, a.pin_hash));
+  if (enrolled.length === 0) {
+    await sleep(800);
+    return { error: "이름 또는 강의실 비밀번호가 맞지 않아요. 특강은 그 달 수강생만 신청할 수 있어요." };
+  }
+  if (!enrolled.some(canWatch)) return { error: "교재비 납부가 확인된 뒤에 특강을 신청할 수 있어요." };
 
   const already = (await listSpecialRegistrations(eventId)).find((r) => r.name === name && checkPin(pin, r.pin_hash));
   const id = already?.id ?? await createSpecialRegistration({

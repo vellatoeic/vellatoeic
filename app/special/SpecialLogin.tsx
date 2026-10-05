@@ -8,7 +8,7 @@ export default function SpecialLogin() {
   const [state, action, pending] = useActionState<FormState, FormData>(specialLogin, {});
   return (
     <form onSubmit={keep(action)} className="card space-y-3">
-      <h2 className="font-jua text-xl text-sky-ink">신청 확인 · 자료 보기</h2>
+      <h2 className="font-jua text-xl text-sky-ink">불라방 신청 확인</h2>
       <p className="text-sm text-slate-500">특강 신청할 때 쓴 이름과 비밀번호로 확인해요.</p>
       <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
         <input name="name" className="input" placeholder="이름" autoComplete="name" />
