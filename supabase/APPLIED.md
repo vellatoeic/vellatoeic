@@ -10,6 +10,7 @@ Vella가 Supabase SQL Editor에서 실행했다고 확인한 SQL 파일만 기�
 | `4_attendance_late.sql` | 완료 | `2_stamps.sql`, `5_homework_stickers.sql`과 함께 실행. 출석 지각 열 추가 |
 | `5_homework_stickers.sql` | 완료 | `2_stamps.sql`, `4_attendance_late.sql`과 함께 실행. 숙제 사진 경로를 비워둘 수 있게 변경 |
 | `6_repair_runtime_schema.sql` | 완료 | 실행본에서는 Storage 권한 두 줄을 제외하고 마지막에 `notify pgrst, 'reload schema';`를 추가해 실행 |
+| `7_special_lectures.sql` | 완료 | 특강 일정·신청 명단·자료 표와 비공개 자료 보관함 생성, 10월 특강 2회 기본값 입력 |
 
 ## 기록 갱신 규칙
 
