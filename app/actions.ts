@@ -246,6 +246,21 @@ export async function markHomeworkDone(fd: FormData) {
   revalidatePath("/class");
 }
 
+export async function cancelMyHomeworkDone(fd: FormData) {
+  const id = clean(fd.get("app_id"));
+  const day = clean(fd.get("day"));
+  const ids = await getStudentIds();
+  if (!ids.includes(id) || day !== todayKST()) return;
+  const [app] = await getApplications([id]);
+  if (!app || !canWatch(app) || app.cohort !== (await currentCohort())) return;
+  const klass = scheduleClassFor(app.course, app.track);
+  const rawDays = await getSetting(scheduleKey(app.cohort, klass));
+  const savedDays = rawDays ? parseSchoolDays(rawDays, app.cohort) : defaultSchoolDays(app.cohort, klass);
+  if (!savedDays.includes(day)) return;
+  await deleteHomeworkSticker(app.id, day);
+  revalidatePath("/class");
+}
+
 export async function cancelHomeworkSticker(fd: FormData) {
   if (!(await isAdmin())) return;
   const id = clean(fd.get("id"));

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { markHomeworkDone } from "@/app/actions";
+import { cancelMyHomeworkDone, markHomeworkDone } from "@/app/actions";
 import { weekDaysInMonth, type ScheduleClass } from "@/lib/schedule";
 import Cloud from "@/components/Cloud";
 
@@ -223,7 +223,14 @@ export default function StickerBoard({
 
         {!complete && active && todayIsLesson && (
           todayHomeworkDone ? (
-            <div className="mt-[14px] rounded-[22px] border-2 border-[#ffe9a3] bg-[#fffbea] px-4 py-4 text-center font-jua text-base text-[#a7741a]">오늘 숙제 제출 완료! ⭐</div>
+            <div className="mt-[14px] rounded-[22px] border-2 border-[#ffe9a3] bg-[#fffbea] px-4 py-3 text-center text-[#a7741a]">
+              <p className="font-jua text-base">오늘 숙제 제출 완료! ⭐</p>
+              <form action={cancelMyHomeworkDone} className="mt-1">
+                <input type="hidden" name="app_id" value={appId} />
+                <input type="hidden" name="day" value={today} />
+                <button className="rounded-full px-3 py-1 text-xs text-[#a7741a]/70 underline underline-offset-2">잘못 눌렀어요 · 스티커 취소</button>
+              </form>
+            </div>
           ) : (
             <div className="mt-[14px] rounded-[22px] border-2 border-[#ffe58a] bg-gradient-to-br from-[#fff9e0] to-white p-4 shadow-[0_2px_0_#d5ecf9]">
               <a href={cafeUrl || undefined} target="_blank" rel="noreferrer" aria-disabled={!cafeUrl} className={`block w-full rounded-2xl bg-[#ffd23f] px-3 py-[13px] text-center font-jua text-lg text-[#5a3b00] shadow-[0_4px_0_#e0b400] ${cafeUrl ? "" : "pointer-events-none opacity-50"}`}>📝 숙제 제출하러 가기</a>

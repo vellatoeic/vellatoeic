@@ -89,9 +89,10 @@ export default async function ClassRoom() {
                     <a key={link.label} href={`https://youtu.be/${link.id}`} target="_blank" rel="noreferrer" className="btn-ghost !py-2">{link.label} 보기 ↗</a>
                   ))}
                   {(a.course === "intensive" ? [...liveLinks.start, ...liveLinks.solve] : liveLinks[a.course]).every((link) => !link.id) && (
-                    <p className="text-sm text-slate-600">라이브 링크가 등록되면 여기에 안내해요.</p>
+                    <p className="text-sm text-slate-600">수업이 시작되면 여기에 올라와요</p>
                   )}
                 </div>
+                <p className="mt-2 text-xs text-slate-500">(종강일까지 시청 가능)</p>
               </div>
             )}
             {(() => {
@@ -112,7 +113,6 @@ export default async function ClassRoom() {
                 active={a.cohort === cohort}
               />;
             })()}
-            {mine.length === 0 && <p className="mt-4 text-slate-500">아직 올라온 강의가 없어요. 수업이 시작되면 여기에 올라와요!</p>}
             {TRACK_PARTS[a.track].map((part) => {
               const list = mine.filter((l) => l.part === part);
               if (list.length === 0) return null;
