@@ -126,6 +126,7 @@ export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 })
           <label className="sm:col-span-2">
             <span className="label">택배 받을 주소</span>
             <input name="address" className="input" placeholder="도로명 주소 + 상세 주소" autoComplete="street-address" />
+            <span className="mt-1 block text-sm font-bold text-red-600">* 교재를 받을 수 있도록 동·호수까지 정확한 주소를 입력해 주세요.</span>
           </label>
         )}
       </div>
