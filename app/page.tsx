@@ -3,9 +3,9 @@ import Cloud from "@/components/Cloud";
 
 // 문구는 초안이에요. 자유롭게 바꿔 주세요.
 const POINTS = [
-  { t: "개념부터 탄탄하게", d: "토익이 처음이어도 괜찮아요. 시작반에서 개념집으로 기초를 잡고 갑니다." },
-  { t: "문제로 점수를 완성", d: "문풀반에서 실전 문제를 풀며 점수로 이어지는 감각을 만들어요." },
-  { t: "현장도, 라이브도", d: "서면 강의실 현장 수업과 온라인 불라방 중 편한 방식으로 들어요." },
+  { t: "개념부터 탄탄하게", d: ["토익이 처음이어도 괜찮아요.", "시작반에서 개념집으로 기초를 잡고 갑니다."] },
+  { t: "문제로 점수를 완성", d: ["문풀반에서 실전 문제를 풀며 점수로 이어지는 감각을 만들어요."] },
+  { t: "현장도, 라이브도", d: ["서면 강의실 현장 수업과 온라인 불라방 중 편한 방식으로 들어요."] },
 ];
 
 function HeroCloud({ className }: { className: string }) {
@@ -48,7 +48,9 @@ export default function Home() {
           {POINTS.map((p) => (
             <div key={p.t} className="card">
               <h3 className="font-jua text-xl text-sky-ink">{p.t}</h3>
-              <p className="mt-2 text-[15px] leading-relaxed text-slate-600">{p.d}</p>
+              <p className="mt-2 text-[15px] leading-relaxed text-slate-600">
+                {p.d.map((sentence) => <span key={sentence} className="block">{sentence}</span>)}
+              </p>
             </div>
           ))}
         </div>

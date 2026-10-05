@@ -68,7 +68,7 @@ export default async function Roster() {
         <p className="font-jua text-lg text-sky-ink">준비할 교재 (현장 · 납부 완료 기준)</p>
         <p className="mt-1 text-slate-700">{bookCount(onsite.filter((a) => a.status !== "pending")).join(" · ") || "아직 없어요"}</p>
         <p className="mt-2 text-sm text-amber-700">
-          미납 {onsite.filter((a) => a.status === "pending").length}명은 노란색으로 표시돼요. 납부 확인 후 지급하세요.
+          미납 {onsite.filter((a) => a.status === "pending").length}명은 노란색으로 표시돼요.<br />납부 확인 후 지급하세요.
         </p>
       </div>
 

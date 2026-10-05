@@ -37,7 +37,7 @@ export default async function QrPage() {
         <div>
           <h2 className="font-jua text-3xl text-sky-ink">출석 QR 인쇄</h2>
           <p className="mt-1 text-sm text-slate-500">
-            반별로 한 장씩 출력해 강의실에 붙여 두면 끝이에요. QR은 바뀌지 않으니 한 번만 붙이면 계속 쓸 수 있어요.
+            반별로 한 장씩 출력해 강의실에 붙여 두면 끝이에요.<br />QR은 바뀌지 않으니 한 번만 붙이면 계속 쓸 수 있어요.
           </p>
         </div>
         <PrintButton />

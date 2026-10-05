@@ -61,10 +61,10 @@ export default async function MyPage({ params }: { params: Promise<{ id: string 
           <p className="text-lg text-slate-700">
             {a.pickup === "delivery"
               ? a.status === "shipped"
-                ? "교재를 택배로 보냈어요. 곧 도착해요!"
+                ? <>교재를 택배로 보냈어요.<br />곧 도착해요!</>
                 : "납부가 확인됐어요. 교재를 순서대로 발송할게요."
               : a.kind === "onsite"
-                ? `납부가 확인됐어요. 첫 수업 날 ${CLASSROOM}에서 교재를 일괄 지급해요. 수강 시간에 맞춰 등원해 주세요!`
+                ? <>납부가 확인됐어요.<br />첫 수업 날 {CLASSROOM}에서 교재를 일괄 지급해요.<br />수강 시간에 맞춰 등원해 주세요!</>
                 : "납부가 확인됐어요. 1층 데스크에서 교재를 받아 가세요!"}
           </p>
         </section>

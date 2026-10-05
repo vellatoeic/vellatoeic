@@ -65,7 +65,7 @@ export default function ScheduleEditor({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="font-jua text-2xl text-sky-ink">{cohortLabel(cohort)} · {SCHEDULE_CLASSES[klass]} 수업일</h2>
-            <p className="mt-1 text-sm text-slate-500">요일 기준 날짜가 먼저 선택돼요. 날짜를 눌러 더하거나 빼고, 공휴일은 이름을 등록해 주세요.</p>
+            <p className="mt-1 text-sm text-slate-500">요일 기준 날짜가 먼저 선택돼요.<br />날짜를 눌러 더하거나 빼고, 공휴일은 이름을 등록해 주세요.</p>
           </div>
           <span className="rounded-full bg-sky-soft px-4 py-2 font-bold text-sky-ink">선택 {days.size}일</span>
         </div>
@@ -139,7 +139,7 @@ export default function ScheduleEditor({
           </ul>
         </section>
       )}
-      <p className="px-2 text-sm text-slate-500">수업일이 아닌 평일은 학생 달력에 날짜만 흐리게 보여요. 공휴일은 이름과 함께 빨간색으로 표시돼요.</p>
+      <p className="px-2 text-sm text-slate-500">수업일이 아닌 평일은 학생 달력에 날짜만 흐리게 보여요.<br />공휴일은 이름과 함께 빨간색으로 표시돼요.</p>
     </div>
   );
 }

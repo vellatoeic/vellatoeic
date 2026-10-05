@@ -238,7 +238,7 @@ export default function StickerBoard({
               </select>
             </label>
           ) : (
-            <p className="mb-3 text-center text-sm text-[#a7741a]">첫 수업에는 숙제가 없어요. 둘째 수업부터 날짜를 선택해 주세요.</p>
+            <p className="mb-3 text-center text-sm text-[#a7741a]">첫 수업에는 숙제가 없어요.<br />둘째 수업부터 날짜를 선택해 주세요.</p>
           )}
           <a href={cafeUrl || undefined} target="_blank" rel="noreferrer" aria-disabled={!cafeUrl} className={`block w-full rounded-2xl bg-[#ffd23f] px-3 py-[13px] text-center font-jua text-lg text-[#5a3b00] shadow-[0_4px_0_#e0b400] ${cafeUrl ? "" : "pointer-events-none opacity-50"}`}>📝 숙제 제출하러 가기</a>
           {selectedHomework ? (
