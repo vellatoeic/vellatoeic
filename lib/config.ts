@@ -71,6 +71,7 @@ export function booksFor(course: CourseId, track: Track, round: 1 | 2, continuin
   }
   if (track === "rc") return [solveRc];
   if (track === "lc") return [lc];
+  // 문풀반 격일반은 매달 교재가 바뀌므로 이어들어도 새 교재 전부 구매해요.
   return [solveRc, lc];
 }
 
@@ -144,18 +145,22 @@ export function youtubeId(url: string): string | null {
 }
 
 // ── 출석·숙제 스티커 ─────────────────────────────
-// 수업 단위: 시작반 / 시작반 격일반 / 문풀반 / 문풀반 격일반 (단과는 같은 시간 수업이라 매일반에 포함)
-export type Klass = "start-daily" | "start-alt" | "solve-daily" | "solve-alt" | "intensive-daily";
+// 수업 단위: 시작반 / 시작반 격일반 / 문풀반 / 문풀반 격일반 / 속성반 / LC 공통
+export type Klass = "start-daily" | "start-alt" | "solve-daily" | "solve-alt" | "intensive-daily" | "lc-common";
 export const KLASSES: Record<Klass, string> = {
   "start-daily": "시작반",
   "start-alt": "시작반 격일반",
   "solve-daily": "문풀반",
   "solve-alt": "문풀반 격일반",
   "intensive-daily": "속성반",
+  "lc-common": "LC 공통",
 };
 export function klassOf(a: { course: CourseId; track: Track }): Klass {
   if (a.course === "intensive") return "intensive-daily";
   return `${a.course}-${isAlt(a.track) ? "alt" : "daily"}` as Klass;
+}
+export function takesSharedLc(a: { course: CourseId; track: Track }) {
+  return a.course === "intensive" || a.track !== "rc";
 }
 export function todayKST() {
   return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
@@ -194,6 +199,10 @@ export const KLASS_TIME: Record<Klass, Slot[]> = {
   "solve-daily": SOLVE_TIME,
   "solve-alt": SOLVE_TIME,
   "intensive-daily": INTENSIVE_TIME,
+  "lc-common": [
+    { label: "오전 공통 LC", from: "11:10", to: "12:10", detail: "시작반·문풀반 공통 수업" },
+    { label: "저녁 공통 LC", from: "19:10", to: "20:10", detail: "시작반·문풀반 공통 수업" },
+  ],
 };
 
 // 수업 시작 전·종료 후로 이만큼 여유를 둬요 (지각·늦은 로그인 대비)
@@ -213,4 +222,25 @@ export function isCheckOpen(k: Klass, nowMs = Date.now()) {
   const kst = new Date(nowMs + 9 * 3600 * 1000);
   const now = kst.getUTCHours() * 60 + kst.getUTCMinutes();
   return KLASS_TIME[k].some((s) => now >= toMin(s.from) - CHECK_GRACE_MIN && now <= toMin(s.to) + CHECK_GRACE_MIN);
+}
+
+// 지각은 해당 수업의 첫 시작 시각을 넘긴 경우예요.
+const CLASS_STARTS: Record<Klass, string[]> = {
+  "start-daily": ["10:00", "20:20"],
+  "start-alt": ["10:00", "20:20"],
+  "solve-daily": ["11:10", "18:00"],
+  "solve-alt": ["11:10", "18:00"],
+  "intensive-daily": ["10:00", "18:00"],
+  "lc-common": ["11:10", "19:10"],
+};
+
+export function isLate(k: Klass, nowMs = Date.now()) {
+  const kst = new Date(nowMs + 9 * 3600 * 1000);
+  const now = kst.getUTCHours() * 60 + kst.getUTCMinutes();
+  return KLASS_TIME[k].some((slot, i) => {
+    const from = toMin(slot.from);
+    const to = toMin(slot.to);
+    const inSlot = now >= from - CHECK_GRACE_MIN && now <= to + CHECK_GRACE_MIN;
+    return inSlot && now > toMin(CLASS_STARTS[k][i]);
+  });
 }

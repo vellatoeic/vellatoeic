@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { KINDS, KLASSES, TRACKS, cohortLabel, dayLabel, klassOf, type Klass } from "@/lib/config";
+import { KINDS, KLASSES, TRACKS, cohortLabel, dayLabel, klassOf, takesSharedLc, type Klass } from "@/lib/config";
 import { listApplications, listStamps, currentCohort, isPreview } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { canWatch } from "@/lib/access";
-import { cleanupPhotos } from "@/app/actions";
+import { cleanupPhotos, markAttendanceManual } from "@/app/actions";
 import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
 
@@ -17,7 +17,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
   const cohort = await currentCohort();
 
   const apps = (await listApplications())
-    .filter((a) => a.cohort === cohort && canWatch(a) && klassOf(a) === klass)
+    .filter((a) => a.cohort === cohort && canWatch(a) && (klass === "lc-common" ? takesSharedLc(a) : klassOf(a) === klass))
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
   const { attendance, homework } = await listStamps(apps.map((a) => a.id));
   const days = [...new Set([...attendance.map((x) => x.day), ...homework.map((x) => x.day)])].sort();
@@ -47,7 +47,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
         <h2 className="font-jua text-2xl text-sky-ink">
           {cohortLabel(cohort)} {KLASSES[klass]} <span className="text-base text-slate-400">· {apps.length}명 · 수업 {days.length}회</span>
         </h2>
-        <p className="mt-1 text-xs text-slate-500">☁️ 출석 · ⭐ 숙제(누르면 사진) · 빨간 이름 = 결석 3회 이상</p>
+        <p className="mt-1 text-xs text-slate-500">☁️ 출석(빈 구름을 누르면 직접 처리) · ⭐ 숙제(누르면 사진) · 빨간 이름 = 결석 3회 이상</p>
         {apps.length === 0 ? (
           <p className="mt-4 text-slate-500">납부 완료된 수강생이 아직 없어요.</p>
         ) : (
@@ -74,7 +74,17 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
                       const h = has(homework, a.id, d) as { photo_path?: string } | undefined;
                       return (
                         <td key={d} className="px-1 py-2 whitespace-nowrap">
-                          <span className={has(attendance, a.id, d) ? "" : "opacity-20"}>☁️</span>
+                          {has(attendance, a.id, d) ? (
+                            <span title={(has(attendance, a.id, d) as { late?: boolean }).late ? "지각" : "출석"}>
+                              ☁️{(has(attendance, a.id, d) as { late?: boolean }).late ? "⏰" : ""}
+                            </span>
+                          ) : (
+                            <form action={markAttendanceManual} className="inline">
+                              <input type="hidden" name="id" value={a.id} />
+                              <input type="hidden" name="day" value={d} />
+                              <button className="opacity-25 hover:opacity-100" aria-label={`${a.name} ${dayLabel(d)} 출석 처리`}>☁️</button>
+                            </form>
+                          )}
                           {h?.photo_path ? (
                             <a href={`/admin/photo?p=${encodeURIComponent(h.photo_path)}`} target="_blank" rel="noreferrer">⭐</a>
                           ) : (
@@ -92,6 +102,24 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
           </table>
         )}
       </section>
+
+      <form action={markAttendanceManual} className="card flex flex-wrap items-end gap-3">
+        <div className="w-full">
+          <p className="font-jua text-lg text-sky-ink">표에 없는 날짜 출석 보정</p>
+          <p className="text-sm text-slate-500">그날 출석한 학생이 아무도 없어 표에 날짜가 없을 때 사용해요.</p>
+        </div>
+        <label className="min-w-48 flex-1">
+          <span className="label">수강생</span>
+          <select name="id" required className="input">
+            {apps.map((a) => <option key={a.id} value={a.id}>{a.name} · {KINDS[a.kind].short}</option>)}
+          </select>
+        </label>
+        <label>
+          <span className="label">수업 날짜</span>
+          <input type="date" name="day" required className="input" />
+        </label>
+        <button className="btn !py-3" disabled={apps.length === 0}>출석 처리</button>
+      </form>
 
       <form action={cleanupPhotos} className="card flex flex-wrap items-center justify-between gap-3 text-sm">
         <p className="text-slate-600">지난 기수 숙제 사진 정리 (스티커 기록은 남아요 · 저장 공간 확보)</p>

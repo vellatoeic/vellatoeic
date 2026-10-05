@@ -42,13 +42,14 @@ const sb: SupabaseClient | null =
 export const isPreview = !sb;
 
 export type Stamp = { app_id: string; day: string };
+export type Attendance = Stamp & { late: boolean };
 export type Homework = Stamp & { photo_path: string };
 
 type Mem = {
   apps: Application[];
   lectures: Lecture[];
   settings: Record<string, string>;
-  attendance: Stamp[];
+  attendance: Attendance[];
   homework: Homework[];
   photos: Record<string, string>;
 };
@@ -228,26 +229,26 @@ export async function roundFor(cohort: string): Promise<1 | 2> {
 }
 
 // ── 출석·숙제 스티커 ─────────────────────────────
-export async function addAttendance(app_id: string, day: string) {
+export async function addAttendance(app_id: string, day: string, late = false) {
   if (sb) {
-    const { error } = await sb.from("attendance").upsert({ app_id, day }, { onConflict: "app_id,day", ignoreDuplicates: true });
+    const { error } = await sb.from("attendance").upsert({ app_id, day, late }, { onConflict: "app_id,day", ignoreDuplicates: true });
     if (error) throw error;
     return;
   }
-  if (!mem.attendance.some((x) => x.app_id === app_id && x.day === day)) mem.attendance.push({ app_id, day });
+  if (!mem.attendance.some((x) => x.app_id === app_id && x.day === day)) mem.attendance.push({ app_id, day, late });
 }
 
-export async function listStamps(appIds: string[]): Promise<{ attendance: Stamp[]; homework: Homework[] }> {
+export async function listStamps(appIds: string[]): Promise<{ attendance: Attendance[]; homework: Homework[] }> {
   const ok = appIds.filter(isUuid);
   if (ok.length === 0) return { attendance: [], homework: [] };
   if (sb) {
     const [a, h] = await Promise.all([
-      sb.from("attendance").select("app_id, day").in("app_id", ok),
+      sb.from("attendance").select("app_id, day, late").in("app_id", ok),
       sb.from("homework").select("app_id, day, photo_path").in("app_id", ok),
     ]);
     if (a.error) throw a.error;
     if (h.error) throw h.error;
-    return { attendance: a.data as Stamp[], homework: h.data as Homework[] };
+    return { attendance: a.data as Attendance[], homework: h.data as Homework[] };
   }
   return {
     attendance: mem.attendance.filter((x) => ok.includes(x.app_id)),

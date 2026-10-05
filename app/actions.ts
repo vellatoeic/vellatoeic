@@ -7,7 +7,7 @@ import {
   type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
 } from "@/lib/config";
 import {
-  createApplication, deleteApplication, deleteApplications, getApplication, getApplications, saveHomework, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, deleteLecture, currentCohort, roundFor,
+  createApplication, deleteApplication, deleteApplications, getApplication, getApplications, saveHomework, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, deleteLecture, currentCohort, roundFor, addAttendance,
 } from "@/lib/db";
 import { canWatch } from "@/lib/access";
 import {
@@ -25,7 +25,7 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   const course = clean(fd.get("course")) as CourseId;
   const pickup = (kind === "onsite" ? "classroom" : clean(fd.get("pickup"))) as Pickup;
   const track = clean(fd.get("track")) as Track;
-  // 시작반 격일반만 "지난달에 이어 듣기"를 물어봐요
+  // 이어듣기 교재 할인은 시작반 격일반에만 적용해요
   const continuing = course === "start" && isAlt(track) && !!fd.get("continuing");
   const cohort = await currentCohort();
   // 교재는 반·과정·회차로 자동 결정 (학생이 고르지 않아요)
@@ -126,6 +126,11 @@ export async function saveSettings(fd: FormData) {
   // 교재 회차는 자동으로 번갈아 정해지고, 필요할 때만 여기서 바꿔요
   const round = clean(fd.get("round"));
   if (/^\d{4}-\d{2}$/.test(c) && (round === "1" || round === "2")) await setSetting(`round_${c}`, round);
+  for (const key of ["live_start_am", "live_start_pm", "live_solve_am", "live_solve_pm"]) {
+    const value = clean(fd.get(key));
+    const id = value ? youtubeId(value) : null;
+    if (!value || id) await setSetting(key, id ?? "");
+  }
   revalidatePath("/admin");
 }
 
@@ -193,6 +198,18 @@ export async function uploadHomework(_: FormState, fd: FormData): Promise<FormSt
 export async function cleanupPhotos(): Promise<void> {
   if (!(await isAdmin())) return;
   await deletePhotosBefore(await currentCohort());
+  revalidatePath("/admin/stamps");
+}
+
+// 관리자가 현황표에서 출석을 직접 보정해요.
+export async function markAttendanceManual(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const id = clean(fd.get("id"));
+  const day = clean(fd.get("day"));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+  const app = await getApplication(id);
+  if (!app || !canWatch(app) || app.cohort !== (await currentCohort())) return;
+  await addAttendance(app.id, day);
   revalidatePath("/admin/stamps");
 }
 

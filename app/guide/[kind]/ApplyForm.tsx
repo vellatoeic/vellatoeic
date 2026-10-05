@@ -18,7 +18,7 @@ export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 })
   const [continuing, setContinuing] = useState<boolean | null>(null);
   const [pickup, setPickup] = useState<Pickup>(kind === "onsite" ? "classroom" : "delivery");
 
-  // 시작반 격일반만 "지난달에 이어 듣기"를 물어봐요
+  // 시작반 격일반만 지난달 이어듣기 여부를 확인해요
   const askContinuing = course === "start" && isAlt(track);
   const books = course ? booksFor(course, track, round, askContinuing && continuing === true) : [];
   const amount = calcAmount(books, pickup);

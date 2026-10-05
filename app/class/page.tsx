@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { COURSES, PARTS, TRACKS, TRACK_PARTS, cohortLabel, klassOf, todayKST, dayLabel } from "@/lib/config";
-import { getApplications, listLectures, listApplications, listStamps, currentCohort, type Application } from "@/lib/db";
+import { getApplications, listLectures, listApplications, listStamps, currentCohort, getSetting, type Application } from "@/lib/db";
 import { getStudentIds } from "@/lib/auth";
 import { canWatch, covers } from "@/lib/access";
 import { studentLogout } from "@/app/actions";
@@ -21,6 +21,16 @@ export default async function ClassRoom() {
 
   // 스티커판: 같은 기수·같은 수업 학생들의 출석 날짜 = 수업일
   const cohort = await currentCohort();
+  const [liveStartAm, liveStartPm, liveSolveAm, liveSolvePm] = await Promise.all([
+    getSetting("live_start_am"),
+    getSetting("live_start_pm"),
+    getSetting("live_solve_am"),
+    getSetting("live_solve_pm"),
+  ]);
+  const liveLinks = {
+    start: [{ label: "시작반 오전 라이브", id: liveStartAm }, { label: "시작반 저녁 라이브", id: liveStartPm }],
+    solve: [{ label: "문풀반 오전 라이브", id: liveSolveAm }, { label: "문풀반 저녁 라이브", id: liveSolvePm }],
+  };
   const today = todayKST();
   const everyone = paid.length ? await listApplications() : [];
   const peers = (a: Application) => everyone.filter((x) => x.cohort === a.cohort && klassOf(x) === klassOf(a)).map((x) => x.id);
@@ -29,9 +39,10 @@ export default async function ClassRoom() {
   const board = (a: Application) => {
     const ids = new Set(peers(a));
     const att = new Set(stamps.attendance.filter((x) => x.app_id === a.id).map((x) => x.day));
+    const late = new Set(stamps.attendance.filter((x) => x.app_id === a.id && x.late).map((x) => x.day));
     const hw = new Set(stamps.homework.filter((x) => x.app_id === a.id).map((x) => x.day));
     const days = [...new Set([...stamps.attendance.filter((x) => ids.has(x.app_id)).map((x) => x.day), ...hw])].sort();
-    return { days, att, hw };
+    return { days, att, hw, late };
   };
 
   return (
@@ -66,8 +77,21 @@ export default async function ClassRoom() {
                 {COURSES[a.course].label} {TRACKS[a.track]}
               </h2>
             </div>
+            {a.cohort === cohort && a.status !== "pending" && (
+              <div className="mt-4 rounded-2xl bg-sky-soft p-4">
+                <p className="font-jua text-lg text-sky-ink">오늘 수업 라이브</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(a.course === "intensive" ? [...liveLinks.start, ...liveLinks.solve] : liveLinks[a.course]).filter((link) => link.id).map((link) => (
+                    <a key={link.label} href={`https://youtu.be/${link.id}`} target="_blank" rel="noreferrer" className="btn-ghost !py-2">{link.label} 보기 ↗</a>
+                  ))}
+                  {(a.course === "intensive" ? [...liveLinks.start, ...liveLinks.solve] : liveLinks[a.course]).every((link) => !link.id) && (
+                    <p className="text-sm text-slate-600">라이브 링크가 등록되면 여기에 안내해요.</p>
+                  )}
+                </div>
+              </div>
+            )}
             {(() => {
-              const { days, att, hw } = board(a);
+              const { days, att, hw, late } = board(a);
               return (
                 <div className="mt-4 rounded-2xl bg-sky-soft p-4">
                   <div className="flex items-center justify-between">
@@ -82,7 +106,10 @@ export default async function ClassRoom() {
                     <div className="mt-3 grid grid-cols-5 gap-2 sm:grid-cols-8">
                       {days.map((d) => (
                         <div key={d} className={`flex flex-col items-center rounded-xl bg-white p-1.5 ${d === today ? "ring-2 ring-sky-deep" : ""}`}>
-                          <Cloud className={`h-6 w-auto ${att.has(d) ? "fill-sky-main" : "fill-slate-200"}`} />
+                          <span className="relative">
+                            <Cloud className={`h-6 w-auto ${att.has(d) ? "fill-sky-main" : "fill-slate-200"}`} />
+                            {late.has(d) && <span title="지각" className="absolute -right-2 -top-2 text-xs">⏰</span>}
+                          </span>
                           <span className={`-mt-1 text-sm leading-none ${hw.has(d) ? "text-amber-400" : "text-slate-200"}`}>★</span>
                           <span className="mt-0.5 text-[11px] text-slate-500">{dayLabel(d)}</span>
                         </div>

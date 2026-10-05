@@ -7,5 +7,6 @@ export const canWatch = (a: Application) => a.status !== "pending";
 
 // 이 신청으로 볼 수 있는 강의인지: 같은 기수 + 같은 반 + 수강 과목에 포함된 파트
 export function covers(a: Application, l: Lecture) {
-  return canWatch(a) && a.cohort === l.cohort && a.course === l.course && TRACK_PARTS[a.track].includes(l.part);
+  const courseAccess = a.course === l.course || (a.course === "intensive" && (l.course === "start" || l.course === "solve"));
+  return canWatch(a) && a.cohort === l.cohort && courseAccess && TRACK_PARTS[a.track].includes(l.part);
 }

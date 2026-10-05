@@ -47,6 +47,7 @@ alter default privileges in schema public grant select, insert, update, delete o
 create table if not exists attendance (
   app_id uuid not null references applications(id) on delete cascade,
   day date not null,
+  late boolean not null default false,
   created_at timestamptz not null default now(),
   primary key (app_id, day)
 );

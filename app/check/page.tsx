@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { KLASSES, klassOf, klassTimeLabel, isCheckOpen, todayKST, type Klass } from "@/lib/config";
+import { KLASSES, klassOf, klassTimeLabel, isCheckOpen, isLate, takesSharedLc, todayKST, type Klass } from "@/lib/config";
 import { getApplications, addAttendance, currentCohort, listStamps } from "@/lib/db";
 import { getStudentIds } from "@/lib/auth";
 import { canWatch } from "@/lib/access";
@@ -47,9 +47,12 @@ export default async function Check({ searchParams }: { searchParams: Promise<{ 
   }
 
   const cohort = await currentCohort();
-  const mine = apps.find((a) => canWatch(a) && a.cohort === cohort && klassOf(a) === klass);
-  if (!mine) {
-    const unpaid = apps.some((a) => a.cohort === cohort && klassOf(a) === klass && !canWatch(a));
+  const matches = apps.filter((a) => a.cohort === cohort && (klass === "lc-common" ? takesSharedLc(a) : klassOf(a) === klass));
+  const mine = klass === "lc-common"
+    ? matches.filter(canWatch)
+    : matches.filter(canWatch).slice(0, 1);
+  if (mine.length === 0) {
+    const unpaid = matches.some((a) => !canWatch(a));
     return (
       <Box title="출석할 수 없어요">
         <p className="text-slate-600">
@@ -59,14 +62,16 @@ export default async function Check({ searchParams }: { searchParams: Promise<{ 
     );
   }
 
-  await addAttendance(mine.id, todayKST());
-  const { attendance } = await listStamps([mine.id]);
+  const late = isLate(klass);
+  await Promise.all(mine.map((a) => addAttendance(a.id, todayKST(), late)));
+  const { attendance } = await listStamps(mine.map((a) => a.id));
+  const days = new Set(attendance.map((a) => a.day));
 
   return (
     <Box title="출석 완료! ☁️">
-      <p className="text-slate-600">{mine.name}님, 오늘도 왔네요 :)</p>
-      <p className="font-jua text-5xl text-sky-deep">{attendance.length}</p>
-      <p className="text-sm text-slate-500">이번 달 모은 출석 스티커</p>
+      <p className="text-slate-600">{mine[0].name}님, 오늘도 왔네요 :)</p>
+      <p className="font-jua text-5xl text-sky-deep">{days.size}</p>
+      <p className="text-sm text-slate-500">이번 달 모은 출석 스티커 {late ? "· 오늘은 지각 표시가 남아요 ⏰" : ""}</p>
     </Box>
   );
 }

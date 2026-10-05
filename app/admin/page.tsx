@@ -26,7 +26,13 @@ export default async function Admin({
   const now = await currentCohort();
   const { f = "all", q = "", c = now } = await searchParams;
   const everything = await listApplications();
-  const account = await getSetting("bank_account");
+  const [account, liveStartAm, liveStartPm, liveSolveAm, liveSolvePm] = await Promise.all([
+    getSetting("bank_account"),
+    getSetting("live_start_am"),
+    getSetting("live_start_pm"),
+    getSetting("live_solve_am"),
+    getSetting("live_solve_pm"),
+  ]);
   const round = await roundFor(now);
   const cohorts = [...new Set([now, ...everything.map((a) => a.cohort)])].sort().reverse();
   const all = c === "all" ? everything : everything.filter((a) => a.cohort === c);
@@ -68,6 +74,15 @@ export default async function Admin({
           <span className="label">학생에게 보여줄 입금 계좌</span>
           <input name="bank_account" defaultValue={account} className="input" placeholder="예: OO은행 000-0000-0000 (예금주)" />
         </label>
+        <div className="sm:col-span-4">
+          <p className="label">학생에게 안내할 유튜브 라이브 링크 (비워두면 숨겨요)</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label><span className="text-sm text-slate-500">시작반 오전</span><input type="url" name="live_start_am" defaultValue={liveStartAm ? `https://youtu.be/${liveStartAm}` : ""} className="input" placeholder="유튜브 라이브 주소" /></label>
+            <label><span className="text-sm text-slate-500">시작반 저녁</span><input type="url" name="live_start_pm" defaultValue={liveStartPm ? `https://youtu.be/${liveStartPm}` : ""} className="input" placeholder="유튜브 라이브 주소" /></label>
+            <label><span className="text-sm text-slate-500">문풀반 오전</span><input type="url" name="live_solve_am" defaultValue={liveSolveAm ? `https://youtu.be/${liveSolveAm}` : ""} className="input" placeholder="유튜브 라이브 주소" /></label>
+            <label><span className="text-sm text-slate-500">문풀반 저녁</span><input type="url" name="live_solve_pm" defaultValue={liveSolvePm ? `https://youtu.be/${liveSolvePm}` : ""} className="input" placeholder="유튜브 라이브 주소" /></label>
+          </div>
+        </div>
         <button className="btn !py-3">저장</button>
         <p className="text-xs text-slate-500 sm:col-span-3">
           새로 들어오는 신청은 &apos;현재 모집 기수&apos;로 저장돼요. 다음 달 모집을 시작할 때 바꿔 주세요.
