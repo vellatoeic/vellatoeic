@@ -59,7 +59,11 @@
 ## 작업 규칙
 - 코드 수정과 push는 VS Code에서만. Cowork의 Claude는 논의와 정리만 담당.
 - 수정 전에 git status로 최신 상태 확인. 남이 바꾼 내용을 덮어쓰지 말 것.
-- push 전 npm run build 통과 확인. 실패하면 올리지 말고 Vella에게 알릴 것.
+- 작업이 끝나면 npm run build를 실행해 통과를 확인하고, 바로 commit해요. 실패하면 commit/push하지 말고 Vella에게 알려요.
+- DB 변경이 없으면 commit 후 바로 push해요.
+- DB 변경이 있으면 SQL 파일은 작업당 하나만 만들고, 재실행해도 안전하도록 가능한 DDL에 if not exists를 사용해요. 답변 맨 위에 크게 "⚠️ SQL 실행 필요"라고 표시하고, Vella가 "실행했어"라고 확인하기 전에는 push하지 않아요.
+- SQL에 DROP, DELETE, TRUNCATE, UPDATE가 있으면 실행 전에 별도로 "🔴 위험: 검토 필요"라고 표시하고, 어떤 기존 데이터/구조에 영향을 주는지 쉬운 말로 설명해요.
+- 새 작업을 시작하기 전에 supabase/APPLIED.md와 supabase/*.sql을 대조해 실행 완료 SQL이 기록에서 빠졌는지 확인해요. SQL 실행을 확인받으면 파일 이름과 실행 내용을 supabase/APPLIED.md에 기록해요.
 - 운영 규칙이 바뀌면 이 파일도 같이 고칠 것.
 
 <!-- BEGIN:nextjs-agent-rules -->
