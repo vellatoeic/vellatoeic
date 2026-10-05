@@ -8,13 +8,13 @@ import {
 } from "@/lib/config";
 import {
   createApplication, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  createSpecialRegistration, getSpecialLecture, getSpecialRegistrationById, listSpecialRegistrations, updateSpecialLecture, updateSpecialRegistration,
+  createSpecialLecture, createSpecialRegistration, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, findSpecialRegistrationsByName, getSpecialLecture, listSpecialRegistrations, updateSpecialLecture,
 } from "@/lib/db";
 import { canWatch } from "@/lib/access";
 import { SCHEDULE_CLASSES, holidayKey, homeworkAssignmentDays, parseHolidays, parseSchoolDays, previousMonth, scheduleKey, scheduleClassFor, schoolDaysFor, shiftSchoolDays, type ScheduleClass } from "@/lib/schedule";
 import { specialRegistrationOpen } from "@/lib/special";
 import {
-  hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
+  hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin, getSpecialIds, setSpecialIds, clearSpecialIds,
 } from "@/lib/auth";
 
 export type FormState = { error?: string; ok?: string };
@@ -91,7 +91,7 @@ export async function studentLogin(_: FormState, fd: FormData): Promise<FormStat
   }
   await setStudent(mine.map((a) => a.id));
   const next = clean(fd.get("next"));
-  redirect(next.startsWith("/check?") || next === "/class" || next === "/special" ? next : "/class");
+  redirect(next.startsWith("/check?") || next === "/class" ? next : "/class");
 }
 
 export async function studentLogout() {
@@ -211,64 +211,110 @@ export async function removeLecture(fd: FormData) {
   revalidatePath("/admin/lectures");
 }
 
-// ── 특강 신청·관리 ─────────────────────────────
-export async function registerSpecialLecture(fd: FormData) {
+// ── 특강 신청 (수강생이 아니어도 이름 + 비밀번호로 신청) ──────
+const validTime = (v: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+const validDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+export async function registerSpecialLecture(_: FormState, fd: FormData): Promise<FormState> {
   const eventId = clean(fd.get("event_id"));
-  const applicationId = clean(fd.get("application_id"));
   const mode = clean(fd.get("mode"));
-  if (mode !== "onsite" && mode !== "online") return;
-  const studentIds = await getStudentIds();
-  if (!studentIds.includes(applicationId)) return;
-  const app = await getApplication(applicationId);
+  const name = clean(fd.get("name"));
+  const pin = clean(fd.get("pin"));
+  const phone = clean(fd.get("phone")).replace(/[^0-9]/g, "");
   const event = await getSpecialLecture(eventId);
-  if (!app || !canWatch(app) || !event || app.cohort !== event.cohort || !specialRegistrationOpen(event.event_date, event.starts_at)) return;
-  const eventRegistrations = await listSpecialRegistrations(eventId);
-  if (eventRegistrations.some((registration) => studentIds.includes(registration.application_id))) return;
-  await createSpecialRegistration({ special_lecture_id: eventId, application_id: applicationId, mode });
+  if (!event) return { error: "신청할 특강을 선택해 주세요." };
+  if (!specialRegistrationOpen(event.event_date, event.starts_at)) return { error: "신청 기간이 끝난 특강이에요." };
+  if (mode !== "onsite" && mode !== "online") return { error: "현장 또는 불라방을 선택해 주세요." };
+  if (!name) return { error: "이름을 입력해 주세요." };
+  if (!/^\d{4}$/.test(pin)) return { error: "비밀번호를 숫자 4자리로 정해 주세요." };
+  if (mode === "online" && !/^01[0-9]{8,9}$/.test(phone)) return { error: "연락처를 정확히 입력해 주세요. (예: 01012345678)" };
+
+  const already = (await listSpecialRegistrations(eventId)).find((r) => r.name === name && checkPin(pin, r.pin_hash));
+  const id = already?.id ?? await createSpecialRegistration({
+    special_lecture_id: eventId,
+    mode,
+    name,
+    phone: mode === "online" ? phone : null,
+    pin_hash: hashPin(pin),
+  });
+  await setSpecialIds([...(await getSpecialIds()), id]);
+  revalidatePath("/special");
+  if (already) return { ok: "이미 신청한 특강이에요. 아래에서 신청 내용을 확인해 주세요." };
+  return {
+    ok: mode === "onsite"
+      ? "신청이 완료됐어요. 특강 당일 10시까지 필기구를 챙겨 703호로 와주세요."
+      : "신청이 완료됐어요. 특강 시작 전에 이 페이지에 자료와 유튜브 링크가 올라와요.",
+  };
+}
+
+export async function specialLogin(_: FormState, fd: FormData): Promise<FormState> {
+  const name = clean(fd.get("name"));
+  const pin = clean(fd.get("pin"));
+  if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 비밀번호 4자리를 입력해 주세요." };
+  const mine = (await findSpecialRegistrationsByName(name)).filter((r) => checkPin(pin, r.pin_hash));
+  if (mine.length === 0) {
+    await sleep(800);
+    return { error: "이름 또는 비밀번호가 맞지 않아요. 특강 신청할 때 정한 비밀번호를 입력해 주세요." };
+  }
+  await setSpecialIds([...(await getSpecialIds()), ...mine.map((r) => r.id)]);
+  redirect("/special");
+}
+
+export async function specialLogout() {
+  await clearSpecialIds();
+  redirect("/special");
+}
+
+// ── 특강 관리 (관리자) ─────────────────────────
+function specialFields(fd: FormData) {
+  const event_date = clean(fd.get("event_date"));
+  const title = clean(fd.get("title"));
+  const starts_at = clean(fd.get("starts_at"));
+  const ends_at = clean(fd.get("ends_at"));
+  if (!validDate(event_date) || !title || !validTime(starts_at)) return null;
+  if (ends_at && (!validTime(ends_at) || ends_at <= starts_at)) return null;
+  return { event_date, title, starts_at, ends_at: ends_at || null };
+}
+
+export async function addSpecialLecture(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const fields = specialFields(fd);
+  if (!fields) return;
+  await createSpecialLecture(fields);
+  revalidatePath("/admin/special");
   revalidatePath("/special");
 }
 
 export async function saveSpecialLecture(fd: FormData) {
   if (!(await isAdmin())) return;
-  const id = clean(fd.get("id"));
-  const title = clean(fd.get("title"));
-  const startsAt = clean(fd.get("starts_at"));
-  const endsAt = clean(fd.get("ends_at"));
+  const fields = specialFields(fd);
   const youtube = clean(fd.get("youtube_url"));
-  const event = await getSpecialLecture(id);
-  if (!event || !title || !/^\d{2}:\d{2}$/.test(startsAt)) return;
-  if (endsAt && (!/^\d{2}:\d{2}$/.test(endsAt) || endsAt <= startsAt)) return;
-  const youtubeIdValue = youtube ? youtubeId(youtube) : null;
-  if (youtube && !youtubeIdValue) return;
-  await updateSpecialLecture(id, { title, starts_at: startsAt, ends_at: endsAt || null, youtube_id: youtubeIdValue });
+  const youtube_id = youtube ? youtubeId(youtube) : null;
+  if (!fields || (youtube && !youtube_id)) return;
+  await updateSpecialLecture(clean(fd.get("id")), { ...fields, youtube_id });
   revalidatePath("/admin/special");
   revalidatePath("/special");
 }
 
-export async function confirmSpecialRegistration(fd: FormData) {
+export async function removeSpecialLecture(fd: FormData) {
   if (!(await isAdmin())) return;
-  const id = clean(fd.get("id"));
-  const registration = await getSpecialRegistrationById(id);
-  if (!registration || registration.approved) return;
-  await updateSpecialRegistration(id, registration.mode === "onsite" ? { deposit_paid: true, approved: true } : { approved: true });
+  await deleteSpecialLecture(clean(fd.get("id")));
   revalidatePath("/admin/special");
   revalidatePath("/special");
 }
 
-export async function confirmSpecialAttendance(fd: FormData) {
+export async function removeSpecialRegistration(fd: FormData) {
   if (!(await isAdmin())) return;
-  const registration = await getSpecialRegistrationById(clean(fd.get("id")));
-  if (!registration?.approved || registration.attended) return;
-  await updateSpecialRegistration(registration.id, { attended: true });
+  await deleteSpecialRegistration(clean(fd.get("id")));
   revalidatePath("/admin/special");
+  revalidatePath("/special");
 }
 
-export async function markSpecialRefunded(fd: FormData) {
+export async function removeSpecialMaterial(fd: FormData) {
   if (!(await isAdmin())) return;
-  const registration = await getSpecialRegistrationById(clean(fd.get("id")));
-  if (!registration || registration.mode !== "onsite" || !registration.deposit_paid || !registration.attended || registration.refunded) return;
-  await updateSpecialRegistration(registration.id, { refunded: true });
+  await deleteSpecialMaterial(clean(fd.get("id")));
   revalidatePath("/admin/special");
+  revalidatePath("/special");
 }
 
 // 학생이 반을 잘못 고른 경우 Vella가 바로잡기 (교재·금액 자동 재계산)
@@ -368,6 +414,18 @@ export async function bulkConfirmPayment(fd: FormData) {
   const apps = await getApplications(ids);
   const pendingIds = apps.filter((app) => app.status === "pending").map((app) => app.id);
   await updateApplications(pendingIds, { status: "paid" });
+  revalidatePath("/admin");
+}
+
+// 불라방 택배: 체크한 학생 중 납부 완료 상태만 발송 완료로 바꿔요.
+export async function bulkMarkShipped(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const ids = checkedIds(fd);
+  if (ids.length === 0) return;
+  const apps = await getApplications(ids);
+  const ready = apps.filter((app) => app.status === "paid" && app.kind === "online" && app.pickup === "delivery").map((app) => app.id);
+  await updateApplications(ready, { status: "shipped" });
+  revalidatePath("/admin/roster");
   revalidatePath("/admin");
 }
 

@@ -7,3 +7,11 @@ export function specialRegistrationOpen(eventDate: string, startsAt: string, now
   const [hour, minute] = startsAt.slice(0, 5).split(":").map(Number);
   return currentMinutes < hour * 60 + minute;
 }
+
+// 예: 10/17(토) · 10:00~12:00
+export function specialWhen(event: { event_date: string; starts_at: string; ends_at: string | null }) {
+  const [y, m, d] = event.event_date.split("-").map(Number);
+  const weekday = "일월화수목금토"[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  const time = event.ends_at ? `${event.starts_at.slice(0, 5)}~${event.ends_at.slice(0, 5)}` : `${event.starts_at.slice(0, 5)} 시작`;
+  return `${m}/${d}(${weekday}) · ${time}`;
+}

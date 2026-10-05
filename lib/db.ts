@@ -35,7 +35,6 @@ export type Lecture = {
 
 export type SpecialLecture = {
   id: string;
-  cohort: string;
   event_date: string;
   title: string;
   starts_at: string;
@@ -47,12 +46,10 @@ export type SpecialLecture = {
 export type SpecialRegistration = {
   id: string;
   special_lecture_id: string;
-  application_id: string;
   mode: "onsite" | "online";
-  deposit_paid: boolean;
-  approved: boolean;
-  attended: boolean;
-  refunded: boolean;
+  name: string;
+  phone: string | null;
+  pin_hash: string;
   created_at: string;
 };
 
@@ -237,16 +234,20 @@ export async function deleteLecture(id: string) {
 }
 
 // ── 특강 ────────────────────────────────────────
+const SPECIAL_BUCKET = "special-lecture-materials";
+type SpecialLectureFields = Pick<SpecialLecture, "event_date" | "title" | "starts_at" | "ends_at">;
+
 export async function listSpecialLectures(): Promise<SpecialLecture[]> {
   if (sb) {
-    const { data, error } = await sb.from("special_lectures").select("*").order("event_date", { ascending: true });
+    const { data, error } = await sb.from("special_lectures").select("*").order("event_date").order("starts_at");
     if (error) throw error;
     return data as SpecialLecture[];
   }
-  return mem.specialLectures.sort((a, b) => a.event_date.localeCompare(b.event_date));
+  return [...mem.specialLectures].sort((a, b) => a.event_date.localeCompare(b.event_date) || a.starts_at.localeCompare(b.starts_at));
 }
 
 export async function getSpecialLecture(id: string): Promise<SpecialLecture | null> {
+  if (!isUuid(id)) return null;
   if (sb) {
     const { data, error } = await sb.from("special_lectures").select("*").eq("id", id).maybeSingle();
     if (error) throw error;
@@ -255,7 +256,17 @@ export async function getSpecialLecture(id: string): Promise<SpecialLecture | nu
   return mem.specialLectures.find((event) => event.id === id) ?? null;
 }
 
-export async function updateSpecialLecture(id: string, patch: Pick<SpecialLecture, "title" | "starts_at" | "ends_at" | "youtube_id">) {
+export async function createSpecialLecture(fields: SpecialLectureFields) {
+  if (sb) {
+    const { error } = await sb.from("special_lectures").insert(fields);
+    if (error) throw error;
+    return;
+  }
+  mem.specialLectures.push({ ...fields, id: crypto.randomUUID(), youtube_id: null, created_at: new Date().toISOString() });
+}
+
+export async function updateSpecialLecture(id: string, patch: Partial<SpecialLectureFields & Pick<SpecialLecture, "youtube_id">>) {
+  if (!isUuid(id)) return;
   if (sb) {
     const { error } = await sb.from("special_lectures").update(patch).eq("id", id);
     if (error) throw error;
@@ -263,6 +274,22 @@ export async function updateSpecialLecture(id: string, patch: Pick<SpecialLectur
   }
   const event = mem.specialLectures.find((item) => item.id === id);
   if (event) Object.assign(event, patch);
+}
+
+// 특강을 지우면 신청 명단과 자료 파일도 함께 지워져요.
+export async function deleteSpecialLecture(id: string) {
+  if (!isUuid(id)) return;
+  const paths = (await listSpecialMaterials(id)).map((material) => material.storage_path);
+  if (sb) {
+    if (paths.length > 0) await sb.storage.from(SPECIAL_BUCKET).remove(paths);
+    const { error } = await sb.from("special_lectures").delete().eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  for (const path of paths) delete mem.photos[path];
+  mem.specialLectures = mem.specialLectures.filter((event) => event.id !== id);
+  mem.specialRegistrations = mem.specialRegistrations.filter((registration) => registration.special_lecture_id !== id);
+  mem.specialMaterials = mem.specialMaterials.filter((material) => material.special_lecture_id !== id);
 }
 
 export async function listSpecialRegistrations(special_lecture_id?: string): Promise<SpecialRegistration[]> {
@@ -276,44 +303,45 @@ export async function listSpecialRegistrations(special_lecture_id?: string): Pro
   return mem.specialRegistrations.filter((registration) => !special_lecture_id || registration.special_lecture_id === special_lecture_id);
 }
 
-export async function getSpecialRegistration(special_lecture_id: string, application_id: string): Promise<SpecialRegistration | null> {
+export async function getSpecialRegistrations(ids: string[]): Promise<SpecialRegistration[]> {
+  const ok = ids.filter(isUuid);
+  if (ok.length === 0) return [];
   if (sb) {
-    const { data, error } = await sb.from("special_lecture_registrations").select("*").eq("special_lecture_id", special_lecture_id).eq("application_id", application_id).maybeSingle();
+    const { data, error } = await sb.from("special_lecture_registrations").select("*").in("id", ok);
     if (error) throw error;
-    return (data as SpecialRegistration) ?? null;
+    return data as SpecialRegistration[];
   }
-  return mem.specialRegistrations.find((registration) => registration.special_lecture_id === special_lecture_id && registration.application_id === application_id) ?? null;
+  return mem.specialRegistrations.filter((registration) => ok.includes(registration.id));
 }
 
-export async function getSpecialRegistrationById(id: string): Promise<SpecialRegistration | null> {
+export async function findSpecialRegistrationsByName(name: string): Promise<SpecialRegistration[]> {
   if (sb) {
-    const { data, error } = await sb.from("special_lecture_registrations").select("*").eq("id", id).maybeSingle();
+    const { data, error } = await sb.from("special_lecture_registrations").select("*").eq("name", name);
     if (error) throw error;
-    return (data as SpecialRegistration) ?? null;
+    return data as SpecialRegistration[];
   }
-  return mem.specialRegistrations.find((registration) => registration.id === id) ?? null;
+  return mem.specialRegistrations.filter((registration) => registration.name === name);
 }
 
-export async function createSpecialRegistration(registration: Pick<SpecialRegistration, "special_lecture_id" | "application_id" | "mode">) {
+export async function createSpecialRegistration(registration: Pick<SpecialRegistration, "special_lecture_id" | "mode" | "name" | "phone" | "pin_hash">): Promise<string> {
   if (sb) {
-    const { error } = await sb.from("special_lecture_registrations").insert(registration);
+    const { data, error } = await sb.from("special_lecture_registrations").insert(registration).select("id").single();
+    if (error) throw error;
+    return data.id as string;
+  }
+  const id = crypto.randomUUID();
+  mem.specialRegistrations.push({ ...registration, id, created_at: new Date().toISOString() });
+  return id;
+}
+
+export async function deleteSpecialRegistration(id: string) {
+  if (!isUuid(id)) return;
+  if (sb) {
+    const { error } = await sb.from("special_lecture_registrations").delete().eq("id", id);
     if (error) throw error;
     return;
   }
-  if (await getSpecialRegistration(registration.special_lecture_id, registration.application_id)) return;
-  mem.specialRegistrations.push({ ...registration, id: crypto.randomUUID(), deposit_paid: false, approved: false, attended: false, refunded: false, created_at: new Date().toISOString() });
-}
-
-type SpecialRegistrationPatch = Partial<Pick<SpecialRegistration, "deposit_paid" | "approved" | "attended" | "refunded">>;
-
-export async function updateSpecialRegistration(id: string, patch: SpecialRegistrationPatch) {
-  if (sb) {
-    const { error } = await sb.from("special_lecture_registrations").update(patch).eq("id", id);
-    if (error) throw error;
-    return;
-  }
-  const registration = mem.specialRegistrations.find((item) => item.id === id);
-  if (registration) Object.assign(registration, patch);
+  mem.specialRegistrations = mem.specialRegistrations.filter((registration) => registration.id !== id);
 }
 
 export async function listSpecialMaterials(special_lecture_id: string): Promise<SpecialMaterial[]> {
@@ -326,6 +354,7 @@ export async function listSpecialMaterials(special_lecture_id: string): Promise<
 }
 
 export async function getSpecialMaterial(id: string): Promise<SpecialMaterial | null> {
+  if (!isUuid(id)) return null;
   if (sb) {
     const { data, error } = await sb.from("special_lecture_materials").select("*").eq("id", id).maybeSingle();
     if (error) throw error;
@@ -335,14 +364,14 @@ export async function getSpecialMaterial(id: string): Promise<SpecialMaterial | 
 }
 
 export async function uploadSpecialMaterial(special_lecture_id: string, fileName: string, file: Buffer, contentType: string) {
-  const safeName = fileName.replace(/[^\p{L}\p{N}._-]/gu, "_").slice(-120) || "material";
+  const safeName = fileName.replace(/[^A-Za-z0-9._-]/g, "_").slice(-120) || "material";
   const storagePath = `${special_lecture_id}/${crypto.randomUUID()}-${safeName}`;
   if (sb) {
-    const upload = await sb.storage.from("special-lecture-materials").upload(storagePath, file, { contentType, upsert: false });
+    const upload = await sb.storage.from(SPECIAL_BUCKET).upload(storagePath, file, { contentType, upsert: false });
     if (upload.error) throw upload.error;
     const { error } = await sb.from("special_lecture_materials").insert({ special_lecture_id, file_name: fileName.slice(0, 200), storage_path: storagePath });
     if (error) {
-      await sb.storage.from("special-lecture-materials").remove([storagePath]);
+      await sb.storage.from(SPECIAL_BUCKET).remove([storagePath]);
       throw error;
     }
     return;
@@ -351,9 +380,22 @@ export async function uploadSpecialMaterial(special_lecture_id: string, fileName
   mem.specialMaterials.push({ id: crypto.randomUUID(), special_lecture_id, file_name: fileName.slice(0, 200), storage_path: storagePath, created_at: new Date().toISOString() });
 }
 
-export async function specialMaterialUrl(path: string): Promise<string | null> {
+export async function deleteSpecialMaterial(id: string) {
+  const material = await getSpecialMaterial(id);
+  if (!material) return;
   if (sb) {
-    const { data, error } = await sb.storage.from("special-lecture-materials").createSignedUrl(path, 60 * 10);
+    await sb.storage.from(SPECIAL_BUCKET).remove([material.storage_path]);
+    const { error } = await sb.from("special_lecture_materials").delete().eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  delete mem.photos[material.storage_path];
+  mem.specialMaterials = mem.specialMaterials.filter((item) => item.id !== id);
+}
+
+export async function specialMaterialUrl(path: string, fileName: string): Promise<string | null> {
+  if (sb) {
+    const { data, error } = await sb.storage.from(SPECIAL_BUCKET).createSignedUrl(path, 60 * 10, { download: fileName });
     if (error) throw error;
     return data?.signedUrl ?? null;
   }

@@ -56,6 +56,18 @@ export async function clearStudent() {
   (await cookies()).delete("vella_student");
 }
 
+// ── 특강 신청 확인 (특강 신청 id 목록, 강의실 로그인과 따로 저장) ──
+export async function setSpecialIds(ids: string[]) {
+  (await cookies()).set("vella_special", seal([...new Set(ids)].join(",")), cookieOpts);
+}
+export async function getSpecialIds(): Promise<string[]> {
+  const v = unseal((await cookies()).get("vella_special")?.value);
+  return v ? v.split(",").filter(Boolean) : [];
+}
+export async function clearSpecialIds() {
+  (await cookies()).delete("vella_special");
+}
+
 // ── 관리자 ─────────────────────────────────────
 function adminPassword() {
   return process.env.ADMIN_PASSWORD || (isPreview ? "vella" : "");
