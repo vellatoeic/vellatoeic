@@ -29,7 +29,7 @@ export default async function SpecialPage() {
       <div className="text-center">
         <span className="rounded-full bg-sky-main px-4 py-1.5 text-sm font-bold text-sky-ink">토요 특강</span>
         <h1 className="font-jua mt-3 text-4xl text-sky-ink">특강 신청</h1>
-        <p className="mt-2 text-slate-600">그 달 수강생만 현장 또는 불라방으로 신청할 수 있어요.</p>
+        <p className="mt-2 text-slate-600">현장 또는 불라방으로 신청할 수 있어요.</p>
       </div>
 
       {open.length > 0
@@ -48,10 +48,11 @@ export default async function SpecialPage() {
               </div>
               {registration.mode === "onsite" ? (
                 <p className="rounded-2xl bg-sky-soft p-4 text-sm text-slate-700">특강 당일 10시까지 필기구를 챙겨 {CLASSROOM}로 와주세요.</p>
-              ) : materials.length === 0 && !event.youtube_id ? (
-                <p className="rounded-2xl bg-sky-soft p-4 text-sm text-slate-700">특강 시작 전에 이 페이지에 자료와 유튜브 링크가 올라와요.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
+                  {(materials.length === 0 || !event.youtube_id) && (
+                    <p className="w-full rounded-2xl bg-sky-soft p-4 text-sm text-slate-700">자료는 특강 하루 전, 참여 링크는 특강 시작 전에 이 페이지에 올라와요.</p>
+                  )}
                   {materials.map((material) => (
                     <a key={material.id} href={`/special/material/${material.id}`} className="btn-ghost !py-2 text-sm">📄 {material.file_name}</a>
                   ))}

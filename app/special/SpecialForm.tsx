@@ -51,7 +51,7 @@ export default function SpecialForm({ events }: { events: Option[] }) {
         <p className="label">3. 강의실 로그인 정보</p>
         <input name="name" className="input" placeholder="이름" autoComplete="name" />
         <input name="pin" className="input tracking-[0.3em]" placeholder="강의실 비밀번호 4자리" inputMode="numeric" maxLength={4} type="password" />
-        <p className="text-xs text-slate-500">교재비 신청할 때 정한 이름과 강의실 비밀번호를 입력해 주세요.<br />특강은 그 달 수강생만 신청할 수 있어요.</p>
+        <p className="text-xs text-slate-500">교재비 신청할 때 정한 이름과 강의실 비밀번호를 입력해 주세요.</p>
       </div>
 
       {state.error && <p className="text-sm font-bold text-red-600">{state.error}</p>}

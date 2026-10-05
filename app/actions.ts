@@ -230,7 +230,7 @@ export async function registerSpecialLecture(_: FormState, fd: FormData): Promis
   const month = mine.filter((a) => a.cohort === event.event_date.slice(0, 7));
   if (month.length === 0) {
     await sleep(800);
-    return { error: "이름 또는 강의실 비밀번호가 맞지 않아요. 특강은 그 달 수강생만 신청할 수 있어요." };
+    return { error: "이름 또는 강의실 비밀번호가 맞지 않아요. 이번 달 수강 신청 내역을 확인해 주세요." };
   }
   const paid = month.filter(canWatch);
   if (paid.length === 0) return { error: "수강 신청 후에 특강을 신청할 수 있어요." };
@@ -244,7 +244,7 @@ export async function registerSpecialLecture(_: FormState, fd: FormData): Promis
   return {
     ok: mode === "onsite"
       ? "신청이 완료됐어요. 특강 당일 10시까지 필기구를 챙겨 703호로 와주세요."
-      : "신청이 완료됐어요. 특강 시작 전에 이 페이지에 자료와 유튜브 링크가 올라와요.",
+      : "신청이 완료됐어요. 자료는 특강 하루 전, 참여 링크는 특강 시작 전에 이 페이지에 올라와요.",
   };
 }
 
