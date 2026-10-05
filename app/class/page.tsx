@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { COURSES, PARTS, TRACKS, TRACK_PARTS, cohortLabel, klassOf, todayKST, dayLabel } from "@/lib/config";
-import { getApplications, listLectures, listApplications, listStamps, currentCohort, getSetting, type Application } from "@/lib/db";
+import { COURSES, PARTS, TRACKS, TRACK_PARTS, cohortLabel, todayKST } from "@/lib/config";
+import { getApplications, listLectures, listStamps, currentCohort, getSetting } from "@/lib/db";
 import { getStudentIds } from "@/lib/auth";
 import { canWatch, covers } from "@/lib/access";
 import { studentLogout } from "@/app/actions";
 import StudentLogin from "./StudentLogin";
-import HomeworkUpload from "./HomeworkUpload";
-import Cloud from "@/components/Cloud";
+import StickerBoard from "./StickerBoard";
+import { defaultSchoolDays, holidayKey, parseHolidays, parseSchoolDays, scheduleClassFor, scheduleKey } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "강의실 · vella_toeic", robots: { index: false } };
@@ -21,29 +21,33 @@ export default async function ClassRoom() {
 
   // 스티커판: 같은 기수·같은 수업 학생들의 출석 날짜 = 수업일
   const cohort = await currentCohort();
-  const [liveStartAm, liveStartPm, liveSolveAm, liveSolvePm] = await Promise.all([
+  const [liveStartAm, liveStartPm, liveSolveAm, liveSolvePm, cafeUrl] = await Promise.all([
     getSetting("live_start_am"),
     getSetting("live_start_pm"),
     getSetting("live_solve_am"),
     getSetting("live_solve_pm"),
+    getSetting("cafe_homework_url"),
   ]);
   const liveLinks = {
     start: [{ label: "시작반 오전 라이브", id: liveStartAm }, { label: "시작반 저녁 라이브", id: liveStartPm }],
     solve: [{ label: "문풀반 오전 라이브", id: liveSolveAm }, { label: "문풀반 저녁 라이브", id: liveSolvePm }],
   };
   const today = todayKST();
-  const everyone = paid.length ? await listApplications() : [];
-  const peers = (a: Application) => everyone.filter((x) => x.cohort === a.cohort && klassOf(x) === klassOf(a)).map((x) => x.id);
-  const peerIds = [...new Set(paid.flatMap(peers))];
-  const stamps = await listStamps(peerIds);
-  const board = (a: Application) => {
-    const ids = new Set(peers(a));
-    const att = new Set(stamps.attendance.filter((x) => x.app_id === a.id).map((x) => x.day));
-    const late = new Set(stamps.attendance.filter((x) => x.app_id === a.id && x.late).map((x) => x.day));
-    const hw = new Set(stamps.homework.filter((x) => x.app_id === a.id).map((x) => x.day));
-    const days = [...new Set([...stamps.attendance.filter((x) => ids.has(x.app_id)).map((x) => x.day), ...hw])].sort();
-    return { days, att, hw, late };
-  };
+  const stamps = await listStamps(paid.map((a) => a.id));
+  const boardKeys = [...new Map(paid.map((a) => {
+    const klass = scheduleClassFor(a.course, a.track);
+    return [`${a.cohort}:${klass}`, { cohort: a.cohort, klass }];
+  })).values()];
+  const schedulesByClass = new Map(await Promise.all(boardKeys.map(async ({ cohort: appCohort, klass }) => {
+    const [rawDays, rawHolidays] = await Promise.all([
+      getSetting(scheduleKey(appCohort, klass)),
+      getSetting(holidayKey(appCohort)),
+    ]);
+    return [`${appCohort}:${klass}`, {
+      days: rawDays ? parseSchoolDays(rawDays, appCohort) : defaultSchoolDays(appCohort, klass),
+      holidays: parseHolidays(rawHolidays, appCohort),
+    }] as const;
+  })));
 
   return (
     <div className="space-y-6 pt-8">
@@ -91,34 +95,22 @@ export default async function ClassRoom() {
               </div>
             )}
             {(() => {
-              const { days, att, hw, late } = board(a);
-              return (
-                <div className="mt-4 rounded-2xl bg-sky-soft p-4">
-                  <div className="flex items-center justify-between">
-                    <p className="font-jua text-lg text-sky-ink">내 스티커판</p>
-                    <p className="text-sm text-slate-600">
-                      출석 ☁️ <b className="text-sky-deep">{att.size}</b>/{days.length} · 숙제 ⭐ <b className="text-sky-deep">{hw.size}</b>/{days.length}
-                    </p>
-                  </div>
-                  {days.length === 0 ? (
-                    <p className="mt-2 text-sm text-slate-500">수업 시작하면 QR 출석과 숙제 인증으로 스티커가 모여요!</p>
-                  ) : (
-                    <div className="mt-3 grid grid-cols-5 gap-2 sm:grid-cols-8">
-                      {days.map((d) => (
-                        <div key={d} className={`flex flex-col items-center rounded-xl bg-white p-1.5 ${d === today ? "ring-2 ring-sky-deep" : ""}`}>
-                          <span className="relative">
-                            <Cloud className={`h-6 w-auto ${att.has(d) ? "fill-sky-main" : "fill-slate-200"}`} />
-                            {late.has(d) && <span title="지각" className="absolute -right-2 -top-2 text-xs">⏰</span>}
-                          </span>
-                          <span className={`-mt-1 text-sm leading-none ${hw.has(d) ? "text-amber-400" : "text-slate-200"}`}>★</span>
-                          <span className="mt-0.5 text-[11px] text-slate-500">{dayLabel(d)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {a.cohort === cohort && <HomeworkUpload appId={a.id} doneToday={hw.has(today)} />}
-                </div>
-              );
+              const klass = scheduleClassFor(a.course, a.track);
+              const schedule = schedulesByClass.get(`${a.cohort}:${klass}`)!;
+              return <StickerBoard
+                appId={a.id}
+                name={a.name}
+                cohort={a.cohort}
+                className={`${COURSES[a.course].label} ${TRACKS[a.track]}`}
+                klass={klass}
+                scheduleDays={schedule.days}
+                holidays={schedule.holidays}
+                attendance={stamps.attendance.filter((stamp) => stamp.app_id === a.id)}
+                homework={stamps.homework.filter((stamp) => stamp.app_id === a.id).map((stamp) => stamp.day)}
+                cafeUrl={cafeUrl}
+                today={today}
+                active={a.cohort === cohort}
+              />;
             })()}
             {mine.length === 0 && <p className="mt-4 text-slate-500">아직 올라온 강의가 없어요. 수업이 시작되면 여기에 올라와요!</p>}
             {TRACK_PARTS[a.track].map((part) => {

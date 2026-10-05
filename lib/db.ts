@@ -43,7 +43,7 @@ export const isPreview = !sb;
 
 export type Stamp = { app_id: string; day: string };
 export type Attendance = Stamp & { late: boolean };
-export type Homework = Stamp & { photo_path: string };
+export type Homework = Stamp & { photo_path: string | null };
 
 type Mem = {
   apps: Application[];
@@ -238,6 +238,32 @@ export async function addAttendance(app_id: string, day: string, late = false) {
   if (!mem.attendance.some((x) => x.app_id === app_id && x.day === day)) mem.attendance.push({ app_id, day, late });
 }
 
+export async function addHomeworkSticker(app_id: string, day: string) {
+  if (sb) {
+    const { error } = await sb.from("homework").upsert({ app_id, day, photo_path: null }, { onConflict: "app_id,day", ignoreDuplicates: true });
+    if (error) throw error;
+    return;
+  }
+  if (!mem.homework.some((x) => x.app_id === app_id && x.day === day)) mem.homework.push({ app_id, day, photo_path: null });
+}
+
+export async function deleteHomeworkSticker(app_id: string, day: string) {
+  if (sb) {
+    const { data, error: selectError } = await sb.from("homework").select("photo_path").eq("app_id", app_id).eq("day", day).maybeSingle();
+    if (selectError) throw selectError;
+    const { error } = await sb.from("homework").delete().eq("app_id", app_id).eq("day", day);
+    if (error) throw error;
+    if (data?.photo_path) {
+      const { error: removeError } = await sb.storage.from(BUCKET).remove([data.photo_path as string]);
+      if (removeError) throw removeError;
+    }
+    return;
+  }
+  const row = mem.homework.find((x) => x.app_id === app_id && x.day === day);
+  if (row?.photo_path) delete mem.photos[row.photo_path];
+  mem.homework = mem.homework.filter((x) => !(x.app_id === app_id && x.day === day));
+}
+
 export async function listStamps(appIds: string[]): Promise<{ attendance: Attendance[]; homework: Homework[] }> {
   const ok = appIds.filter(isUuid);
   if (ok.length === 0) return { attendance: [], homework: [] };
@@ -257,20 +283,6 @@ export async function listStamps(appIds: string[]): Promise<{ attendance: Attend
 }
 
 const BUCKET = "homework";
-
-export async function saveHomework(app: Application, day: string, jpeg: Buffer) {
-  const photo_path = `${app.cohort}/${app.id}/${day}.jpg`;
-  if (sb) {
-    const up = await sb.storage.from(BUCKET).upload(photo_path, jpeg, { contentType: "image/jpeg", upsert: true });
-    if (up.error) throw up.error;
-    const { error } = await sb.from("homework").upsert({ app_id: app.id, day, photo_path }, { onConflict: "app_id,day" });
-    if (error) throw error;
-    return;
-  }
-  mem.photos[photo_path] = "data:image/jpeg;base64," + jpeg.toString("base64");
-  mem.homework = mem.homework.filter((x) => !(x.app_id === app.id && x.day === day));
-  mem.homework.push({ app_id: app.id, day, photo_path });
-}
 
 export async function photoUrl(path: string): Promise<string | null> {
   if (sb) {

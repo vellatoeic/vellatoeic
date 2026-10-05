@@ -26,12 +26,13 @@ export default async function Admin({
   const now = await currentCohort();
   const { f = "all", q = "", c = now } = await searchParams;
   const everything = await listApplications();
-  const [account, liveStartAm, liveStartPm, liveSolveAm, liveSolvePm] = await Promise.all([
+  const [account, liveStartAm, liveStartPm, liveSolveAm, liveSolvePm, cafeHomeworkUrl] = await Promise.all([
     getSetting("bank_account"),
     getSetting("live_start_am"),
     getSetting("live_start_pm"),
     getSetting("live_solve_am"),
     getSetting("live_solve_pm"),
+    getSetting("cafe_homework_url"),
   ]);
   const round = await roundFor(now);
   const cohorts = [...new Set([now, ...everything.map((a) => a.cohort)])].sort().reverse();
@@ -83,6 +84,10 @@ export default async function Admin({
             <label><span className="text-sm text-slate-500">문풀반 저녁</span><input type="url" name="live_solve_pm" defaultValue={liveSolvePm ? `https://youtu.be/${liveSolvePm}` : ""} className="input" placeholder="유튜브 라이브 주소" /></label>
           </div>
         </div>
+        <label className="sm:col-span-3">
+          <span className="label">네이버 카페 숙제 게시판 주소</span>
+          <input type="url" name="cafe_homework_url" defaultValue={cafeHomeworkUrl} className="input" placeholder="https://cafe.naver.com/..." />
+        </label>
         <button className="btn !py-3">저장</button>
         <p className="text-xs text-slate-500 sm:col-span-3">
           새로 들어오는 신청은 &apos;현재 모집 기수&apos;로 저장돼요. 다음 달 모집을 시작할 때 바꿔 주세요.

@@ -27,3 +27,20 @@ b, strong, .font-bold, .btn, .btn-ghost, .label { font-family: var(--font-jua); 
 .cloud-a { animation: drift 9s ease-in-out infinite; }
 .cloud-b { animation: drift 12s ease-in-out infinite reverse; }
 @media (prefers-reduced-motion: reduce) { .cloud-a, .cloud-b { animation: none; } }
+
+@keyframes sticker-pop {
+  0% { transform: scale(0.15) rotate(-24deg); opacity: 0; }
+  68% { transform: scale(1.18) rotate(5deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); }
+}
+.sticker-pop { animation: sticker-pop 520ms cubic-bezier(.2, .8, .25, 1.3) both; }
+
+.sticker-rainbow { background: linear-gradient(135deg, #fff2fc 0%, #eaf8ff 35%, #fff9de 68%, #edfff1 100%); }
+.sticker-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.sticker-confetti span { position: absolute; top: -1rem; font-size: 1.2rem; animation: confetti-fall 5s linear infinite; }
+@keyframes confetti-fall {
+  0% { transform: translateY(-1rem) rotate(0deg); opacity: 0; }
+  12% { opacity: 1; }
+  100% { transform: translateY(36rem) rotate(520deg); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .sticker-pop, .sticker-confetti span { animation: none; } }

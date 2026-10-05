@@ -39,7 +39,9 @@
 - 강의: 유튜브 일부 공개 링크를 관리 페이지 [강의 관리]에 등록.
 - 출석: /admin/qr 화면에 반별·LC 공통 QR을 인쇄해 강의실과 라이브 방송에 띄워요. 수업 시간 전후 20분까지 인정하고, 수업 시작 시각 이후는 지각(⏰)으로 표시해요. 관리자는 현황표에서 출석을 직접 보정할 수 있어요.
 - 라이브: 관리 페이지에서 시작반·문풀반 오전·저녁 유튜브 링크를 저장하면 납부 완료 학생 강의실에 안내돼요. 속성반은 두 반 링크를 모두 봐요.
-- 숙제: 강의실에서 사진 1장 업로드(1280px로 줄여서), 하루 1개. Supabase Storage 'homework' 버킷(비공개). 지난 기수 사진은 관리 페이지에서 정리.
+- 수업일: 관리 페이지 [수업일 설정]에서 월·반별 날짜와 공휴일을 정해요. 학생 스티커 달력에 반영돼요.
+- 스티커판: 강의실에 월~금 수업 달력, 출석·지각·숙제 스티커, 배지와 이미지 저장을 제공해요. 숙제는 네이버 카페에 제출하고, 수업일 당일에 학생이 스티커를 받아요. 카페 링크는 신청 관리에서 설정해요.
+- 기존 숙제 사진은 관리자 화면에서 확인·정리할 수 있지만, 새 사진 업로드 기능은 없어요.
 
 ## 남은 주의사항
 - 시작반 격일반 이어듣기 할인은 신청자가 직접 선택해요. 이전 기수 수강 이력을 자동 대조하지 않으니 관리자가 신청 내용을 확인해 주세요.
@@ -59,3 +61,13 @@
 - 수정 전에 git status로 최신 상태 확인. 남이 바꾼 내용을 덮어쓰지 말 것.
 - push 전 npm run build 통과 확인. 실패하면 올리지 말고 Vella에게 알릴 것.
 - 운영 규칙이 바뀌면 이 파일도 같이 고칠 것.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

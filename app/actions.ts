@@ -7,9 +7,10 @@ import {
   type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
 } from "@/lib/config";
 import {
-  createApplication, deleteApplication, deleteApplications, getApplication, getApplications, saveHomework, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, deleteLecture, currentCohort, roundFor, addAttendance,
+  createApplication, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
 } from "@/lib/db";
 import { canWatch } from "@/lib/access";
+import { SCHEDULE_CLASSES, defaultSchoolDays, holidayKey, parseHolidays, parseSchoolDays, previousMonth, scheduleKey, scheduleClassFor, shiftSchoolDays, type ScheduleClass } from "@/lib/schedule";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
 } from "@/lib/auth";
@@ -17,7 +18,16 @@ import {
 export type FormState = { error?: string; ok?: string };
 
 const clean = (v: FormDataEntryValue | null) => String(v ?? "").trim().slice(0, 200);
+const largeField = (fd: FormData, key: string) => String(fd.get(key) ?? "").trim().slice(0, 6000);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function validCohort(value: string) {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+}
+
+function validScheduleClass(value: string): value is ScheduleClass {
+  return Object.hasOwn(SCHEDULE_CLASSES, value);
+}
 
 // ── 교재비 신청 ─────────────────────────────────
 export async function submitApplication(_: FormState, fd: FormData): Promise<FormState> {
@@ -131,7 +141,49 @@ export async function saveSettings(fd: FormData) {
     const id = value ? youtubeId(value) : null;
     if (!value || id) await setSetting(key, id ?? "");
   }
+  const cafeLink = clean(fd.get("cafe_homework_url"));
+  if (!cafeLink) await setSetting("cafe_homework_url", "");
+  else {
+    try {
+      const url = new URL(cafeLink);
+      if (url.protocol === "https:" && ["cafe.naver.com", "m.cafe.naver.com", "naver.me"].includes(url.hostname)) {
+        await setSetting("cafe_homework_url", url.toString());
+      }
+    } catch {
+      // 잘못된 주소는 기존 주소를 유지해요.
+    }
+  }
   revalidatePath("/admin");
+}
+
+export async function saveSchoolSchedule(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const cohort = clean(fd.get("cohort"));
+  const klass = clean(fd.get("klass"));
+  if (!validCohort(cohort) || !validScheduleClass(klass)) return;
+  const holidays = parseHolidays(largeField(fd, "holidays"), cohort);
+  const days = parseSchoolDays(largeField(fd, "days"), cohort).filter((day) => !holidays[day]);
+  await Promise.all([
+    setSetting(scheduleKey(cohort, klass), JSON.stringify(days)),
+    setSetting(holidayKey(cohort), JSON.stringify(holidays)),
+  ]);
+  revalidatePath("/admin/schedule");
+  revalidatePath("/class");
+}
+
+export async function copyPreviousSchedule(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const cohort = clean(fd.get("cohort"));
+  const klass = clean(fd.get("klass"));
+  if (!validCohort(cohort) || !validScheduleClass(klass)) return;
+  const previous = previousMonth(cohort);
+  const rawPreviousDays = await getSetting(scheduleKey(previous, klass));
+  const previousDays = rawPreviousDays ? parseSchoolDays(rawPreviousDays, previous) : defaultSchoolDays(previous, klass);
+  const days = shiftSchoolDays(previousDays, previous, cohort);
+  await setSetting(scheduleKey(cohort, klass), JSON.stringify(days));
+  revalidatePath("/admin/schedule");
+  revalidatePath("/class");
+  redirect(`/admin/schedule?cohort=${cohort}&klass=${klass}`);
 }
 
 export async function uploadLecture(_: FormState, fd: FormData): Promise<FormState> {
@@ -178,23 +230,33 @@ export async function removeApplication(fd: FormData) {
   revalidatePath("/admin");
 }
 
-// ── 숙제 인증 ──────────────────────────────────
-export async function uploadHomework(_: FormState, fd: FormData): Promise<FormState> {
+// ── 숙제 스티커 ────────────────────────────────
+export async function markHomeworkDone(fd: FormData) {
   const id = clean(fd.get("app_id"));
-  const file = fd.get("photo");
+  const day = clean(fd.get("day"));
   const ids = await getStudentIds();
-  if (!ids.includes(id)) return { error: "강의실에 다시 로그인해 주세요." };
+  if (!ids.includes(id) || day !== todayKST()) return;
   const [app] = await getApplications([id]);
-  if (!app || !canWatch(app) || app.cohort !== (await currentCohort())) return { error: "이번 기수 수강생만 인증할 수 있어요." };
-  if (!(file instanceof File) || file.size === 0) return { error: "숙제 사진을 골라 주세요." };
-  if (file.size > 4 * 1024 * 1024) return { error: "사진이 너무 커요. 다시 시도해 주세요." };
-  if (!file.type.startsWith("image/")) return { error: "사진 파일만 올릴 수 있어요." };
-  await saveHomework(app, todayKST(), Buffer.from(await file.arrayBuffer()));
+  if (!app || !canWatch(app) || app.cohort !== (await currentCohort())) return;
+  const klass = scheduleClassFor(app.course, app.track);
+  const rawDays = await getSetting(scheduleKey(app.cohort, klass));
+  const savedDays = rawDays ? parseSchoolDays(rawDays, app.cohort) : defaultSchoolDays(app.cohort, klass);
+  if (!savedDays.includes(day)) return;
+  await addHomeworkSticker(app.id, day);
   revalidatePath("/class");
-  return { ok: "숙제 인증 완료! ⭐ 스티커가 붙었어요." };
 }
 
-// 지난 기수 숙제 사진 정리
+export async function cancelHomeworkSticker(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const id = clean(fd.get("id"));
+  const day = clean(fd.get("day"));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+  await deleteHomeworkSticker(id, day);
+  revalidatePath("/admin/stamps");
+  revalidatePath("/class");
+}
+
+// 예전에 저장한 숙제 사진을 지난 기수 기준으로 정리해요.
 export async function cleanupPhotos(): Promise<void> {
   if (!(await isAdmin())) return;
   await deletePhotosBefore(await currentCohort());

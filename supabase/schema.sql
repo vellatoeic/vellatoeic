@@ -54,7 +54,7 @@ create table if not exists attendance (
 create table if not exists homework (
   app_id uuid not null references applications(id) on delete cascade,
   day date not null,
-  photo_path text not null,
+  photo_path text,
   created_at timestamptz not null default now(),
   primary key (app_id, day)
 );

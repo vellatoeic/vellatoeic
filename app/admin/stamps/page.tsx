@@ -3,7 +3,7 @@ import { KINDS, KLASSES, TRACKS, cohortLabel, dayLabel, klassOf, takesSharedLc, 
 import { listApplications, listStamps, currentCohort, isPreview } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { canWatch } from "@/lib/access";
-import { cleanupPhotos, markAttendanceManual } from "@/app/actions";
+import { cancelHomeworkSticker, cleanupPhotos, markAttendanceManual } from "@/app/actions";
 import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
 
@@ -85,8 +85,13 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
                               <button className="opacity-25 hover:opacity-100" aria-label={`${a.name} ${dayLabel(d)} 출석 처리`}>☁️</button>
                             </form>
                           )}
-                          {h?.photo_path ? (
-                            <a href={`/admin/photo?p=${encodeURIComponent(h.photo_path)}`} target="_blank" rel="noreferrer">⭐</a>
+                          {h ? (
+                            <form action={cancelHomeworkSticker} className="inline">
+                              <input type="hidden" name="id" value={a.id} />
+                              <input type="hidden" name="day" value={d} />
+                              <button aria-label={`${a.name} ${dayLabel(d)} 숙제 스티커 취소`} title="누르면 별 스티커를 취소해요">⭐</button>
+                              {h.photo_path && <a className="ml-1 text-xs" href={`/admin/photo?p=${encodeURIComponent(h.photo_path)}`} target="_blank" rel="noreferrer" aria-label="기존 숙제 사진 보기">📷</a>}
+                            </form>
                           ) : (
                             <span className="opacity-20">⭐</span>
                           )}
@@ -122,7 +127,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
       </form>
 
       <form action={cleanupPhotos} className="card flex flex-wrap items-center justify-between gap-3 text-sm">
-        <p className="text-slate-600">지난 기수 숙제 사진 정리 (스티커 기록은 남아요 · 저장 공간 확보)</p>
+        <p className="text-slate-600">예전 기수 숙제 사진 정리 (새 숙제 인증은 카페 링크를 사용해요)</p>
         <button className="btn-ghost !py-2">지난 기수 사진 지우기</button>
       </form>
     </div>
