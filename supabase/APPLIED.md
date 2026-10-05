@@ -12,6 +12,7 @@ Vella가 Supabase SQL Editor에서 실행했다고 확인한 SQL 파일만 기�
 | `6_repair_runtime_schema.sql` | 완료 | 실행본에서는 Storage 권한 두 줄을 제외하고 마지막에 `notify pgrst, 'reload schema';`를 추가해 실행 |
 | `7_special_lectures.sql` | 완료 | 특강 일정·신청 명단·자료 표와 비공개 자료 보관함 생성, 10월 특강 2회 기본값 입력 |
 | `8_special_link_application.sql` | 완료 | 특강 신청에 수강 신청 연결 열(application_id) 추가, 특강 전용 비밀번호 열을 비워둘 수 있게 변경 |
+| `9_application_slot.sql` | 완료 | 수강 신청에 수강 시간 열(slot: am/pm) 추가 |
 
 ## 기록 갱신 규칙
 
