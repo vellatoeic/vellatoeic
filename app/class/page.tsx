@@ -6,7 +6,7 @@ import { canWatch, covers } from "@/lib/access";
 import { studentLogout } from "@/app/actions";
 import StudentLogin from "./StudentLogin";
 import StickerBoard from "./StickerBoard";
-import { defaultHolidays, defaultSchoolDays, holidayKey, homeworkWindowDays, parseHolidays, parseSchoolDays, scheduleClassFor, scheduleKey } from "@/lib/schedule";
+import { defaultHolidays, defaultSchoolDays, holidayKey, parseHolidays, parseSchoolDays, scheduleClassFor, scheduleKey } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "강의실 · vella_toeic", robots: { index: false } };
@@ -105,13 +105,11 @@ export default async function ClassRoom() {
                 className={`${COURSES[a.course].label} ${TRACKS[a.track]}`}
                 klass={klass}
                 scheduleDays={schedule.days}
-                homeworkWindowDays={homeworkWindowDays(klass, schedule.days)}
                 holidays={schedule.holidays}
                 attendance={stamps.attendance.filter((stamp) => stamp.app_id === a.id)}
-                homework={stamps.homework.filter((stamp) => stamp.app_id === a.id).map((stamp) => stamp.day)}
+                homework={stamps.homework.filter((stamp) => stamp.app_id === a.id).map(({ day, created_at }) => ({ day, created_at }))}
                 cafeUrl={cafeUrl}
                 today={today}
-                active={a.cohort === cohort}
               />;
             })()}
             {TRACK_PARTS[a.track].map((part) => {

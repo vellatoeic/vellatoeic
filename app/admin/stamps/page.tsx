@@ -3,6 +3,7 @@ import { KINDS, KLASSES, TRACKS, cohortLabel, dayLabel, klassOf, takesSharedLc, 
 import { listApplications, listStamps, currentCohort, isPreview } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { canWatch } from "@/lib/access";
+import { isHomeworkStickerEligible } from "@/lib/schedule";
 import { cancelHomeworkSticker, cleanupPhotos, markAttendanceManual } from "@/app/actions";
 import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
@@ -63,7 +64,10 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
             <tbody>
               {apps.map((a) => {
                 const att = days.filter((d) => has(attendance, a.id, d)).length;
-                const hw = days.filter((d) => has(homework, a.id, d)).length;
+                const hw = days.filter((d) => {
+                  const stamp = has(homework, a.id, d) as { created_at?: string } | undefined;
+                  return !!stamp && isHomeworkStickerEligible(d, stamp.created_at);
+                }).length;
                 return (
                   <tr key={a.id} className="border-b border-sky-soft">
                     <td className={`sticky left-0 bg-white py-2 pr-3 text-left ${days.length - att >= 3 ? "font-bold text-red-500" : ""}`}>
@@ -71,7 +75,8 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
                       <span className="ml-1 text-[11px] text-slate-400">{KINDS[a.kind].short}{a.track === "rc" || a.track === "lc" ? ` ${TRACKS[a.track]}` : ""}</span>
                     </td>
                     {days.map((d) => {
-                      const h = has(homework, a.id, d) as { photo_path?: string } | undefined;
+                      const h = has(homework, a.id, d) as { photo_path?: string | null; created_at?: string } | undefined;
+                      const hasStar = !!h && isHomeworkStickerEligible(d, h.created_at);
                       return (
                         <td key={d} className="px-1 py-2 whitespace-nowrap">
                           {has(attendance, a.id, d) ? (
@@ -89,7 +94,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
                             <form action={cancelHomeworkSticker} className="inline">
                               <input type="hidden" name="id" value={a.id} />
                               <input type="hidden" name="day" value={d} />
-                              <button aria-label={`${a.name} ${dayLabel(d)} 숙제 스티커 취소`} title="누르면 별 스티커를 취소해요">⭐</button>
+                              <button className={hasStar ? "" : "opacity-35"} aria-label={`${a.name} ${dayLabel(d)} 숙제 제출 기록 취소`} title={hasStar ? "별 스티커가 있어요. 누르면 기록을 취소해요." : "제출 기록은 있지만 제출이 늦어 별은 없어요. 누르면 기록을 취소해요."}>{hasStar ? "⭐" : "✓"}</button>
                               {h.photo_path && <a className="ml-1 text-xs" href={`/admin/photo?p=${encodeURIComponent(h.photo_path)}`} target="_blank" rel="noreferrer" aria-label="기존 숙제 사진 보기">📷</a>}
                             </form>
                           ) : (

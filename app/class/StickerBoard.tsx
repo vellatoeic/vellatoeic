@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { cancelMyHomeworkDone, markHomeworkDone } from "@/app/actions";
-import { weekDaysInMonth, type ScheduleClass } from "@/lib/schedule";
+import { homeworkAssignmentDays, isHomeworkStickerEligible, weekDaysInMonth, type ScheduleClass } from "@/lib/schedule";
 import Cloud from "@/components/Cloud";
 
 type StampAttendance = { day: string; late: boolean };
@@ -14,13 +14,11 @@ export default function StickerBoard({
   className: _className,
   klass,
   scheduleDays,
-  homeworkWindowDays,
   holidays,
   attendance,
   homework,
   cafeUrl,
   today,
-  active,
 }: {
   appId: string;
   name: string;
@@ -28,20 +26,26 @@ export default function StickerBoard({
   className: string;
   klass: ScheduleClass;
   scheduleDays: string[];
-  homeworkWindowDays: string[];
   holidays: Record<string, string>;
   attendance: StampAttendance[];
-  homework: string[];
+  homework: { day: string; created_at: string }[];
   cafeUrl: string;
   today: string;
-  active: boolean;
 }) {
   const [newBadges, setNewBadges] = useState<string[]>([]);
   const [newStickers, setNewStickers] = useState<string[]>([]);
   const weeks = useMemo(() => weekDaysInMonth(cohort), [cohort]);
   const lessonDays = useMemo(() => new Set(scheduleDays), [scheduleDays]);
   const attendanceByDay = useMemo(() => new Map(attendance.map((item) => [item.day, item])), [attendance]);
-  const homeworkDays = useMemo(() => new Set(homework), [homework]);
+  const homeworkByDay = useMemo(() => new Map(homework.map((item) => [item.day, item])), [homework]);
+  const homeworkAssignments = useMemo(() => homeworkAssignmentDays(scheduleDays).filter((day) => day <= today), [scheduleDays, today]);
+  const [selectedHomeworkDay, setSelectedHomeworkDay] = useState("");
+  const homeworkTargetDay = homeworkAssignments.includes(selectedHomeworkDay)
+    ? selectedHomeworkDay
+    : homeworkAssignments.find((day) => !homeworkByDay.has(day)) ?? homeworkAssignments[homeworkAssignments.length - 1] ?? "";
+  const selectedHomework = homeworkByDay.get(homeworkTargetDay);
+  const selectedHomeworkHasSticker = selectedHomework ? isHomeworkStickerEligible(homeworkTargetDay, selectedHomework.created_at) : false;
+  const homeworkDays = useMemo(() => new Set(homework.filter((item) => isHomeworkStickerEligible(item.day, item.created_at)).map((item) => item.day)), [homework]);
   const total = scheduleDays.length;
   const attendanceCount = scheduleDays.filter((day) => attendanceByDay.has(day)).length;
   const lateCount = scheduleDays.filter((day) => attendanceByDay.get(day)?.late).length;
@@ -62,10 +66,6 @@ export default function StickerBoard({
           : klass === "solve-mw" ? "문풀반 격일 (월·수)"
             : klass === "solve-tt" ? "문풀반 격일 (화·목)" : "속성반";
   const classSummary = `${displayClass} · ${startDate} 개강 · 총 ${total}회`;
-  const homeworkDueDay = homeworkWindowDays.find((day) => !homeworkDays.has(day)) ?? null;
-  const completedHomeworkDay = [...homeworkWindowDays].reverse().find((day) => homeworkDays.has(day)) ?? null;
-  const homeworkActionDay = homeworkDueDay ?? completedHomeworkDay;
-
   const badgeStates = [
     { id: "attendance", title: "출석", count: `${attendanceCount}/${total}`, earned: attendanceCount > 0, icon: "cloud" as const, color: "#d9f0fd" },
     { id: "homework", title: "숙제", count: `${homeworkCount}/${total}`, earned: homeworkCount > 0, icon: "star" as const, color: "#fff3c4" },
@@ -86,7 +86,8 @@ export default function StickerBoard({
       const stickerKey = `vella-stickers:${appId}:${cohort}`;
       const storedStickers: unknown = JSON.parse(localStorage.getItem(stickerKey) ?? "[]");
       const seenStickers = new Set(Array.isArray(storedStickers) ? storedStickers.filter((v): v is string => typeof v === "string") : []);
-      const presentToday = [attendanceByDay.has(today) ? `${today}:attendance` : "", homeworkDays.has(today) ? `${today}:homework` : ""].filter(Boolean);
+      const homeworkSubmittedToday = homework.filter((item) => new Date(Date.parse(item.created_at) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10) === today && isHomeworkStickerEligible(item.day, item.created_at)).map((item) => `${item.day}:homework`);
+      const presentToday = [attendanceByDay.has(today) ? `${today}:attendance` : "", ...homeworkSubmittedToday].filter(Boolean);
       setNewStickers(presentToday.filter((key) => !seenStickers.has(key)));
       presentToday.forEach((key) => seenStickers.add(key));
       localStorage.setItem(stickerKey, JSON.stringify([...seenStickers]));
@@ -224,27 +225,39 @@ export default function StickerBoard({
           </div>
         )}
 
-        {active && homeworkActionDay && (
-          homeworkDueDay === null ? (
-            <div className="mt-[14px] rounded-[22px] border-2 border-[#ffe9a3] bg-[#fffbea] px-4 py-3 text-center text-[#a7741a]">
-              <p className="font-jua text-base">숙제 제출 완료! ⭐</p>
+        <div className="mt-[14px] rounded-[22px] border-2 border-[#ffe58a] bg-gradient-to-br from-[#fff9e0] to-white p-4 shadow-[0_2px_0_#d5ecf9]">
+          {homeworkAssignments.length > 0 ? (
+            <label className="mb-3 block">
+              <span className="mb-1 block text-sm font-bold text-[#7d6728]">숙제 날짜 선택</span>
+              <select value={homeworkTargetDay} onChange={(event) => setSelectedHomeworkDay(event.target.value)} className="w-full rounded-xl border border-[#ffe58a] bg-white px-3 py-2 text-sm text-[#5a3b00]">
+                {homeworkAssignments.map((day) => {
+                  const stamp = homeworkByDay.get(day);
+                  const marked = stamp ? (isHomeworkStickerEligible(day, stamp.created_at) ? " · 제출 완료 ⭐" : " · 제출 기록 있음") : "";
+                  return <option key={day} value={day}>{Number(day.slice(5, 7))}/{Number(day.slice(8, 10))} 수업{marked}</option>;
+                })}
+              </select>
+            </label>
+          ) : (
+            <p className="mb-3 text-center text-sm text-[#a7741a]">첫 수업에는 숙제가 없어요. 둘째 수업부터 날짜를 선택해 주세요.</p>
+          )}
+          <a href={cafeUrl || undefined} target="_blank" rel="noreferrer" aria-disabled={!cafeUrl} className={`block w-full rounded-2xl bg-[#ffd23f] px-3 py-[13px] text-center font-jua text-lg text-[#5a3b00] shadow-[0_4px_0_#e0b400] ${cafeUrl ? "" : "pointer-events-none opacity-50"}`}>📝 숙제 제출하러 가기</a>
+          {selectedHomework ? (
+            <div className="mt-2 rounded-2xl border-2 border-dashed border-[#e0b400] bg-white px-3 py-2.5 text-center text-[#a7741a]">
+              <p className="font-jua text-[15px]">{selectedHomeworkHasSticker ? "숙제 제출 완료! ⭐" : "제출 기록 완료 · 제출일이 수업 다음 날 이후라 스티커는 없어요."}</p>
               <form action={cancelMyHomeworkDone} className="mt-1">
                 <input type="hidden" name="app_id" value={appId} />
-                <input type="hidden" name="day" value={homeworkActionDay} />
-                <button className="rounded-full px-3 py-1 text-xs text-[#a7741a]/70 underline underline-offset-2">잘못 눌렀어요 · 스티커 취소</button>
+                <input type="hidden" name="day" value={homeworkTargetDay} />
+                <button className="rounded-full px-3 py-1 text-xs text-[#a7741a]/70 underline underline-offset-2">잘못 선택했어요 · 취소 후 다시 제출</button>
               </form>
             </div>
-          ) : !complete ? (
-            <div className="mt-[14px] rounded-[22px] border-2 border-[#ffe58a] bg-gradient-to-br from-[#fff9e0] to-white p-4 shadow-[0_2px_0_#d5ecf9]">
-              <a href={cafeUrl || undefined} target="_blank" rel="noreferrer" aria-disabled={!cafeUrl} className={`block w-full rounded-2xl bg-[#ffd23f] px-3 py-[13px] text-center font-jua text-lg text-[#5a3b00] shadow-[0_4px_0_#e0b400] ${cafeUrl ? "" : "pointer-events-none opacity-50"}`}>📝 숙제 제출하러 가기</a>
-              <form action={markHomeworkDone} className="mt-2">
-                <input type="hidden" name="app_id" value={appId} />
-                <input type="hidden" name="day" value={homeworkDueDay} />
-                <button className="block w-full rounded-2xl border-2 border-dashed border-[#e0b400] bg-white px-3 py-2.5 font-jua text-[15px] text-[#a7741a]">숙제 제출했어요 ✓ 스티커 받기</button>
-              </form>
-            </div>
-          ) : null
-        )}
+          ) : homeworkTargetDay ? (
+            <form action={markHomeworkDone} className="mt-2">
+              <input type="hidden" name="app_id" value={appId} />
+              <input type="hidden" name="day" value={homeworkTargetDay} />
+              <button className="block w-full rounded-2xl border-2 border-dashed border-[#e0b400] bg-white px-3 py-2.5 font-jua text-[15px] text-[#a7741a]">숙제 제출했어요 ✓ 기록하기</button>
+            </form>
+          ) : null}
+        </div>
 
         <div className="mt-[14px] rounded-[22px] bg-white p-4 shadow-[0_2px_0_#d5ecf9]">
           <div className="grid grid-cols-4 gap-1.5 text-center">
@@ -278,7 +291,7 @@ export default function StickerBoard({
               const cloudNew = newStickers.includes(`${day}:attendance`);
               const starNew = newStickers.includes(`${day}:homework`);
               return (
-                <div key={day} className={`relative min-h-[74px] min-w-0 rounded-[14px] border-2 px-px pb-1 pt-1 ${holiday ? "sticker-day-holiday" : !isLesson ? "border-2 border-transparent bg-transparent" : future || missed ? "border-dashed border-[#c4e2f4] bg-white" : isToday ? "border-[#2b8fc7] bg-[#eaf6fd]" : "border-[#e1f1fb] bg-[#f7fcff]"}`}>
+                <div key={day} className={`relative min-h-[74px] min-w-0 rounded-[14px] px-px pb-1 pt-1 ${holiday ? "border-2 border-transparent bg-transparent" : !isLesson ? "border-2 border-transparent bg-transparent" : future || missed ? "border-2 border-dashed border-[#c4e2f4] bg-white" : isToday ? "border-2 border-[#2b8fc7] bg-[#eaf6fd]" : "border-2 border-[#e1f1fb] bg-[#f7fcff]"}`}>
                   {isToday && <span className="absolute -right-1 -top-2 rounded-full bg-[#2b8fc7] px-1.5 py-0.5 font-jua text-[10px] text-white">오늘</span>}
                   <div className={`pl-1 text-left font-jua text-sm ${holiday ? "text-[#e5707e]" : isToday ? "text-[#2b8fc7]" : isLesson ? "text-[#5b88a6]" : "text-[#c6dceb]"}`}>{Number(day.slice(-2))}</div>
                   {holiday && <div className="mt-2 truncate font-jua text-[10px] text-[#e5707e]">{holiday}</div>}

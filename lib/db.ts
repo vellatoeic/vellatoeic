@@ -43,7 +43,7 @@ export const isPreview = !sb;
 
 export type Stamp = { app_id: string; day: string };
 export type Attendance = Stamp & { late: boolean };
-export type Homework = Stamp & { photo_path: string | null };
+export type Homework = Stamp & { photo_path: string | null; created_at: string };
 
 type Mem = {
   apps: Application[];
@@ -244,7 +244,7 @@ export async function addHomeworkSticker(app_id: string, day: string) {
     if (error) throw error;
     return;
   }
-  if (!mem.homework.some((x) => x.app_id === app_id && x.day === day)) mem.homework.push({ app_id, day, photo_path: null });
+  if (!mem.homework.some((x) => x.app_id === app_id && x.day === day)) mem.homework.push({ app_id, day, photo_path: null, created_at: new Date().toISOString() });
 }
 
 export async function deleteHomeworkSticker(app_id: string, day: string) {
@@ -270,7 +270,7 @@ export async function listStamps(appIds: string[]): Promise<{ attendance: Attend
   if (sb) {
     const [a, h] = await Promise.all([
       sb.from("attendance").select("app_id, day, late").in("app_id", ok),
-      sb.from("homework").select("app_id, day, photo_path").in("app_id", ok),
+      sb.from("homework").select("app_id, day, photo_path, created_at").in("app_id", ok),
     ]);
     if (a.error) throw a.error;
     if (h.error) throw h.error;
