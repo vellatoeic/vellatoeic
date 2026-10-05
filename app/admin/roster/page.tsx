@@ -4,8 +4,7 @@ import { isAdmin } from "@/lib/auth";
 import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
 import PrintButton from "./PrintButton";
-import DeliveryList from "./DeliveryList";
-import { phoneLabel } from "@/lib/csv";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
@@ -98,18 +97,9 @@ export default async function Roster() {
         </h3>
         {desk.length > 0 ? <Table apps={desk} /> : <p className="mt-2 text-sm text-slate-500">아직 없어요.</p>}
       </section>
-      <section className="card break-inside-avoid">
-        <h3 className="font-jua text-xl text-sky-ink">
-          택배 <span className="text-base text-slate-400">· {delivery.length}명</span>
-        </h3>
-        {delivery.length > 0 ? (
-          <DeliveryList
-            rows={[...delivery]
-              .sort((a, b) => ["paid", "pending", "shipped"].indexOf(a.status) - ["paid", "pending", "shipped"].indexOf(b.status) || a.name.localeCompare(b.name, "ko"))
-              .map((a) => ({ id: a.id, name: a.name, phone: phoneLabel(a.phone), address: a.address ?? "", books: a.books.map((b) => BOOKS[b]).join(", "), status: a.status }))}
-          />
-        ) : <p className="mt-2 text-sm text-slate-500">아직 없어요.</p>}
-      </section>
+      <p className="card text-sm text-slate-600 print:hidden">
+        택배 수령 {delivery.length}명의 이름·연락처·주소는 <Link href="/admin/delivery" className="font-bold text-sky-deep underline">[택배 발송]</Link> 탭에서 볼 수 있어요.
+      </p>
     </div>
   );
 }

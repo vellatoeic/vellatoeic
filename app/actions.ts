@@ -427,7 +427,7 @@ export async function bulkMarkShipped(fd: FormData) {
   const apps = await getApplications(ids);
   const ready = apps.filter((app) => app.status === "paid" && app.kind === "online" && app.pickup === "delivery").map((app) => app.id);
   await updateApplications(ready, { status: "shipped" });
-  revalidatePath("/admin/roster");
+  revalidatePath("/admin/delivery");
   revalidatePath("/admin");
 }
 

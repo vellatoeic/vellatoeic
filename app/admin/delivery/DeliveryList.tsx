@@ -27,17 +27,19 @@ export default function DeliveryList({ rows }: { rows: Row[] }) {
         <button type="button" onClick={copy} disabled={waiting.length === 0} className="btn-ghost !py-2 text-sm">
           발송 대기 {waiting.length}명 이름·연락처·주소 복사
         </button>
-        <a href="/admin/roster/delivery-csv" className="btn-ghost !py-2 text-sm">CSV 받기</a>
+        <a href="/admin/delivery/csv" className="btn-ghost !py-2 text-sm">CSV 받기</a>
         <button className="btn !py-2 !text-sm">체크한 학생 발송 완료</button>
       </div>
       {copied && <p className="mt-2 text-sm text-sky-deep">{copied}</p>}
       <p className="mt-1 text-xs text-slate-500 print:hidden">납부 완료(발송 대기) 학생만 발송 완료로 바뀌어요. 되돌리기는 [신청 관리]에서 할 수 있어요.</p>
-      <table className="mt-3 w-full text-left text-[15px]">
+      <div className="mt-3 overflow-x-auto">
+      <table className="w-full min-w-[640px] text-left text-[15px]">
         <thead>
           <tr className="border-b border-sky-main text-sm text-slate-500">
             <th className="w-8 py-2">✓</th>
             <th className="py-2">이름</th>
-            <th className="py-2">연락처 · 주소</th>
+            <th className="py-2">연락처</th>
+            <th className="py-2">주소</th>
             <th className="py-2">교재</th>
             <th className="py-2 text-right">상태</th>
           </tr>
@@ -48,14 +50,16 @@ export default function DeliveryList({ rows }: { rows: Row[] }) {
               <td className="py-2">
                 {r.status === "paid" && <input type="checkbox" name="ids" value={r.id} aria-label={`${r.name} 선택`} className="h-4 w-4 accent-sky-deep" />}
               </td>
-              <td className="py-2">{r.name}</td>
-              <td className="py-2 text-sm">{r.phone}<br />{r.address}</td>
+              <td className="whitespace-nowrap py-2 font-bold">{r.name}</td>
+              <td className="whitespace-nowrap py-2">{r.phone}</td>
+              <td className="py-2">{r.address}</td>
               <td className="py-2 text-sm">{r.books}</td>
               <td className={`py-2 text-right font-bold ${r.status === "pending" ? "text-amber-600" : r.status === "paid" ? "text-sky-deep" : ""}`}>{STATUS[r.status]}</td>
             </tr>
           ))}
         </tbody>
       </table>
+      </div>
     </form>
   );
 }
