@@ -54,7 +54,7 @@ export default async function MissionPage() {
       <section className="rounded-[20px] bg-white px-4 py-3.5 shadow-[0_2px_0_#d5ecf9]">
         <div className="flex items-center gap-2.5">
           <Num done={introDone} n={1} />
-          <Title title="나를 소개해요" sub="Vella가 수업에 참고해요" />
+          <Title title="나를 소개해요" sub="Vella쌤이 수업에 참고해요" />
           {introDone && <span className="ml-auto font-jua text-xs text-[#4cc38a]">완료!</span>}
         </div>
         {introDone ? (

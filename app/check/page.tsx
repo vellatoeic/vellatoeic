@@ -52,7 +52,7 @@ export default async function Check() {
     console.error("출석 저장 실패", detail);
     return (
       <Box title="출석 저장 중 문제가 생겼어요">
-        <p className="text-slate-600">잠시 후 QR을 다시 찍어 주세요.<br />계속 안 되면 이 화면을 캡처해서 Vella에게 보내 주세요.</p>
+        <p className="text-slate-600">잠시 후 QR을 다시 찍어 주세요.<br />계속 안 되면 이 화면을 캡처해서 Vella쌤에게 보내 주세요.</p>
         <p className="break-all rounded-xl bg-slate-50 p-2 text-left text-xs text-slate-400">{detail}</p>
       </Box>
     );
