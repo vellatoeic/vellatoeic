@@ -5,6 +5,7 @@ import { editLecture, removeLecture } from "@/app/actions";
 import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
 import UploadForm from "./UploadForm";
+import CloseOnSubmitForm from "../CloseOnSubmitForm";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
@@ -64,7 +65,7 @@ export default async function Lectures() {
                                 <button className="text-xs text-slate-400 hover:text-red-500">삭제</button>
                               </form>
                             </summary>
-                            <form action={editLecture} className="mt-3 grid gap-2 rounded-xl bg-white p-3 text-sm">
+                            <CloseOnSubmitForm action={editLecture} className="mt-3 grid gap-2 rounded-xl bg-white p-3 text-sm">
                               <input type="hidden" name="id" value={l.id} />
                               <label><span className="text-xs text-slate-500">강의 제목</span><input name="title" defaultValue={l.title} required className="input !py-2" /></label>
                               <label><span className="text-xs text-slate-500">유튜브 링크</span><input name="url" defaultValue={`https://youtu.be/${l.youtube_id}`} required className="input !py-2" /></label>
@@ -89,7 +90,7 @@ export default async function Lectures() {
                                 </label>
                               </div>
                               <button className="btn !py-2 !text-sm">수정 저장</button>
-                            </form>
+                            </CloseOnSubmitForm>
                           </details>
                         </li>
                       ))}
