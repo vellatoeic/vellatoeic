@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BOOKS, COURSES, PARTS, TIME_SLOTS, TRACKS, TRACK_PARTS, cohortLabel, dayLabel, todayKST, won } from "@/lib/config";
+import { BOOKS, COURSES, PARTS, TIME_SLOTS, TRACKS, TRACK_PARTS, cohortLabel, todayKST, won } from "@/lib/config";
 import { liveState } from "@/lib/live";
 import AddToHome from "@/components/AddToHome";
 import { getApplications, listAudios, listLectures, listMissions, listStamps, currentCohort, getSetting } from "@/lib/db";
@@ -128,9 +128,6 @@ export default async function ClassRoom() {
 
       {paid.map((a) => {
         const mine = lectures.filter((l) => covers(a, l));
-        // 라이브 바로가기: 내 반·내 수강 시간에 가장 최근 올라온 강의 링크 (반·RC/LC·오전/저녁별 하나씩)
-        const latest = new Map(mine.filter((l) => !a.slot || !l.slot || l.slot === a.slot).map((l) => [`${l.course}-${l.part}-${l.slot ?? ""}`, l]));
-        const live = [...latest.values()].sort((x, y) => y.created_at.localeCompare(x.created_at));
         return (
           <section key={a.id} className="card">
             <div className="flex flex-wrap items-center gap-2">
@@ -139,25 +136,6 @@ export default async function ClassRoom() {
                 {COURSES[a.course].label} {TRACKS[a.track]}
               </h2>
             </div>
-            {a.cohort === cohort && (
-              <div className="mt-4 rounded-2xl bg-sky-soft p-4">
-                <p className="font-jua text-lg text-sky-ink">📺 라이브 바로가기 {a.slot && <span className="text-sm text-slate-500">({TIME_SLOTS[a.slot]})</span>}</p>
-                {live.length === 0 ? <p className="mt-2 text-sm text-slate-600">수업이 시작되면 여기에 올라와요</p> : (
-                  <div className="mt-2 grid gap-2">
-                    {live.map((l) => (
-                      <a key={l.id} href={`https://youtu.be/${l.youtube_id}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5">
-                        <span className="flex-1">
-                          <b className="block text-sky-ink">{COURSES[l.course].label} {PARTS[l.part]}{l.slot ? ` · ${TIME_SLOTS[l.slot]}` : ""}</b>
-                          <span className="text-xs text-slate-500">{l.title} · {dayLabel(new Date(Date.parse(l.created_at) + 9 * 3600 * 1000).toISOString().slice(0, 10))} 업로드</span>
-                        </span>
-                        <span className="text-sky-deep">보기 ↗</span>
-                      </a>
-                    ))}
-                  </div>
-                )}
-                <p className="mt-2 text-xs text-slate-500">가장 최근에 올라온 수업 링크예요 (종강일까지 시청 가능)</p>
-              </div>
-            )}
             {(() => {
               const box = audioBoxes.get(a.id);
               if (!box?.period || today > box.period.end) return null;
@@ -204,11 +182,12 @@ export default async function ClassRoom() {
                 welcome={missionCount(missionFor(a.id, missions)) === 4}
               />;
             })()}
+            {mine.length > 0 && <h3 className="font-jua mt-6 border-t border-sky-main/50 pt-5 text-2xl text-sky-ink">📚 지난 강의</h3>}
             {TRACK_PARTS[a.track].map((part) => {
               const list = mine.filter((l) => l.part === part);
               if (list.length === 0) return null;
               return (
-                <div key={part} className="mt-5">
+                <div key={part} className="mt-3">
                   <p className="font-jua mb-2 text-lg text-sky-deep">{PARTS[part]}</p>
                   <ol className="space-y-2">
                     {list.map((l, i) => (

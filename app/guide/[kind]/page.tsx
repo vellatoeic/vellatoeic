@@ -56,7 +56,7 @@ export default async function KindGuide({ params }: { params: Promise<{ kind: st
         </ul>
       </section>
 
-      {kind === "online" && <HowToWatch />}
+      {kind === "online" && <HowToWatch beforeApply />}
 
       <ApplyForm kind={kind} round={round} />
     </div>

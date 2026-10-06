@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 // 불라방 학생에게 보여주는 "수업 듣는 방법" 카드. 반 정보가 있으면 수업 요일·시간도 보여줘요.
-export default function HowToWatch({ days, times }: { days?: string; times?: { label: string; from: string; to: string }[] }) {
+export default function HowToWatch({ days, times, beforeApply }: { days?: string; times?: { label: string; from: string; to: string }[]; beforeApply?: boolean }) {
   const steps = [
     "수업 10분 전, 홈페이지 → 강의실",
     "이름 + 비밀번호 4자리로 로그인",
@@ -22,7 +22,10 @@ export default function HowToWatch({ days, times }: { days?: string; times?: { l
         {steps.map((s, i) => (
           <li key={s} className="flex items-center gap-3">
             <span className="font-jua grid h-9 w-9 shrink-0 place-items-center rounded-full bg-sky-deep text-lg text-white">{"①②③"[i]}</span>
-            <span className="text-[17px] text-slate-800">{s}</span>
+            <span className="text-[17px] text-slate-800">
+              {s}
+              {i === 0 && beforeApply && <span className="block text-sm font-bold text-sky-deep">아래 신청서 작성 후</span>}
+            </span>
           </li>
         ))}
       </ol>
