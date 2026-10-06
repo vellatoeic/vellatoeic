@@ -1,7 +1,7 @@
 import { COURSES, PARTS, LECTURE_COURSES, cohortLabel, type Part } from "@/lib/config";
 import { listLectures, currentCohort, isPreview } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
-import { removeLecture } from "@/app/actions";
+import { editLecture, removeLecture } from "@/app/actions";
 import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
 import UploadForm from "./UploadForm";
@@ -45,20 +45,44 @@ export default async function Lectures() {
                     </p>
                     <ol className="space-y-2">
                       {list.map((l, i) => (
-                        <li key={l.id} className="flex items-center gap-3 rounded-2xl bg-sky-soft px-4 py-2">
-                          <span className="font-jua w-6 text-sky-deep">{i + 1}</span>
-                          <a
-                            href={`https://youtu.be/${l.youtube_id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex-1 text-slate-800 hover:underline"
-                          >
-                            {l.title}
-                          </a>
-                          <form action={removeLecture}>
-                            <input type="hidden" name="id" value={l.id} />
-                            <button className="text-xs text-slate-400 hover:text-red-500">삭제</button>
-                          </form>
+                        <li key={l.id} className="rounded-2xl bg-sky-soft px-4 py-2">
+                          <details className="group">
+                            <summary className="flex list-none items-center gap-3">
+                              <span className="font-jua w-6 text-sky-deep">{i + 1}</span>
+                              <a
+                                href={`https://youtu.be/${l.youtube_id}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex-1 text-slate-800 hover:underline"
+                              >
+                                {l.title}
+                              </a>
+                              <span className="cursor-pointer text-xs text-slate-500 hover:text-sky-deep group-open:text-sky-deep">수정</span>
+                              <form action={removeLecture}>
+                                <input type="hidden" name="id" value={l.id} />
+                                <button className="text-xs text-slate-400 hover:text-red-500">삭제</button>
+                              </form>
+                            </summary>
+                            <form action={editLecture} className="mt-3 grid gap-2 rounded-xl bg-white p-3 text-sm">
+                              <input type="hidden" name="id" value={l.id} />
+                              <label><span className="text-xs text-slate-500">강의 제목</span><input name="title" defaultValue={l.title} required className="input !py-2" /></label>
+                              <label><span className="text-xs text-slate-500">유튜브 링크</span><input name="url" defaultValue={`https://youtu.be/${l.youtube_id}`} required className="input !py-2" /></label>
+                              <div className="grid grid-cols-3 gap-2">
+                                <label><span className="text-xs text-slate-500">기수</span><input type="month" name="cohort" defaultValue={l.cohort} required className="input !py-2" /></label>
+                                <label><span className="text-xs text-slate-500">반</span>
+                                  <select name="course" defaultValue={l.course} className="input !py-2">
+                                    {LECTURE_COURSES.map((co) => <option key={co} value={co}>{COURSES[co].label}</option>)}
+                                  </select>
+                                </label>
+                                <label><span className="text-xs text-slate-500">RC/LC</span>
+                                  <select name="part" defaultValue={l.part} className="input !py-2">
+                                    {(Object.keys(PARTS) as Part[]).map((p) => <option key={p} value={p}>{PARTS[p]}</option>)}
+                                  </select>
+                                </label>
+                              </div>
+                              <button className="btn !py-2 !text-sm">수정 저장</button>
+                            </form>
+                          </details>
                         </li>
                       ))}
                     </ol>

@@ -7,7 +7,7 @@ import {
   type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
 } from "@/lib/config";
 import {
-  createApplication, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
+  createApplication, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
   saveMission, type Mission, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
 } from "@/lib/db";
 import { canWatch } from "@/lib/access";
@@ -240,6 +240,20 @@ export async function uploadLecture(_: FormState, fd: FormData): Promise<FormSta
   await addLecture({ cohort, course, part, title, youtube_id: yt });
   revalidatePath("/admin/lectures");
   return { ok: `'${title}' 강의를 올렸어요.` };
+}
+
+// 올린 강의의 제목·링크·기수·반·RC/LC 고치기 (잘못된 값이면 그대로 둬요)
+export async function editLecture(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const cohort = clean(fd.get("cohort"));
+  const course = clean(fd.get("course")) as CourseId;
+  const part = clean(fd.get("part")) as Part;
+  const title = clean(fd.get("title"));
+  const yt = youtubeId(clean(fd.get("url")));
+  if (!validCohort(cohort) || !LECTURE_COURSES.includes(course) || !Object.hasOwn(PARTS, part) || !title || !yt) return;
+  await updateLecture(clean(fd.get("id")), { cohort, course, part, title, youtube_id: yt });
+  revalidatePath("/admin/lectures");
+  revalidatePath("/class");
 }
 
 export async function removeLecture(fd: FormData) {

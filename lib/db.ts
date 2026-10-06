@@ -254,6 +254,17 @@ export async function addLecture(l: Omit<Lecture, "id" | "created_at">) {
   mem.lectures.push({ ...l, id: crypto.randomUUID(), created_at: new Date().toISOString() });
 }
 
+export async function updateLecture(id: string, patch: Omit<Lecture, "id" | "created_at">) {
+  if (!isUuid(id)) return;
+  if (sb) {
+    const { error } = await sb.from("lectures").update(patch).eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  const lecture = mem.lectures.find((l) => l.id === id);
+  if (lecture) Object.assign(lecture, patch);
+}
+
 export async function deleteLecture(id: string) {
   if (sb) {
     const { error } = await sb.from("lectures").delete().eq("id", id);
