@@ -85,7 +85,10 @@ export default async function MyPage({ params, searchParams }: { params: Promise
       )}
 
       {a.status !== "pending" && (
-        <Link href="/class" className="btn w-full">강의실 가기 →</Link>
+        <div className="space-y-2 text-center">
+          <Link href="/class" className="btn w-full">강의 수강하러 가기 →</Link>
+          <p className="text-sm text-sky-deep">강의실에서 라이브와 강의 영상을 볼 수 있어요!</p>
+        </div>
       )}
 
       <section className="card">
