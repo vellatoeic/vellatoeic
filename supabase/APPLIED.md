@@ -14,6 +14,7 @@ Vella가 Supabase SQL Editor에서 실행했다고 확인한 SQL 파일만 기�
 | `8_special_link_application.sql` | 완료 | 특강 신청에 수강 신청 연결 열(application_id) 추가, 특강 전용 비밀번호 열을 비워둘 수 있게 변경 |
 | `9_application_slot.sql` | 완료 | 수강 신청에 수강 시간 열(slot: am/pm) 추가 |
 | `10_student_missions.sql` | 완료 | 첫 수업 미션 기록 표(student_missions) 생성 |
+| `11_lc_audio.sql` | 완료 | LC 교재(lc1/lc2)별 음원 zip 목록 표(lc_audios)와 비공개 보관함(lc-audio) 생성 |
 
 ## 기록 갱신 규칙
 
