@@ -1,24 +1,37 @@
 import Link from "next/link";
-import { KINDS, KLASSES, TRACKS, cohortLabel, dayLabel, klassOf, takesSharedLc, type Klass } from "@/lib/config";
+import { COURSES, KINDS, KLASSES, TIME_SLOTS, TRACKS, cohortLabel, dayLabel, klassOf, takesSharedLc, todayKST, type CourseId, type Klass, type Track } from "@/lib/config";
 import { listApplications, listStamps, currentCohort, isPreview } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { canWatch } from "@/lib/access";
 import { isHomeworkStickerEligible } from "@/lib/schedule";
-import { cancelHomeworkSticker, cleanupPhotos, markAttendanceManual } from "@/app/actions";
+import { bulkStamp, cancelHomeworkSticker, cleanupPhotos, markAttendanceManual } from "@/app/actions";
+import SelectAll from "../SelectAll";
 import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
 
-export default async function Stamps({ searchParams }: { searchParams: Promise<{ k?: string }> }) {
+const SLOT_FILTERS = [["am", "오전반"], ["pm", "저녁반"], ["none", "시간 미정"], ["all", "전체"]] as const;
+
+export default async function Stamps({ searchParams }: { searchParams: Promise<{ k?: string; t?: string }> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
-  const { k = "start-daily" } = await searchParams;
+  const { k = "start-daily", t = "am" } = await searchParams;
   const klass = (Object.hasOwn(KLASSES, k) ? k : "start-daily") as Klass;
   const cohort = await currentCohort();
+  const today = todayKST();
 
-  const apps = (await listApplications())
-    .filter((a) => a.cohort === cohort && canWatch(a) && (klass === "lc-common" ? takesSharedLc(a) : klassOf(a) === klass))
+  const everyone = (await listApplications()).filter((a) => a.cohort === cohort && canWatch(a));
+  // 일괄 붙이기 대상: 수강 시간으로 걸러서 반별로 묶어요.
+  const bulkApps = everyone
+    .filter((a) => (t === "all" ? true : t === "none" ? !a.slot : a.slot === t))
+    .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  const bulkGroups = (Object.keys(COURSES) as CourseId[]).flatMap((co) =>
+    (Object.keys(TRACKS) as Track[]).map((tr) => ({ key: `${co}-${tr}`, title: `${COURSES[co].label} ${TRACKS[tr]}`, items: bulkApps.filter((a) => a.course === co && a.track === tr) })),
+  ).filter((g) => g.items.length > 0);
+
+  const apps = everyone
+    .filter((a) => (klass === "lc-common" ? takesSharedLc(a) : klassOf(a) === klass))
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
   const { attendance, homework } = await listStamps(apps.map((a) => a.id));
   const days = [...new Set([...attendance.map((x) => x.day), ...homework.map((x) => x.day)])].sort();
@@ -31,14 +44,52 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
       <div className="card flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="font-jua text-xl text-sky-ink">출석 QR</p>
-          <p className="text-sm text-slate-500">반별로 한 장씩 출력해 강의실에 붙여 두면 끝.<br />수업 시간에만 출석이 열려요.</p>
+          <p className="text-sm text-slate-500">QR 하나를 강의실에 붙이고 라이브에 띄워 주세요.<br />찍으면 그날 출석으로 남아요.</p>
         </div>
         <Link href="/admin/qr" target="_blank" className="btn !py-3">출석 QR 인쇄하기</Link>
       </div>
 
+      <form action={bulkStamp} className="card space-y-3">
+        <div>
+          <p className="font-jua text-xl text-sky-ink">스티커 일괄 붙이기</p>
+          <p className="text-sm text-slate-500">QR이 안 됐던 날처럼 여러 학생에게 한 번에 출석(+숙제) 스티커를 붙여요. 이미 붙은 스티커는 그대로예요.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="font-bold text-slate-500">수강 시간</span>
+          {SLOT_FILTERS.map(([v, label]) => (
+            <a key={v} href={`/admin/stamps?k=${klass}&t=${v}`} className={`rounded-full px-3 py-1.5 font-bold ${t === v ? "bg-sky-deep text-white" : "bg-sky-soft text-sky-ink"}`}>{label}</a>
+          ))}
+        </div>
+        {bulkGroups.length === 0 ? <p className="text-sm text-slate-500">해당하는 납부 완료 학생이 없어요.</p> : (
+          <>
+            <label className="flex items-center gap-2 text-sm font-bold text-sky-ink"><SelectAll group="*" /> 아래 {bulkApps.length}명 전체 선택</label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {bulkGroups.map((g) => (
+                <div key={g.key} className="rounded-2xl bg-sky-soft p-3">
+                  <label className="flex items-center gap-2 font-jua text-sky-ink"><SelectAll group={g.key} /> {g.title} · {g.items.length}명</label>
+                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                    {g.items.map((a) => (
+                      <label key={a.id} className="flex items-center gap-1">
+                        <input type="checkbox" name="ids" value={a.id} data-group={g.key} className="h-4 w-4 accent-sky-deep" />
+                        {a.name}<span className="text-[11px] text-slate-400">{KINDS[a.kind].short}{a.slot ? ` · ${TIME_SLOTS[a.slot]}` : ""}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-end gap-2">
+              <label><span className="label">수업 날짜</span><input type="date" name="day" defaultValue={today} max={today} required className="input !py-2" /></label>
+              <button name="what" value="attendance" className="btn-ghost !py-2.5">선택 학생 출석 ☁️</button>
+              <button name="what" value="both" className="btn !py-2.5 !text-base">선택 학생 출석 ☁️ + 숙제 ⭐</button>
+            </div>
+          </>
+        )}
+      </form>
+
       <div className="flex flex-wrap gap-2">
         {(Object.keys(KLASSES) as Klass[]).map((x) => (
-          <a key={x} href={`/admin/stamps?k=${x}`} className={`rounded-full px-4 py-2 text-sm font-bold ${x === klass ? "bg-sky-deep text-white" : "bg-white text-sky-ink"}`}>
+          <a key={x} href={`/admin/stamps?k=${x}&t=${t}`} className={`rounded-full px-4 py-2 text-sm font-bold ${x === klass ? "bg-sky-deep text-white" : "bg-white text-sky-ink"}`}>
             {KLASSES[x]}
           </a>
         ))}

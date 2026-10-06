@@ -581,13 +581,16 @@ export async function addAttendance(app_id: string, day: string) {
   if (!mem.attendance.some((x) => x.app_id === app_id && x.day === day)) mem.attendance.push({ app_id, day });
 }
 
-export async function addHomeworkSticker(app_id: string, day: string) {
+// createdAt을 주면 그 시각에 제출한 것으로 기록해요. (관리자가 지난 수업일에 붙여도 별이 보이게)
+export async function addHomeworkSticker(app_id: string, day: string, createdAt?: string) {
   if (sb) {
-    const { error } = await sb.from("homework").upsert({ app_id, day, photo_path: null }, { onConflict: "app_id,day", ignoreDuplicates: true });
+    const row: Record<string, string | null> = { app_id, day, photo_path: null };
+    if (createdAt) row.created_at = createdAt;
+    const { error } = await sb.from("homework").upsert(row, { onConflict: "app_id,day", ignoreDuplicates: true });
     if (error) throw error;
     return;
   }
-  if (!mem.homework.some((x) => x.app_id === app_id && x.day === day)) mem.homework.push({ app_id, day, photo_path: null, created_at: new Date().toISOString() });
+  if (!mem.homework.some((x) => x.app_id === app_id && x.day === day)) mem.homework.push({ app_id, day, photo_path: null, created_at: createdAt ?? new Date().toISOString() });
 }
 
 export async function deleteHomeworkSticker(app_id: string, day: string) {

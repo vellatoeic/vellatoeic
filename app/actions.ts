@@ -574,6 +574,21 @@ export async function markAttendanceManual(fd: FormData) {
 // ── 명단에서 체크한 여러 건 한 번에 ───────────────
 const checkedIds = (fd: FormData) => fd.getAll("ids").map(clean).filter(Boolean);
 
+// 체크한 학생들에게 그날 출석(+숙제) 스티커를 한 번에 붙여요. (QR이 안 됐던 날 보정용)
+export async function bulkStamp(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const day = clean(fd.get("day"));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day > todayKST()) return;
+  const withHomework = clean(fd.get("what")) === "both";
+  const apps = (await getApplications(checkedIds(fd))).filter(canWatch);
+  for (const a of apps) {
+    await addAttendance(a.id, day);
+    if (withHomework) await addHomeworkSticker(a.id, day, `${day}T12:00:00+09:00`);
+  }
+  revalidatePath("/admin/stamps");
+  revalidatePath("/class");
+}
+
 export async function bulkRemove(fd: FormData) {
   if (!(await isAdmin())) return;
   await deleteApplications(checkedIds(fd));
