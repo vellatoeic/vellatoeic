@@ -1,6 +1,6 @@
 import QRCode from "qrcode";
 import { headers } from "next/headers";
-import { KLASSES, KLASS_TIME, SITE_URL, type Klass } from "@/lib/config";
+import { CLASS_STARTS, KLASSES, KLASS_TIME, ONTIME_BEFORE_MIN, SITE_URL, type Klass } from "@/lib/config";
 import { isAdmin } from "@/lib/auth";
 import { isPreview } from "@/lib/db";
 import LoginForm from "../LoginForm";
@@ -39,7 +39,7 @@ export default async function QrPage() {
         <div>
           <h2 className="font-jua text-3xl text-sky-ink">출석 QR 인쇄</h2>
           <p className="mt-1 text-sm text-slate-500">
-            반별로 한 장씩 출력해 강의실에 붙여 두면 끝이에요.<br />QR은 바뀌지 않으니 한 번만 붙이면 계속 쓸 수 있어요.
+            반별로 한 장씩 출력해 강의실에 붙여 두면 끝이에요.<br />QR은 바뀌지 않으니 한 번만 붙이면 계속 쓸 수 있어요.<br />반별 QR은 RC 수업, LC 공통 QR은 LC 수업 시작 시각 기준이에요. 수업일이 아닌 날에는 출석이 남지 않아요.
           </p>
         </div>
         <PrintButton />
@@ -58,7 +58,7 @@ export default async function QrPage() {
               </p>
             ))}
           </div>
-          <p className="mt-2 text-sm text-slate-500">이 시간에만 출석할 수 있어요</p>
+          <p className="mt-2 text-sm text-slate-500">수업 시작 {ONTIME_BEFORE_MIN}분 전부터 출석 · 시작({CLASS_STARTS[k].join(" / ")}) 후에는 지각 ⏰</p>
           <p className="mt-1 text-[11px] text-slate-400">{url}</p>
         </section>
       ))}

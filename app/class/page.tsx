@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { COURSES, PARTS, TRACKS, TRACK_PARTS, cohortLabel, todayKST } from "@/lib/config";
+import { BOOKS, COURSES, PARTS, TRACKS, TRACK_PARTS, cohortLabel, todayKST } from "@/lib/config";
 import { getApplications, listAudios, listLectures, listMissions, listStamps, currentCohort, getSetting } from "@/lib/db";
 import { missionCount, missionFor } from "@/lib/mission";
-import { audioCoursesFor, dayDiff, studentAudioWindow, takesLcAudio } from "@/lib/audio";
+import { audioBooksFor, dayDiff, studentAudioWindow } from "@/lib/audio";
 import { getStudentIds } from "@/lib/auth";
 import { canWatch, covers } from "@/lib/access";
 import { studentLogout } from "@/app/actions";
@@ -38,11 +38,11 @@ export default async function ClassRoom() {
   const stamps = await listStamps(paid.map((a) => a.id));
   const missions = await listMissions(apps.map((a) => a.id));
   // LC 음원: 본인 반 첫 수업일부터 14일 동안만 보여요.
-  const audioBoxes = new Map(await Promise.all(paid.filter(takesLcAudio).map(async (a) => {
+  const audioBoxes = new Map(await Promise.all(paid.filter((a) => audioBooksFor(a).length > 0).map(async (a) => {
     const period = await studentAudioWindow(a);
-    const courses = audioCoursesFor(a);
+    const books = audioBooksFor(a);
     const list = period && today >= period.start && today <= period.end
-      ? (await listAudios(a.cohort)).filter((x) => courses.includes(x.course)).sort((x, y) => x.course.localeCompare(y.course) || x.sort_order - y.sort_order)
+      ? (await listAudios(a.cohort)).filter((x) => books.includes(x.book))
       : [];
     return [a.id, { period, list }] as const;
   })));
@@ -130,7 +130,7 @@ export default async function ClassRoom() {
               }
               return (
                 <div className="mt-4 rounded-2xl bg-sky-soft p-4">
-                  <p className="font-jua text-lg text-sky-ink">🎧 LC 음원</p>
+                  <p className="font-jua text-lg text-sky-ink">🎧 LC 음원 <span className="text-sm text-slate-500">({audioBooksFor(a).map((b) => BOOKS[b]).join(", ")} 교재)</span></p>
                   <p className="text-sm text-sky-deep">{m}/{d}까지 다운로드 가능 ({left === 0 ? "D-DAY" : `D-${left}`})</p>
                   {box.list.length === 0 ? <p className="mt-2 text-sm text-slate-500">음원이 올라오면 여기에 보여요.</p> : (
                     <ol className="mt-2 space-y-1.5">
@@ -138,7 +138,7 @@ export default async function ClassRoom() {
                         <li key={x.id}>
                           <a href={`/class/audio/${x.id}`} className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-[15px] text-slate-800">
                             <span className="flex-1">{x.title}</span>
-                            <span className="text-sm text-sky-deep">다운로드 ↓</span>
+                            <span className="text-sm text-sky-deep">zip 받기 ↓</span>
                           </a>
                         </li>
                       ))}

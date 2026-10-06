@@ -14,7 +14,7 @@ import { canWatch } from "@/lib/access";
 import { SCHEDULE_CLASSES, holidayKey, homeworkAssignmentDays, parseHolidays, parseSchoolDays, previousMonth, scheduleKey, scheduleClassFor, schoolDaysFor, shiftSchoolDays, type ScheduleClass } from "@/lib/schedule";
 import { specialRegistrationOpen } from "@/lib/special";
 import { MISSION_STEPS, studentMission, type MissionStep } from "@/lib/mission";
-import { AUDIO_MAX_BYTES, audioExpiresOn } from "@/lib/audio";
+import { AUDIO_MAX_BYTES, audioExpiresOn, isAudioBook } from "@/lib/audio";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
 } from "@/lib/auth";
@@ -248,32 +248,29 @@ export async function removeLecture(fd: FormData) {
   revalidatePath("/admin/lectures");
 }
 
-// ── LC 음원 (관리자) ───────────────────────────
-type AudioCourse = "start" | "solve";
-const audioCourse = (v: string): v is AudioCourse => v === "start" || v === "solve";
-
+// ── LC 음원 zip (관리자) ───────────────────────
 // 1단계: 브라우저가 Supabase 보관함으로 바로 올릴 서명된 주소를 받아요. (Vercel 서버를 거치지 않아요)
-export async function prepareAudioUpload(input: { cohort: string; course: string; fileName: string; size: number }): Promise<{ error?: string; path?: string; url?: string | null }> {
+export async function prepareAudioUpload(input: { cohort: string; book: string; fileName: string; size: number }): Promise<{ error?: string; path?: string; url?: string | null }> {
   if (!(await isAdmin())) return { error: "관리자 로그인이 필요해요." };
-  if (!validCohort(input.cohort) || !audioCourse(input.course)) return { error: "기수와 반을 다시 골라 주세요." };
-  if (!/\.mp3$/i.test(input.fileName)) return { error: "mp3 파일만 올릴 수 있어요." };
-  if (input.size > AUDIO_MAX_BYTES) return { error: "파일 하나가 50MB를 넘으면 올릴 수 없어요." };
-  const path = `${input.cohort}/${input.course}/${crypto.randomUUID()}.mp3`;
+  if (!validCohort(input.cohort) || !isAudioBook(input.book)) return { error: "기수와 LC 교재를 다시 골라 주세요." };
+  if (!/\.zip$/i.test(input.fileName)) return { error: "zip 파일만 올릴 수 있어요." };
+  if (input.size > AUDIO_MAX_BYTES) return { error: "파일 하나가 50MB를 넘으면 올릴 수 없어요. 나눠서 압축해 주세요." };
+  const path = `${input.cohort}/${input.book}/${crypto.randomUUID()}.zip`;
   return { path, url: await audioUploadUrl(path) };
 }
 
-// 2단계: 올라간 파일을 확인하고 목록에 추가해요. 제목은 파일 이름에서 .mp3를 뺀 것이에요.
-export async function finishAudioUpload(input: { cohort: string; course: string; path: string; fileName: string; size: number }): Promise<{ error?: string }> {
+// 2단계: 올라간 파일을 확인하고 목록에 추가해요. 제목은 파일 이름에서 .zip을 뺀 것이에요.
+export async function finishAudioUpload(input: { cohort: string; book: string; path: string; fileName: string; size: number }): Promise<{ error?: string }> {
   if (!(await isAdmin())) return { error: "관리자 로그인이 필요해요." };
-  const { cohort, course, path } = input;
-  if (!validCohort(cohort) || !audioCourse(course) || !path.startsWith(`${cohort}/${course}/`)) return { error: "잘못된 요청이에요." };
+  const { cohort, book, path } = input;
+  if (!validCohort(cohort) || !isAudioBook(book) || !path.startsWith(`${cohort}/${book}/`)) return { error: "잘못된 요청이에요." };
   const size = await uploadedAudioSize(path);
   if (size === null) return { error: "파일이 올라가지 않았어요. 다시 시도해 주세요." };
-  const same = (await listAudios(cohort)).filter((a) => a.course === course);
+  const same = (await listAudios(cohort)).filter((a) => a.book === book);
   await createAudio({
     cohort,
-    course,
-    title: input.fileName.replace(/\.mp3$/i, "").trim().slice(0, 200) || "LC 음원",
+    book,
+    title: input.fileName.replace(/\.zip$/i, "").trim().slice(0, 200) || "LC 음원",
     storage_path: path,
     size_bytes: size || input.size,
     sort_order: same.reduce((max, a) => Math.max(max, a.sort_order), 0) + 1,
@@ -286,12 +283,12 @@ export async function moveAudio(fd: FormData) {
   if (!(await isAdmin())) return;
   const audio = await getAudio(clean(fd.get("id")));
   if (!audio) return;
-  const list = (await listAudios(audio.cohort)).filter((a) => a.course === audio.course);
+  const list = (await listAudios(audio.cohort)).filter((a) => a.book === audio.book);
   const i = list.findIndex((a) => a.id === audio.id);
   const j = clean(fd.get("dir")) === "up" ? i - 1 : i + 1;
   if (j < 0 || j >= list.length) return;
   [list[i], list[j]] = [list[j], list[i]];
-  // 순서가 꼬이지 않게 이 반 목록 전체를 1, 2, 3… 으로 다시 매겨요.
+  // 순서가 꼬이지 않게 이 교재 목록 전체를 1, 2, 3… 으로 다시 매겨요.
   await Promise.all(list.map((a, n) => (a.sort_order === n + 1 ? null : setAudioOrder(a.id, n + 1))));
   revalidatePath("/admin/audio");
   revalidatePath("/class");
@@ -305,16 +302,14 @@ export async function removeAudio(fd: FormData) {
   revalidatePath("/class");
 }
 
-// 모든 해당 반의 다운로드 기간이 끝난 음원을 보관함에서 지워요.
+// 그 기수 모든 반의 다운로드 기간이 끝난 음원을 보관함에서 지워요.
 export async function cleanupExpiredAudios() {
   if (!(await isAdmin())) return;
   const today = todayKST();
   const all = await listAudios();
-  const groups = [...new Set(all.map((a) => `${a.cohort}|${a.course}`))];
-  for (const g of groups) {
-    const [cohort, course] = g.split("|") as [string, AudioCourse];
-    const end = await audioExpiresOn(cohort, course);
-    if (end && end < today) await deleteAudios(all.filter((a) => a.cohort === cohort && a.course === course));
+  for (const cohort of [...new Set(all.map((a) => a.cohort))]) {
+    const end = await audioExpiresOn(cohort);
+    if (end && end < today) await deleteAudios(all.filter((a) => a.cohort === cohort));
   }
   revalidatePath("/admin/audio");
 }

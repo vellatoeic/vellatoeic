@@ -13,7 +13,7 @@ function put(url: string, file: File, onProgress: (p: number) => void) {
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
-    xhr.setRequestHeader("content-type", "audio/mpeg");
+    xhr.setRequestHeader("content-type", "application/zip");
     xhr.setRequestHeader("cache-control", "max-age=3600");
     xhr.setRequestHeader("x-upsert", "false");
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(Math.round((e.loaded / e.total) * 100));
@@ -23,7 +23,7 @@ function put(url: string, file: File, onProgress: (p: number) => void) {
   });
 }
 
-export default function AudioUploader({ cohort, course }: { cohort: string; course: string }) {
+export default function AudioUploader({ cohort, book }: { cohort: string; book: string }) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<Item[]>([]);
@@ -31,19 +31,19 @@ export default function AudioUploader({ cohort, course }: { cohort: string; cour
   const [over, setOver] = useState(false);
 
   async function upload(files: File[]) {
-    const mp3s = files.filter((f) => /\.mp3$/i.test(f.name)).sort((a, b) => a.name.localeCompare(b.name, "ko", { numeric: true }));
-    if (mp3s.length === 0) return;
+    const zips = files.filter((f) => /\.zip$/i.test(f.name)).sort((a, b) => a.name.localeCompare(b.name, "ko", { numeric: true }));
+    if (zips.length === 0) return;
     setBusy(true);
-    setItems(mp3s.map((f) => ({ name: f.name, size: f.size, progress: 0, status: "waiting" })));
+    setItems(zips.map((f) => ({ name: f.name, size: f.size, progress: 0, status: "waiting" })));
     const update = (i: number, patch: Partial<Item>) => setItems((list) => list.map((it, n) => (n === i ? { ...it, ...patch } : it)));
     // 순서가 지켜지도록 한 개씩 차례로 올려요.
-    for (const [i, file] of mp3s.entries()) {
+    for (const [i, file] of zips.entries()) {
       update(i, { status: "uploading" });
       try {
-        const prepared = await prepareAudioUpload({ cohort, course, fileName: file.name, size: file.size });
+        const prepared = await prepareAudioUpload({ cohort, book, fileName: file.name, size: file.size });
         if (prepared.error || !prepared.path) throw new Error(prepared.error ?? "업로드를 준비하지 못했어요.");
         if (prepared.url) await put(prepared.url, file, (p) => update(i, { progress: p }));
-        const done = await finishAudioUpload({ cohort, course, path: prepared.path, fileName: file.name, size: file.size });
+        const done = await finishAudioUpload({ cohort, book, path: prepared.path, fileName: file.name, size: file.size });
         if (done.error) throw new Error(done.error);
         update(i, { status: "done", progress: 100 });
       } catch (e) {
@@ -63,10 +63,10 @@ export default function AudioUploader({ cohort, course }: { cohort: string; cour
         onClick={() => !busy && input.current?.click()}
         className={`cursor-pointer rounded-3xl border-2 border-dashed p-8 text-center transition ${over ? "border-sky-deep bg-sky-soft" : "border-sky-main bg-white"} ${busy ? "opacity-60" : ""}`}
       >
-        <p className="text-3xl">🎧</p>
-        <p className="font-jua mt-2 text-lg text-sky-ink">{busy ? "올리는 중이에요… 창을 닫지 마세요" : "mp3 파일을 여기로 끌어오거나 눌러서 고르세요"}</p>
-        <p className="mt-1 text-sm text-slate-500">여러 개를 한 번에 올릴 수 있어요 · 파일 하나 50MB까지 · 제목은 파일 이름으로 정해져요</p>
-        <input ref={input} type="file" accept=".mp3,audio/mpeg" multiple hidden onChange={(e) => { upload([...(e.target.files ?? [])]); e.target.value = ""; }} />
+        <p className="text-3xl">🗂️</p>
+        <p className="font-jua mt-2 text-lg text-sky-ink">{busy ? "올리는 중이에요… 창을 닫지 마세요" : "음원 zip 파일을 여기로 끌어오거나 눌러서 고르세요"}</p>
+        <p className="mt-1 text-sm text-slate-500">여러 개를 한 번에 올릴 수 있어요 · 파일 하나 50MB까지 (넘으면 나눠서 압축) · 제목은 파일 이름으로 정해져요</p>
+        <input ref={input} type="file" accept=".zip,application/zip" multiple hidden onChange={(e) => { upload([...(e.target.files ?? [])]); e.target.value = ""; }} />
       </div>
       {items.length > 0 && (
         <ul className="mt-3 space-y-1.5 text-sm">

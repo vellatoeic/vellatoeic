@@ -37,7 +37,7 @@ export type Lecture = {
 export type LcAudio = {
   id: string;
   cohort: string;
-  course: "start" | "solve";
+  book: "lc1" | "lc2"; // LC 교재에 따라 음원이 달라요
   title: string;
   storage_path: string;
   size_bytes: number;
@@ -263,7 +263,7 @@ export async function deleteLecture(id: string) {
   mem.lectures = mem.lectures.filter((l) => l.id !== id);
 }
 
-// ── LC 음원 (파일은 비공개 보관함에 브라우저에서 바로 올려요) ──────
+// ── LC 음원 zip (파일은 비공개 보관함에 브라우저에서 바로 올려요) ──────
 export const AUDIO_BUCKET = "lc-audio";
 const sortAudios = (list: LcAudio[]) => [...list].sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at));
 
@@ -288,7 +288,7 @@ export async function getAudio(id: string): Promise<LcAudio | null> {
   return mem.audios.find((a) => a.id === id) ?? null;
 }
 
-export async function createAudio(audio: Pick<LcAudio, "cohort" | "course" | "title" | "storage_path" | "size_bytes" | "sort_order">) {
+export async function createAudio(audio: Pick<LcAudio, "cohort" | "book" | "title" | "storage_path" | "size_bytes" | "sort_order">) {
   if (sb) {
     const { error } = await sb.from("lc_audios").insert(audio);
     if (error) throw error;
