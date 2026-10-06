@@ -266,7 +266,7 @@ export default function StickerBoard({
             <form action={markHomeworkDone} className="mt-2">
               <input type="hidden" name="app_id" value={appId} />
               <input type="hidden" name="day" value={homeworkTargetDay} />
-              <button className="block w-full rounded-2xl border-2 border-dashed border-[#e0b400] bg-white px-3 py-2.5 font-jua text-[15px] text-[#a7741a]">숙제 제출했어요 ✓ 기록하기</button>
+              <button className="block w-full rounded-2xl border-2 border-dashed border-[#e0b400] bg-white px-3 py-2.5 font-jua text-[15px] text-[#a7741a]">카페에 올렸어요 ✓ 별 받기</button>
             </form>
           ) : null}
         </div>
