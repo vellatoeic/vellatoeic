@@ -244,17 +244,10 @@ export default function StickerBoard({
 
         <div ref={homeworkBox} className="mt-[14px] rounded-[22px] border-2 border-[#ffe58a] bg-gradient-to-br from-[#fff9e0] to-white p-4 shadow-[0_2px_0_#d5ecf9]">
           {homeworkAssignments.length > 0 ? (
-            <label className="mb-3 block">
-              <span className="mb-1 block text-sm font-bold text-[#7d6728]">수강일을 선택하여 숙제를 확인해주세요</span>
-              <select value={homeworkTargetDay} onChange={(event) => setSelectedHomeworkDay(event.target.value)} className="w-full rounded-xl border border-[#ffe58a] bg-white px-3 py-2 text-sm text-[#5a3b00]">
-                {homeworkAssignments.map((day) => {
-                  const stamp = homeworkByDay.get(day);
-                  const first = day === homeworkAssignments[0];
-                  const marked = stamp ? (isHomeworkStickerEligible(day, stamp.created_at) ? (first ? " · ⭐" : " · 제출 완료 ⭐") : " · 제출 기록 있음") : "";
-                  return <option key={day} value={day}>{Number(day.slice(5, 7))}/{Number(day.slice(8, 10))} 수업{marked}</option>;
-                })}
-              </select>
-            </label>
+            <div className="mb-3 text-center">
+              <p className="font-jua text-base text-[#7d6728]">수강일을 선택하여 숙제를 확인해주세요</p>
+              <p className="mt-0.5 text-xs text-[#a7741a]">아래 달력에서 날짜를 눌러요 · 지금 <b>{Number(homeworkTargetDay.slice(5, 7))}/{Number(homeworkTargetDay.slice(8, 10))} 수업</b></p>
+            </div>
           ) : (
             <p className="mb-3 text-center text-sm text-[#a7741a]">첫 수업 날부터 숙제를 확인할 수 있어요.</p>
           )}
