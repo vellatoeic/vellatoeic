@@ -111,6 +111,7 @@ export const STATUS_LABEL: Record<Status, string> = {
 };
 
 export const INSTAGRAM_URL = "https://www.instagram.com/vella_toeic/";
+export const BLOG_URL = "https://blog.naver.com/vella_toeic"; // 관리 화면에서 다른 주소를 저장하면 그 주소를 써요
 
 export function calcAmount(books: BookId[], pickup: Pickup) {
   return books.length * BOOK_PRICE + (pickup === "delivery" ? SHIPPING_FEE : 0);

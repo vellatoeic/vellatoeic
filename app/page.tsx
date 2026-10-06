@@ -20,13 +20,12 @@ const CLOUDS = [
   "-right-2 top-[36rem] w-16 fill-white cloud-a",
 ];
 
-function MenuItem({ href, icon, bg, title, sub, badge, hot }: { href: string; icon: string; bg: string; title: string; sub: string; badge?: string; hot?: boolean }) {
+function MenuItem({ href, icon, bg, title, sub }: { href: string; icon: string; bg: string; title: string; sub: string }) {
   return (
-    <Link href={href} className={`flex items-center gap-3 rounded-[20px] bg-white p-4 shadow-[0_3px_0_#cfe6f5] transition active:translate-y-0.5 ${hot ? "border-2 border-[#ffd23f]" : ""}`}>
+    <Link href={href} className="flex items-center gap-3 rounded-[20px] bg-white p-4 shadow-[0_3px_0_#cfe6f5] transition active:translate-y-0.5">
       <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-[14px] text-[22px]" style={{ background: bg }}>{icon}</span>
       <span className="font-jua text-lg text-sky-ink">
         {title}
-        {badge && <span className="ml-1.5 rounded-full bg-[#ff6b8a] px-2 py-0.5 align-middle font-jua text-[10.5px] text-white">{badge}</span>}
         <small className="block font-body text-xs text-[#7aa3bd]">{sub}</small>
       </span>
       <span className="ml-auto text-xl text-[#a9c9dd]">›</span>
@@ -60,9 +59,9 @@ export default async function Home() {
 
         <div className="mt-[18px] grid gap-2.5">
           <MenuItem href="/class" icon="☁️" bg="#e3f4fd" title="강의실" sub="출석 · 스티커판 · 강의 영상" />
-          <MenuItem href="/mission" icon="✅" bg="#e8f8ef" title="첫 수업 미션" sub="첫 수업 날 5분이면 끝나요" />
+          <MenuItem href="/mission" icon="✅" bg="#e8f8ef" title="첫 수업 미션" sub="첫 수업 시간에 다 같이 해요" />
           {open.length > 0 && (
-            <MenuItem href="/special" icon="🎤" bg="#fff5cc" title="특강 신청" badge="모집 중" sub={open.map((e) => specialDay(e.event_date)).join(" · ")} hot />
+            <MenuItem href="/special" icon="🎤" bg="#fff5cc" title="특강 신청" sub={open.map((e) => specialDay(e.event_date)).join(" · ")} />
           )}
         </div>
       </div>

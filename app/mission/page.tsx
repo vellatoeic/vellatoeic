@@ -1,4 +1,4 @@
-import { INSTAGRAM_URL } from "@/lib/config";
+import { BLOG_URL, INSTAGRAM_URL } from "@/lib/config";
 import { getSetting, type Mission } from "@/lib/db";
 import { markMission } from "@/app/actions";
 import { missionCount, studentMission, type MissionStep } from "@/lib/mission";
@@ -30,15 +30,15 @@ export default async function MissionPage() {
 
   const links: { step: MissionStep; n: number; title: string; sub: string; href: string; go: string; did: string }[] = [
     { step: "cafe_at", n: 2, title: "네이버 카페 가입", sub: "숙제는 카페에 올려요", href: cafeUrl || cafeHomeworkUrl, go: "카페 가기 ↗", did: "가입했어요 ✓" },
-    { step: "blog_at", n: 3, title: "블로그 이웃 추가", sub: "수업 자료와 공지가 올라와요", href: blogUrl, go: "블로그 가기 ↗", did: "추가했어요 ✓" },
-    { step: "insta_at", n: 4, title: "인스타 팔로우", sub: "@vella_toeic", href: INSTAGRAM_URL, go: "인스타 가기 ↗", did: "팔로우했어요 ✓" },
+    { step: "blog_at", n: 3, title: "블로그 서로이웃 추가", sub: "수업 자료를 보려면 '서로이웃'이어야 해요. 이웃 말고 서로이웃으로 신청해 주세요", href: blogUrl || BLOG_URL, go: "블로그 가기 ↗", did: "서로이웃 신청했어요 ✓" },
+    { step: "insta_at", n: 4, title: "인스타 팔로우", sub: "@vella_toeic · 쌤과 연락할 수 있는 비상 연락망이에요", href: INSTAGRAM_URL, go: "인스타 가기 ↗", did: "팔로우했어요 ✓" },
   ];
   const introDone = !!mission?.intro_at;
 
   return (
     <div className="mx-auto max-w-md space-y-2.5 pt-8">
       <h1 className="text-center font-jua text-[26px] text-sky-ink">첫 수업 미션 ✅</h1>
-      <p className="text-center text-sm text-[#6b93ad]">{firstName}님, 4개만 하면 웰컴 배지를 받아요!</p>
+      <p className="text-center text-sm text-[#6b93ad]">{firstName}님, 4개만 하면 웰컴 배지를 받아요!<br />첫 수업 시간에 다 같이 해요 :)</p>
 
       <section className="mt-3 rounded-[20px] bg-white px-4 py-3.5 shadow-[0_2px_0_#d5ecf9]">
         <div className="flex items-center justify-between font-jua text-base text-sky-ink"><span>미션 진행</span><span>{count} / 4</span></div>

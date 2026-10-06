@@ -220,7 +220,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
             <input type="url" name="cafe_url" defaultValue={cafeUrl} className="input" placeholder="https://cafe.naver.com/..." />
           </label>
           <label className="sm:col-span-4">
-            <span className="label">첫 수업 미션 · 블로그 주소</span>
+            <span className="label">첫 수업 미션 · 블로그 주소 <span className="font-normal text-slate-400">(비우면 blog.naver.com/vella_toeic)</span></span>
             <input type="url" name="blog_url" defaultValue={blogUrl} className="input" placeholder="https://blog.naver.com/..." />
           </label>
           <label className="sm:col-span-3">
