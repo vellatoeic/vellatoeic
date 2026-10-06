@@ -77,6 +77,7 @@ export function booksFor(course: CourseId, track: Track, round: 1 | 2, continuin
 }
 
 export const CLASSROOM = "703호"; // 현장 수업 강의실
+export const SITE_URL = "https://vellatoeic.vercel.app"; // 학생에게 안내하는 정식 주소 (출석 QR에 들어가요)
 
 export const KINDS: Record<Kind, { label: string; short: string }> = {
   onsite: { label: "현장 수강생", short: "현장" },

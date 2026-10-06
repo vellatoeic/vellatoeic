@@ -1,6 +1,6 @@
 import QRCode from "qrcode";
 import { headers } from "next/headers";
-import { KLASSES, KLASS_TIME, type Klass } from "@/lib/config";
+import { KLASSES, KLASS_TIME, SITE_URL, type Klass } from "@/lib/config";
 import { isAdmin } from "@/lib/auth";
 import { isPreview } from "@/lib/db";
 import LoginForm from "../LoginForm";
@@ -13,15 +13,17 @@ export const metadata = { title: "출석 QR · vella_toeic", robots: { index: fa
 export default async function QrPage() {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
 
-  // 인쇄물에 들어갈 주소는 지금 접속한 주소를 그대로 써요.
+  // QR에는 항상 정식 주소를 넣어요. (배포 미리보기 주소는 로그인이 걸려 있어서 학생 폰에서 오류가 나요)
+  // 컴퓨터에서 미리보기로 실행할 때만 지금 접속한 주소를 써요.
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const base = isPreview ? `${host.startsWith("localhost") ? "http" : "https"}://${host}` : SITE_URL;
 
   const cards = await Promise.all(
     (Object.keys(KLASSES) as Klass[]).map(async (k) => ({
       k,
-      svg: await QRCode.toString(`${proto}://${host}/check?k=${k}`, {
+      url: `${base}/check?k=${k}`,
+      svg: await QRCode.toString(`${base}/check?k=${k}`, {
         type: "svg",
         margin: 1,
         color: { dark: "#12405c", light: "#ffffff" },
@@ -43,7 +45,7 @@ export default async function QrPage() {
         <PrintButton />
       </div>
 
-      {cards.map(({ k, svg }) => (
+      {cards.map(({ k, url, svg }) => (
         <section key={k} className="card break-inside-avoid text-center">
           <p className="font-jua text-3xl text-sky-ink">{KLASSES[k]} 출석 체크 ☁️</p>
           <p className="mt-1 text-slate-600">휴대폰 카메라로 QR을 찍으면 출석 스티커가 붙어요</p>
@@ -57,6 +59,7 @@ export default async function QrPage() {
             ))}
           </div>
           <p className="mt-2 text-sm text-slate-500">이 시간에만 출석할 수 있어요</p>
+          <p className="mt-1 text-[11px] text-slate-400">{url}</p>
         </section>
       ))}
     </div>

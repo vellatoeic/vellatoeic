@@ -63,9 +63,22 @@ export default async function Check({ searchParams }: { searchParams: Promise<{ 
   }
 
   const late = isLate(klass);
-  await Promise.all(mine.map((a) => addAttendance(a.id, todayKST(), late)));
-  const { attendance } = await listStamps(mine.map((a) => a.id));
-  const days = new Set(attendance.map((a) => a.day));
+  let days: Set<string>;
+  try {
+    await Promise.all(mine.map((a) => addAttendance(a.id, todayKST(), late)));
+    const { attendance } = await listStamps(mine.map((a) => a.id));
+    days = new Set(attendance.map((a) => a.day));
+  } catch (e) {
+    // 원인을 바로 알 수 있게 오류 내용을 작게 보여줘요. (학생이 캡처해서 Vella에게 보내면 돼요)
+    const detail = e instanceof Error ? e.message : typeof e === "object" && e ? JSON.stringify(e) : String(e);
+    console.error("출석 저장 실패", klass, detail);
+    return (
+      <Box title="출석 저장 중 문제가 생겼어요">
+        <p className="text-slate-600">잠시 후 QR을 다시 찍어 주세요.<br />계속 안 되면 이 화면을 캡처해서 Vella에게 보내 주세요.</p>
+        <p className="break-all rounded-xl bg-slate-50 p-2 text-left text-xs text-slate-400">{klass} · {detail}</p>
+      </Box>
+    );
+  }
 
   return (
     <Box title="출석 완료! ☁️">
