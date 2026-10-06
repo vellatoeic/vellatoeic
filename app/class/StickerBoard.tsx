@@ -19,6 +19,7 @@ export default function StickerBoard({
   homework,
   cafeUrl,
   today,
+  welcome,
 }: {
   appId: string;
   name: string;
@@ -31,6 +32,7 @@ export default function StickerBoard({
   homework: { day: string; created_at: string }[];
   cafeUrl: string;
   today: string;
+  welcome: boolean;
 }) {
   const [newBadges, setNewBadges] = useState<string[]>([]);
   const [newStickers, setNewStickers] = useState<string[]>([]);
@@ -67,6 +69,7 @@ export default function StickerBoard({
             : klass === "solve-tt" ? "문풀반 격일 (화·목)" : "속성반";
   const classSummary = `${displayClass} · ${startDate} 개강 · 총 ${total}회`;
   const badgeStates = [
+    { id: "welcome", title: "웰컴", count: welcome ? "미션 완료" : "첫 수업 미션", earned: welcome, icon: "welcome" as const, color: "#e8f8ef" },
     { id: "attendance", title: "출석", count: `${attendanceCount}/${total}`, earned: attendanceCount > 0, icon: "cloud" as const, color: "#d9f0fd" },
     { id: "homework", title: "숙제", count: `${homeworkCount}/${total}`, earned: homeworkCount > 0, icon: "star" as const, color: "#fff3c4" },
     { id: "stickers", title: `스티커 ${stickerGoal}개`, count: `${Math.min(stickerCount, stickerGoal)}/${stickerGoal}`, earned: stickerCount >= stickerGoal, icon: "medal" as const, color: "#ffe1ea" },
@@ -96,7 +99,7 @@ export default function StickerBoard({
       setNewStickers([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appId, cohort, today, attendanceCount, homeworkCount]);
+  }, [appId, cohort, today, attendanceCount, homeworkCount, welcome]);
 
   const downloadBoard = async () => {
     await document.fonts.ready;
@@ -260,12 +263,12 @@ export default function StickerBoard({
         </div>
 
         <div className="mt-[14px] rounded-[22px] bg-white p-4 shadow-[0_2px_0_#d5ecf9]">
-          <div className="grid grid-cols-4 gap-1.5 text-center">
+          <div className="grid grid-cols-5 gap-1 text-center">
             {badgeStates.map((badge) => (
               <div key={badge.id}>
-                <div className={`relative mx-auto mb-1 grid h-[58px] w-[58px] place-items-center rounded-full border-[3px] border-white shadow-[0_2px_6px_rgba(31,90,128,.2)] ${badge.earned ? "" : "opacity-55 grayscale"}`} style={{ background: badge.earned ? badge.color : "#eef2f5" }}>
+                <div className={`relative mx-auto mb-1 grid h-[52px] w-[52px] place-items-center rounded-full border-[3px] border-white shadow-[0_2px_6px_rgba(31,90,128,.2)] ${badge.earned ? "" : "opacity-55 grayscale"}`} style={{ background: badge.earned ? badge.color : "#eef2f5" }}>
                   <BadgeIcon type={badge.icon} />
-                  {newBadges.includes(badge.id) && <span className="absolute -mt-[60px] ml-[42px] rounded-full bg-[#ff6b8a] px-1.5 py-0.5 font-jua text-[10px] text-white">NEW</span>}
+                  {newBadges.includes(badge.id) && <span className="absolute -mt-[54px] ml-[38px] rounded-full bg-[#ff6b8a] px-1.5 py-0.5 font-jua text-[10px] text-white">NEW</span>}
                 </div>
                 <p className="m-0 font-jua text-xs leading-[1.3] text-[#1f5a80]">{badge.title}<br /><small className="font-body text-[11px] text-[#7aa3bd]">{badge.count}</small></p>
               </div>
@@ -324,10 +327,11 @@ function Progress({ value, total, color }: { value: number; total: number; color
   return <div className="mb-3 h-3 overflow-hidden rounded-full bg-[#e6f4fc]"><i className="block h-full rounded-full transition-all" style={{ width: `${total ? Math.min(100, value / total * 100) : 0}%`, background: color }} /></div>;
 }
 
-function BadgeIcon({ type }: { type: "cloud" | "star" | "medal" | "rainbow" }) {
+function BadgeIcon({ type }: { type: "welcome" | "cloud" | "star" | "medal" | "rainbow" }) {
+  if (type === "welcome") return <span className="text-[24px]">👋</span>;
   if (type === "cloud") return <CloudSticker fill="#79c6ef" size={34} face={false} />;
   if (type === "star") return <StarSticker size={32} face={false} />;
-  return <span className="text-[26px]">{type === "medal" ? "🏅" : "🌈"}</span>;
+  return <span className="text-[24px]">{type === "medal" ? "🏅" : "🌈"}</span>;
 }
 
 function CloudSticker({ fill, size, face = true }: { fill: string; size: number; face?: boolean }) {

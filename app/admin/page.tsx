@@ -1,5 +1,6 @@
 import { BOOKS, COURSES, KINDS, TRACKS, TIME_SLOTS, bookStatusLabel, cohortLabel, won, type CourseId, type TimeSlot, type Track } from "@/lib/config";
-import { listApplications, getSetting, currentCohort, roundFor, isPreview, type Application } from "@/lib/db";
+import { listApplications, listMissions, getSetting, currentCohort, roundFor, isPreview, type Application, type Mission } from "@/lib/db";
+import { missionCount } from "@/lib/mission";
 import { isAdmin } from "@/lib/auth";
 import { changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove } from "@/app/actions";
 import LoginForm from "./LoginForm";
@@ -29,7 +30,7 @@ function Badge({ tone, children }: { tone: "amber" | "sky" | "slate" | "green"; 
   return <span className={`inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold ${color}`}>{children}</span>;
 }
 
-function Row({ a, group }: { a: Application; group: string }) {
+function Row({ a, group, mission }: { a: Application; group: string; mission?: Mission }) {
   const book = bookStatusLabel(a);
   return (
     <li className={`py-3 ${a.status === "pending" ? "bg-amber-50/60" : ""}`}>
@@ -43,6 +44,7 @@ function Row({ a, group }: { a: Application; group: string }) {
             <Badge tone={a.status === "pending" ? "amber" : "green"}>{a.status === "pending" ? "미납" : "납부 완료"}</Badge>
             {a.kind === "online" && <Badge tone={a.status === "shipped" ? "green" : a.status === "paid" ? "amber" : "slate"}>교재 {book}</Badge>}
             {a.continuing && <Badge tone="slate">이어듣기</Badge>}
+            <Badge tone={missionCount(mission) === 4 ? "green" : "slate"}>미션 {missionCount(mission)}/4</Badge>
           </div>
           <p className="mt-1 text-xs text-slate-500">
             {won(a.amount)} · {a.books.map((b) => BOOKS[b]).join(", ")}
@@ -50,6 +52,14 @@ function Row({ a, group }: { a: Application; group: string }) {
             {a.address && ` · ${a.address}`}
             {" · "}{new Date(a.created_at).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" })} 신청
           </p>
+          {mission?.intro_at && (
+            <p className="mt-1 rounded-xl bg-sky-soft px-2.5 py-1.5 text-xs text-slate-600">
+              📝 {mission.prev_score} → 목표 {mission.target_score} · 시험 {mission.exam_month}
+              {mission.affiliation && ` · ${mission.affiliation}`}
+              {mission.instagram && ` · ${mission.instagram}`}
+              {mission.message && <span className="block text-sky-ink">“{mission.message}”</span>}
+            </p>
+          )}
         </div>
         <details className="shrink-0 text-right text-sm">
           <summary className="cursor-pointer list-none rounded-full bg-sky-soft px-3 py-1 font-bold text-sky-ink">관리</summary>
@@ -124,13 +134,15 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   const now = await currentCohort();
   const { k = "all", p = "all", b = "all", t = "all", q = "", c = now } = await searchParams;
   const everything = await listApplications();
-  const [account, liveStartAm, liveStartPm, liveSolveAm, liveSolvePm, cafeHomeworkUrl] = await Promise.all([
+  const [account, liveStartAm, liveStartPm, liveSolveAm, liveSolvePm, cafeHomeworkUrl, cafeUrl, blogUrl] = await Promise.all([
     getSetting("bank_account"),
     getSetting("live_start_am"),
     getSetting("live_start_pm"),
     getSetting("live_solve_am"),
     getSetting("live_solve_pm"),
     getSetting("cafe_homework_url"),
+    getSetting("cafe_url"),
+    getSetting("blog_url"),
   ]);
   const round = await roundFor(now);
   const cohorts = [...new Set([now, ...everything.map((a) => a.cohort)])].sort().reverse();
@@ -148,6 +160,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   });
 
   const count = (fn: (a: Application) => boolean) => all.filter(fn).length;
+  const missions = new Map((await listMissions(list.map((a) => a.id))).map((m) => [m.app_id, m]));
   const link = (patch: Partial<Filters>) => {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries({ c, k, p, b, t, q, ...patch })) {
@@ -202,6 +215,14 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
               <label><span className="text-sm text-slate-500">문풀반 저녁</span><input type="url" name="live_solve_pm" defaultValue={liveSolvePm ? `https://youtu.be/${liveSolvePm}` : ""} className="input" placeholder="유튜브 라이브 주소" /></label>
             </div>
           </div>
+          <label className="sm:col-span-4">
+            <span className="label">첫 수업 미션 · 네이버 카페 주소 <span className="font-normal text-slate-400">(비우면 숙제 게시판 주소)</span></span>
+            <input type="url" name="cafe_url" defaultValue={cafeUrl} className="input" placeholder="https://cafe.naver.com/..." />
+          </label>
+          <label className="sm:col-span-4">
+            <span className="label">첫 수업 미션 · 블로그 주소</span>
+            <input type="url" name="blog_url" defaultValue={blogUrl} className="input" placeholder="https://blog.naver.com/..." />
+          </label>
           <label className="sm:col-span-3">
             <span className="label">네이버 카페 숙제 게시판 주소</span>
             <input type="url" name="cafe_homework_url" defaultValue={cafeHomeworkUrl} className="input" placeholder="https://cafe.naver.com/..." />
@@ -322,7 +343,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
               {pending > 0 && <Badge tone="amber">미납 {pending}명</Badge>}
             </div>
             <ul className="divide-y divide-sky-soft">
-              {g.items.map((a) => <Row key={a.id} a={a} group={g.key} />)}
+              {g.items.map((a) => <Row key={a.id} a={a} group={g.key} mission={missions.get(a.id)} />)}
             </ul>
           </section>
         );

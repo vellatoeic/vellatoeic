@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { COURSES, PARTS, TRACKS, TRACK_PARTS, cohortLabel, todayKST } from "@/lib/config";
-import { getApplications, listLectures, listStamps, currentCohort, getSetting } from "@/lib/db";
+import { getApplications, listLectures, listMissions, listStamps, currentCohort, getSetting } from "@/lib/db";
+import { missionCount, missionFor } from "@/lib/mission";
 import { getStudentIds } from "@/lib/auth";
 import { canWatch, covers } from "@/lib/access";
 import { studentLogout } from "@/app/actions";
@@ -34,6 +35,8 @@ export default async function ClassRoom() {
   };
   const today = todayKST();
   const stamps = await listStamps(paid.map((a) => a.id));
+  const missions = await listMissions(apps.map((a) => a.id));
+  const latestMission = missionCount(missionFor([...apps].sort((a, b) => b.cohort.localeCompare(a.cohort))[0].id, missions));
   const boardKeys = [...new Map(paid.map((a) => {
     const klass = scheduleClassFor(a.course, a.track);
     return [`${a.cohort}:${klass}`, { cohort: a.cohort, klass }];
@@ -60,6 +63,17 @@ export default async function ClassRoom() {
           <button className="text-sm text-slate-500 underline">로그아웃</button>
         </form>
       </div>
+
+      {latestMission < 4 && (
+        <Link href="/mission" className="flex items-center gap-3 rounded-[20px] border-2 border-[#ffd23f] bg-white p-4 shadow-[0_3px_0_#cfe6f5]">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#e8f8ef] text-2xl">✅</span>
+          <span className="flex-1">
+            <b className="block text-lg text-sky-ink">첫 수업 미션 {latestMission} / 4</b>
+            <span className="text-sm text-slate-500">다 하면 스티커판에 웰컴 배지가 붙어요</span>
+          </span>
+          <span className="text-xl text-sky-main">›</span>
+        </Link>
+      )}
 
       <p className="rounded-2xl bg-sky-soft px-4 py-3 text-sm text-sky-deep">강의 영상은 개강일 이후부터 열람할 수 있어요.</p>
 
@@ -110,6 +124,7 @@ export default async function ClassRoom() {
                 homework={stamps.homework.filter((stamp) => stamp.app_id === a.id).map(({ day, created_at }) => ({ day, created_at }))}
                 cafeUrl={cafeUrl}
                 today={today}
+                welcome={missionCount(missionFor(a.id, missions)) === 4}
               />;
             })()}
             {TRACK_PARTS[a.track].map((part) => {

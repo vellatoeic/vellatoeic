@@ -34,6 +34,21 @@ export type Lecture = {
   created_at: string;
 };
 
+export type Mission = {
+  app_id: string;
+  prev_score: string | null;
+  target_score: string | null;
+  exam_month: string | null;
+  affiliation: string | null;
+  instagram: string | null;
+  message: string | null;
+  intro_at: string | null;
+  cafe_at: string | null;
+  blog_at: string | null;
+  insta_at: string | null;
+  updated_at: string;
+};
+
 export type SpecialLecture = {
   id: string;
   event_date: string;
@@ -83,9 +98,10 @@ type Mem = {
   specialLectures: SpecialLecture[];
   specialRegistrations: SpecialRegistration[];
   specialMaterials: SpecialMaterial[];
+  missions: Mission[];
 };
 const g = globalThis as unknown as { __vellaMem?: Mem };
-const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [] });
+const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [] });
 mem.specialLectures ??= [];
 mem.specialRegistrations ??= [];
 mem.specialMaterials ??= [];
@@ -93,6 +109,7 @@ mem.lectures ??= [];
 mem.attendance ??= [];
 mem.homework ??= [];
 mem.photos ??= {};
+mem.missions ??= [];
 
 const isUuid = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
 
@@ -231,6 +248,28 @@ export async function deleteLecture(id: string) {
     return;
   }
   mem.lectures = mem.lectures.filter((l) => l.id !== id);
+}
+
+// ── 첫 수업 미션 ─────────────────────────────────
+export async function listMissions(appIds: string[]): Promise<Mission[]> {
+  const ok = appIds.filter(isUuid);
+  if (ok.length === 0) return [];
+  if (sb) {
+    const { data, error } = await sb.from("student_missions").select("*").in("app_id", ok);
+    if (error) throw error;
+    return data as Mission[];
+  }
+  return mem.missions.filter((m) => ok.includes(m.app_id));
+}
+
+export async function saveMission(mission: Omit<Mission, "updated_at">) {
+  const row = { ...mission, updated_at: new Date().toISOString() };
+  if (sb) {
+    const { error } = await sb.from("student_missions").upsert(row, { onConflict: "app_id" });
+    if (error) throw error;
+    return;
+  }
+  mem.missions = [...mem.missions.filter((m) => m.app_id !== row.app_id), row];
 }
 
 // ── 특강 ────────────────────────────────────────

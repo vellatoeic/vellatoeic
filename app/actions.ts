@@ -8,11 +8,12 @@ import {
 } from "@/lib/config";
 import {
   createApplication, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  createSpecialLecture, createSpecialRegistration, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
+  saveMission, type Mission, createSpecialLecture, createSpecialRegistration, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
 } from "@/lib/db";
 import { canWatch } from "@/lib/access";
 import { SCHEDULE_CLASSES, holidayKey, homeworkAssignmentDays, parseHolidays, parseSchoolDays, previousMonth, scheduleKey, scheduleClassFor, schoolDaysFor, shiftSchoolDays, type ScheduleClass } from "@/lib/schedule";
 import { specialRegistrationOpen } from "@/lib/special";
+import { MISSION_STEPS, studentMission, type MissionStep } from "@/lib/mission";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
 } from "@/lib/auth";
@@ -116,7 +117,7 @@ export async function studentLogin(_: FormState, fd: FormData): Promise<FormStat
   }
   await setStudent(mine.map((a) => a.id));
   const next = clean(fd.get("next"));
-  redirect(next.startsWith("/check?") || next === "/class" ? next : "/class");
+  redirect(next.startsWith("/check?") || next === "/class" || next === "/mission" ? next : "/class");
 }
 
 export async function studentLogout() {
@@ -180,7 +181,17 @@ export async function saveSettings(fd: FormData) {
       // 잘못된 주소는 기존 주소를 유지해요.
     }
   }
+  // 첫 수업 미션 링크 (비워두면 미션 화면에서 버튼이 숨겨져요)
+  for (const key of ["cafe_url", "blog_url"]) {
+    const value = clean(fd.get(key));
+    try {
+      if (!value || new URL(value).protocol === "https:") await setSetting(key, value);
+    } catch {
+      // 잘못된 주소는 기존 주소를 유지해요.
+    }
+  }
   revalidatePath("/admin");
+  revalidatePath("/mission");
 }
 
 export async function saveSchoolSchedule(fd: FormData) {
@@ -234,6 +245,51 @@ export async function removeLecture(fd: FormData) {
   if (!(await isAdmin())) return;
   await deleteLecture(clean(fd.get("id")));
   revalidatePath("/admin/lectures");
+}
+
+// ── 첫 수업 미션 ───────────────────────────────
+const EMPTY_MISSION = { prev_score: null, target_score: null, exam_month: null, affiliation: null, instagram: null, message: null, intro_at: null, cafe_at: null, blog_at: null, insta_at: null };
+// 기존 기록(지난달 기록 포함)을 이어받아 이번 신청에 저장할 바탕을 만들어요.
+function missionBase(mission: Mission | null) {
+  if (!mission) return { ...EMPTY_MISSION };
+  const { app_id: _app, updated_at: _updated, ...rest } = mission;
+  return rest;
+}
+
+export async function saveMissionIntro(_: FormState, fd: FormData): Promise<FormState> {
+  const current = await studentMission();
+  if (!current) return { error: "강의실에 로그인해 주세요." };
+  const short = (k: string) => clean(fd.get(k)).slice(0, 40);
+  const prev_score = short("prev_score");
+  const target_score = short("target_score");
+  const exam_month = short("exam_month");
+  if (!prev_score || !target_score || !exam_month) return { error: "이전 점수, 목표 점수, 시험 예정은 꼭 적어 주세요." };
+  const base = missionBase(current.mission);
+  await saveMission({
+    ...base,
+    app_id: current.app.id,
+    prev_score,
+    target_score,
+    exam_month,
+    affiliation: short("affiliation") || null,
+    instagram: short("instagram") || null,
+    message: clean(fd.get("message")) || null,
+    intro_at: base.intro_at ?? new Date().toISOString(),
+  });
+  revalidatePath("/mission");
+  revalidatePath("/class");
+  return { ok: "저장했어요!" };
+}
+
+export async function markMission(fd: FormData) {
+  const step = clean(fd.get("step")) as MissionStep;
+  if (!MISSION_STEPS.includes(step) || step === "intro_at") return;
+  const current = await studentMission();
+  if (!current) return;
+  const base = missionBase(current.mission);
+  await saveMission({ ...base, app_id: current.app.id, [step]: base[step] ?? new Date().toISOString() });
+  revalidatePath("/mission");
+  revalidatePath("/class");
 }
 
 // ── 특강 신청 (그 달 납부 완료 수강생만, 이름 + 강의실 비밀번호로 확인) ──────

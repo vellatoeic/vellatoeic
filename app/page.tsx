@@ -1,61 +1,72 @@
 import Link from "next/link";
 import Cloud from "@/components/Cloud";
+import { listSpecialLectures } from "@/lib/db";
+import { specialDay, specialRegistrationOpen } from "@/lib/special";
 
-// 문구는 초안이에요. 자유롭게 바꿔 주세요.
-const POINTS = [
-  { t: "개념부터 탄탄하게", d: ["토익이 처음이어도 괜찮아요.", "시작반에서 개념집으로 기초를 잡고 갑니다."] },
-  { t: "문제로 점수를 완성", d: ["문풀반에서 실전 문제를 풀며 점수로 이어지는 감각을 만들어요."] },
-  { t: "현장도, 라이브도", d: ["서면 강의실 현장 수업과 온라인 불라방 중 편한 방식으로 들어요."] },
+// 특강 모집 여부를 매번 확인해요.
+export const dynamic = "force-dynamic";
+
+const KIND_BUTTONS = [
+  { href: "/guide/onsite", icon: "🏫", label: "현장 수강생", sub: "703호 수업" },
+  { href: "/guide/online", icon: "💻", label: "불라방 수강생", sub: "온라인 라이브" },
 ];
 
-function HeroCloud({ className }: { className: string }) {
-  return <Cloud className={`pointer-events-none absolute fill-white ${className}`} />;
+// 배경에 떠 있는 구름 (위치 · 크기 · 색)
+const CLOUDS = [
+  "-left-8 top-6 w-28 fill-white cloud-a",
+  "-right-6 top-2 w-24 fill-white cloud-b",
+  "-right-4 top-64 w-20 fill-[#d9f0fd] cloud-a",
+  "-left-6 top-[30rem] w-24 fill-[#d9f0fd] cloud-b",
+  "-right-2 top-[36rem] w-16 fill-white cloud-a",
+];
+
+function MenuItem({ href, icon, bg, title, sub, badge, hot }: { href: string; icon: string; bg: string; title: string; sub: string; badge?: string; hot?: boolean }) {
+  return (
+    <Link href={href} className={`flex items-center gap-3 rounded-[20px] bg-white p-4 shadow-[0_3px_0_#cfe6f5] transition active:translate-y-0.5 ${hot ? "border-2 border-[#ffd23f]" : ""}`}>
+      <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-[14px] text-[22px]" style={{ background: bg }}>{icon}</span>
+      <span className="font-jua text-lg text-sky-ink">
+        {title}
+        {badge && <span className="ml-1.5 rounded-full bg-[#ff6b8a] px-2 py-0.5 align-middle font-jua text-[10.5px] text-white">{badge}</span>}
+        <small className="block font-body text-xs text-[#7aa3bd]">{sub}</small>
+      </span>
+      <span className="ml-auto text-xl text-[#a9c9dd]">›</span>
+    </Link>
+  );
 }
 
-export default function Home() {
+export default async function Home() {
+  const open = (await listSpecialLectures()).filter((event) => specialRegistrationOpen(event.event_date, event.starts_at));
+
   return (
-    <div className="space-y-8 pt-8">
-      <section className="relative overflow-hidden rounded-[2rem] bg-sky-main px-6 py-12 text-center">
-        <HeroCloud className="cloud-a -left-6 top-4 w-36 opacity-80" />
-        <HeroCloud className="cloud-b -right-8 top-24 w-28 opacity-60" />
-        <HeroCloud className="cloud-a -bottom-4 left-10 w-24 opacity-50" />
-        <HeroCloud className="cloud-b -bottom-6 -right-4 w-40 opacity-70" />
+    <div className="relative -mx-4 overflow-hidden px-4 pb-6">
+      <div className="mx-auto max-w-md">
+      {CLOUDS.map((c) => <Cloud key={c} className={`pointer-events-none absolute opacity-85 ${c}`} />)}
 
-        <p className="font-jua relative text-lg tracking-wide text-sky-ink/70">vella_toeic</p>
-        <h1 className="font-jua relative mt-1 text-5xl text-sky-ink sm:text-6xl">반가워요:)</h1>
-
-        <div className="relative mx-auto mt-8 max-w-sm rounded-3xl bg-white/85 p-6 shadow-[0_4px_24px_rgba(43,143,199,0.15)] backdrop-blur">
-          <p className="font-jua text-2xl text-sky-ink">수강 신청을 마치셨나요?</p>
-          <p className="mt-2 text-slate-600">
-            수업 전에 필독 사항을 확인하고
-            <br />
-            교재비 납부까지 완료해 주세요.
-          </p>
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <Link href="/guide/onsite" className="btn !px-3 !text-base">현장 수강생</Link>
-            <Link href="/guide/online" className="btn !px-3 !text-base">불라방 수강생</Link>
-          </div>
+      <div className="relative">
+        <div className="pb-5 pt-10 text-center">
+          <h1 className="font-jua text-[40px] text-sky-ink">반가워요:)</h1>
+          <p className="mt-2 text-[15px] text-[#5b88a6]">수강 신청을 마치셨나요?</p>
         </div>
-      </section>
 
-      <section>
-        <p className="font-jua mb-4 text-center text-2xl leading-snug text-sky-ink">
-          토익 점수가 필요한 순간,
-          <br />
-          vella_toeic과 끝까지 함께해요.
-        </p>
-        <div className="grid gap-4 sm:grid-cols-3">
-          {POINTS.map((p) => (
-            <div key={p.t} className="card">
-              <h3 className="font-jua text-xl text-sky-ink">{p.t}</h3>
-              <p className="mt-2 text-[15px] leading-relaxed text-slate-600">
-                {p.d.map((sentence) => <span key={sentence} className="block">{sentence}</span>)}
-              </p>
-            </div>
+        <div className="grid grid-cols-2 gap-2.5">
+          {KIND_BUTTONS.map((k) => (
+            <Link key={k.href} href={k.href} className="rounded-[22px] bg-sky-deep px-2.5 pb-[18px] pt-[22px] text-center font-jua text-[19px] text-white shadow-[0_5px_0_#1f6f9d] transition hover:bg-[#4fb0e6] active:translate-y-1 active:shadow-[0_1px_0_#1f6f9d]">
+              <span className="mb-1.5 block text-[30px]">{k.icon}</span>
+              {k.label}
+              <small className="mt-1 block font-body text-[11.5px] opacity-90">{k.sub}</small>
+            </Link>
           ))}
         </div>
-      </section>
 
+        <div className="mt-[18px] grid gap-2.5">
+          <MenuItem href="/class" icon="☁️" bg="#e3f4fd" title="강의실" sub="출석 · 스티커판 · 강의 영상" />
+          <MenuItem href="/mission" icon="✅" bg="#e8f8ef" title="첫 수업 미션" sub="첫 수업 날 5분이면 끝나요" />
+          {open.length > 0 && (
+            <MenuItem href="/special" icon="🎤" bg="#fff5cc" title="특강 신청" badge="모집 중" sub={open.map((e) => specialDay(e.event_date)).join(" · ")} hot />
+          )}
+        </div>
+      </div>
+      </div>
     </div>
   );
 }
