@@ -118,7 +118,7 @@ export async function studentLogin(_: FormState, fd: FormData): Promise<FormStat
   }
   await setStudent(mine.map((a) => a.id));
   const next = clean(fd.get("next"));
-  redirect(next.startsWith("/check?") || next === "/class" || next === "/mission" ? next : "/class");
+  redirect(next === "/check" || next.startsWith("/check?") || next === "/class" || next === "/mission" ? next : "/class");
 }
 
 export async function studentLogout() {

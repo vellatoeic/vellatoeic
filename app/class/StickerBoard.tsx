@@ -5,7 +5,7 @@ import { cancelMyHomeworkDone, markHomeworkDone } from "@/app/actions";
 import { homeworkAssignmentDays, isHomeworkStickerEligible, weekDaysInMonth, type ScheduleClass } from "@/lib/schedule";
 import Cloud from "@/components/Cloud";
 
-type StampAttendance = { day: string; late: boolean };
+type StampAttendance = { day: string };
 
 export default function StickerBoard({
   appId,
@@ -50,7 +50,6 @@ export default function StickerBoard({
   const homeworkDays = useMemo(() => new Set(homework.filter((item) => isHomeworkStickerEligible(item.day, item.created_at)).map((item) => item.day)), [homework]);
   const total = scheduleDays.length;
   const attendanceCount = scheduleDays.filter((day) => attendanceByDay.has(day)).length;
-  const lateCount = scheduleDays.filter((day) => attendanceByDay.get(day)?.late).length;
   const homeworkCount = scheduleDays.filter((day) => homeworkDays.has(day)).length;
   const stickerCount = attendanceCount + homeworkCount;
   const alternating = klass.endsWith("-mw") || klass.endsWith("-tt");
@@ -157,7 +156,7 @@ export default function StickerBoard({
       if (isLesson) {
         const att = attendanceByDay.get(day);
         const homeworkDone = homeworkDays.has(day);
-        if (att) drawStoryCloud(ctx, x + cellWidth / 2 - 49, y + 71, 42, att.late ? "#ffb685" : "#79c6ef", true);
+        if (att) drawStoryCloud(ctx, x + cellWidth / 2 - 49, y + 71, 42, "#79c6ef", true);
         else drawStoryCircle(ctx, x + cellWidth / 2 - 45, y + 104, 13);
         if (homeworkDone) drawStoryStar(ctx, x + cellWidth / 2 + 10, y + 78, 48);
         else drawStoryCircle(ctx, x + cellWidth / 2 + 25, y + 104, 13);
@@ -216,7 +215,7 @@ export default function StickerBoard({
           <div className="mt-[14px] rounded-[22px] bg-white p-4 shadow-[0_2px_0_#d5ecf9]">
             <div className="mb-1.5 flex items-baseline justify-between text-sm">
               <span>☁️ 출석</span>
-              <span><b className="font-jua text-lg font-normal">{attendanceCount}</b> / {total} {lateCount > 0 && <small className="text-[#e08a4e]">(지각 {lateCount})</small>}</span>
+              <span><b className="font-jua text-lg font-normal">{attendanceCount}</b> / {total}</span>
             </div>
             <Progress value={attendanceCount} total={total} color="#79c6ef" />
             <div className="mb-1.5 mt-3 flex items-baseline justify-between text-sm">
@@ -300,7 +299,7 @@ export default function StickerBoard({
                   {holiday && <div className="mt-2 truncate font-jua text-[10px] text-[#e5707e]">{holiday}</div>}
                   {isLesson && <div className="mt-[3px] flex h-[30px] justify-center">
                     <div className="grid w-7 place-items-center">
-                      {att ? <span className={cloudNew ? "mock-pop" : ""} style={{ display: "inline-block", transform: `rotate(${rotation}deg)`, ["--r" as string]: `${rotation}deg` } as React.CSSProperties}><CloudSticker fill={att.late ? "#ffb685" : "#79c6ef"} size={27} /></span> : <EmptySlot />}
+                      {att ? <span className={cloudNew ? "mock-pop" : ""} style={{ display: "inline-block", transform: `rotate(${rotation}deg)`, ["--r" as string]: `${rotation}deg` } as React.CSSProperties}><CloudSticker fill="#79c6ef" size={27} /></span> : <EmptySlot />}
                     </div>
                     <div className="grid w-7 place-items-center">
                       {didHomework ? <span className={starNew ? "mock-pop" : ""} style={{ display: "inline-block", transform: `rotate(${-rotation}deg)`, ["--r" as string]: `${-rotation}deg` } as React.CSSProperties}><StarSticker size={23} /></span> : future ? <EmptySlot /> : missed ? <EmptySlot /> : null}
@@ -312,7 +311,6 @@ export default function StickerBoard({
           </div>
           <div className="mt-3 flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-[#5b88a6]">
             <span className="flex items-center gap-[3px]"><CloudSticker fill="#79c6ef" size={22} />출석</span>
-            <span className="flex items-center gap-[3px]"><CloudSticker fill="#ffb685" size={22} />지각 출석</span>
             <span className="flex items-center gap-[3px]"><StarSticker size={18} />숙제</span>
           </div>
         </div>

@@ -96,7 +96,7 @@ const sb: SupabaseClient | null =
 export const isPreview = !sb;
 
 export type Stamp = { app_id: string; day: string };
-export type Attendance = Stamp & { late: boolean };
+export type Attendance = Stamp;
 export type Homework = Stamp & { photo_path: string | null; created_at: string };
 
 type Mem = {
@@ -561,13 +561,13 @@ export async function roundFor(cohort: string): Promise<1 | 2> {
 }
 
 // ── 출석·숙제 스티커 ─────────────────────────────
-export async function addAttendance(app_id: string, day: string, late = false) {
+export async function addAttendance(app_id: string, day: string) {
   if (sb) {
-    const { error } = await sb.from("attendance").upsert({ app_id, day, late }, { onConflict: "app_id,day", ignoreDuplicates: true });
+    const { error } = await sb.from("attendance").upsert({ app_id, day }, { onConflict: "app_id,day", ignoreDuplicates: true });
     if (error) throw error;
     return;
   }
-  if (!mem.attendance.some((x) => x.app_id === app_id && x.day === day)) mem.attendance.push({ app_id, day, late });
+  if (!mem.attendance.some((x) => x.app_id === app_id && x.day === day)) mem.attendance.push({ app_id, day });
 }
 
 export async function addHomeworkSticker(app_id: string, day: string) {
@@ -601,7 +601,7 @@ export async function listStamps(appIds: string[]): Promise<{ attendance: Attend
   if (ok.length === 0) return { attendance: [], homework: [] };
   if (sb) {
     const [a, h] = await Promise.all([
-      sb.from("attendance").select("app_id, day, late").in("app_id", ok),
+      sb.from("attendance").select("app_id, day").in("app_id", ok),
       sb.from("homework").select("app_id, day, photo_path, created_at").in("app_id", ok),
     ]);
     if (a.error) throw a.error;

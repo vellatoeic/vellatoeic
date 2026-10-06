@@ -80,9 +80,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
                       return (
                         <td key={d} className="px-1 py-2 whitespace-nowrap">
                           {has(attendance, a.id, d) ? (
-                            <span title={(has(attendance, a.id, d) as { late?: boolean }).late ? "지각" : "출석"}>
-                              ☁️{(has(attendance, a.id, d) as { late?: boolean }).late ? "⏰" : ""}
-                            </span>
+                            <span title="출석">☁️</span>
                           ) : (
                             <form action={markAttendanceManual} className="inline">
                               <input type="hidden" name="id" value={a.id} />
