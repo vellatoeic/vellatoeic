@@ -107,7 +107,7 @@ export function defaultSchoolDays(cohort: string, klass: ScheduleClass): string[
 }
 
 export function homeworkAssignmentDays(scheduleDays: string[]): string[] {
-  return [...new Set(scheduleDays)].sort().slice(1); // 첫 수업에는 숙제가 없어요.
+  return [...new Set(scheduleDays)].sort(); // 첫 수업은 [숙제 확인]만 눌러도 별을 받아요.
 }
 
 // 숙제는 언제든 제출할 수 있지만, 수업일 당일 또는 다음 날 제출한 것만 별을 받아요.

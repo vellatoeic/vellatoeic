@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { cancelMyHomeworkDone, markHomeworkDone } from "@/app/actions";
 import { homeworkAssignmentDays, isHomeworkStickerEligible, weekDaysInMonth, type ScheduleClass } from "@/lib/schedule";
 import Cloud from "@/components/Cloud";
@@ -46,6 +46,15 @@ export default function StickerBoard({
     ? selectedHomeworkDay
     : homeworkAssignments.find((day) => !homeworkByDay.has(day)) ?? homeworkAssignments[homeworkAssignments.length - 1] ?? "";
   const selectedHomework = homeworkByDay.get(homeworkTargetDay);
+  // 첫 수업은 숙제가 따로 없어서 [숙제 확인]을 누르기만 해도 별을 붙여요.
+  const firstLessonSelected = homeworkTargetDay !== "" && homeworkTargetDay === homeworkAssignments[0];
+  function checkFirstHomework() {
+    if (!firstLessonSelected || selectedHomework) return;
+    const fd = new FormData();
+    fd.set("app_id", appId);
+    fd.set("day", homeworkTargetDay);
+    startTransition(() => markHomeworkDone(fd));
+  }
   const selectedHomeworkHasSticker = selectedHomework ? isHomeworkStickerEligible(homeworkTargetDay, selectedHomework.created_at) : false;
   const homeworkDays = useMemo(() => new Set(homework.filter((item) => isHomeworkStickerEligible(item.day, item.created_at)).map((item) => item.day)), [homework]);
   const total = scheduleDays.length;
@@ -230,7 +239,7 @@ export default function StickerBoard({
         <div className="mt-[14px] rounded-[22px] border-2 border-[#ffe58a] bg-gradient-to-br from-[#fff9e0] to-white p-4 shadow-[0_2px_0_#d5ecf9]">
           {homeworkAssignments.length > 0 ? (
             <label className="mb-3 block">
-              <span className="mb-1 block text-sm font-bold text-[#7d6728]">숙제 날짜 선택</span>
+              <span className="mb-1 block text-sm font-bold text-[#7d6728]">수강일을 선택하여 숙제를 확인해주세요</span>
               <select value={homeworkTargetDay} onChange={(event) => setSelectedHomeworkDay(event.target.value)} className="w-full rounded-xl border border-[#ffe58a] bg-white px-3 py-2 text-sm text-[#5a3b00]">
                 {homeworkAssignments.map((day) => {
                   const stamp = homeworkByDay.get(day);
@@ -240,9 +249,10 @@ export default function StickerBoard({
               </select>
             </label>
           ) : (
-            <p className="mb-3 text-center text-sm text-[#a7741a]">첫 수업에는 숙제가 없어요.<br />둘째 수업부터 날짜를 선택해 주세요.</p>
+            <p className="mb-3 text-center text-sm text-[#a7741a]">첫 수업 날부터 숙제를 확인할 수 있어요.</p>
           )}
-          <a href={cafeUrl || undefined} target="_blank" rel="noreferrer" aria-disabled={!cafeUrl} className={`block w-full rounded-2xl bg-[#ffd23f] px-3 py-[13px] text-center font-jua text-lg text-[#5a3b00] shadow-[0_4px_0_#e0b400] ${cafeUrl ? "" : "pointer-events-none opacity-50"}`}>📝 숙제 제출하러 가기</a>
+          <a href={cafeUrl || undefined} target="_blank" rel="noreferrer" aria-disabled={!cafeUrl} onClick={checkFirstHomework} className={`block w-full rounded-2xl bg-[#ffd23f] px-3 py-[13px] text-center font-jua text-lg text-[#5a3b00] shadow-[0_4px_0_#e0b400] ${cafeUrl ? "" : "pointer-events-none opacity-50"}`}>📝 숙제 확인</a>
+          {firstLessonSelected && !selectedHomework && <p className="mt-2 text-center text-xs text-[#a7741a]">첫 수업은 [숙제 확인]만 눌러도 별 스티커를 받아요 ⭐</p>}
           {selectedHomework ? (
             <div className="mt-2 rounded-2xl border-2 border-dashed border-[#e0b400] bg-white px-3 py-2.5 text-center text-[#a7741a]">
               <p className="font-jua text-[15px]">{selectedHomeworkHasSticker ? "숙제 제출 완료! ⭐" : "제출 기록 완료 · 제출일이 수업 다음 날 이후라 스티커는 없어요."}</p>
@@ -252,7 +262,7 @@ export default function StickerBoard({
                 <button className="rounded-full px-3 py-1 text-xs text-[#a7741a]/70 underline underline-offset-2">잘못 선택했어요 · 취소 후 다시 제출</button>
               </form>
             </div>
-          ) : homeworkTargetDay ? (
+          ) : homeworkTargetDay && (!firstLessonSelected || !cafeUrl) ? (
             <form action={markHomeworkDone} className="mt-2">
               <input type="hidden" name="app_id" value={appId} />
               <input type="hidden" name="day" value={homeworkTargetDay} />
