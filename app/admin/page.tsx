@@ -134,12 +134,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   const now = await currentCohort();
   const { k = "all", p = "all", b = "all", t = "all", q = "", c = now } = await searchParams;
   const everything = await listApplications();
-  const [account, liveStartAm, liveStartPm, liveSolveAm, liveSolvePm, cafeHomeworkUrl, cafeUrl, blogUrl] = await Promise.all([
+  const [account, cafeHomeworkUrl, cafeUrl, blogUrl] = await Promise.all([
     getSetting("bank_account"),
-    getSetting("live_start_am"),
-    getSetting("live_start_pm"),
-    getSetting("live_solve_am"),
-    getSetting("live_solve_pm"),
     getSetting("cafe_homework_url"),
     getSetting("cafe_url"),
     getSetting("blog_url"),
@@ -188,7 +184,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
       <AdminTabs active="apps" />
 
       <details className="card !p-4">
-        <summary className="font-jua cursor-pointer text-lg text-sky-ink">⚙️ 기본 설정 (모집 기수 · 계좌 · 라이브 링크 · 카페 주소)</summary>
+        <summary className="font-jua cursor-pointer text-lg text-sky-ink">⚙️ 기본 설정 (모집 기수 · 계좌 · 카페·블로그 주소)</summary>
         <div className="mt-4">
           <form action={saveSettings} className="card grid gap-4 sm:grid-cols-[10rem_7rem_1fr_auto] sm:items-end">
           <label>
@@ -206,15 +202,6 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
             <span className="label">학생에게 보여줄 입금 계좌</span>
             <input name="bank_account" defaultValue={account} className="input" placeholder="예: OO은행 000-0000-0000 (예금주)" />
           </label>
-          <div className="sm:col-span-4">
-            <p className="label">학생에게 안내할 유튜브 라이브 링크 (비워두면 숨겨요)</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label><span className="text-sm text-slate-500">시작반 오전</span><input type="url" name="live_start_am" defaultValue={liveStartAm ? `https://youtu.be/${liveStartAm}` : ""} className="input" placeholder="유튜브 라이브 주소" /></label>
-              <label><span className="text-sm text-slate-500">시작반 저녁</span><input type="url" name="live_start_pm" defaultValue={liveStartPm ? `https://youtu.be/${liveStartPm}` : ""} className="input" placeholder="유튜브 라이브 주소" /></label>
-              <label><span className="text-sm text-slate-500">문풀반 오전</span><input type="url" name="live_solve_am" defaultValue={liveSolveAm ? `https://youtu.be/${liveSolveAm}` : ""} className="input" placeholder="유튜브 라이브 주소" /></label>
-              <label><span className="text-sm text-slate-500">문풀반 저녁</span><input type="url" name="live_solve_pm" defaultValue={liveSolvePm ? `https://youtu.be/${liveSolvePm}` : ""} className="input" placeholder="유튜브 라이브 주소" /></label>
-            </div>
-          </div>
           <label className="sm:col-span-4">
             <span className="label">첫 수업 미션 · 네이버 카페 주소 <span className="font-normal text-slate-400">(비우면 숙제 게시판 주소)</span></span>
             <input type="url" name="cafe_url" defaultValue={cafeUrl} className="input" placeholder="https://cafe.naver.com/..." />

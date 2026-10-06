@@ -29,6 +29,7 @@ export type Lecture = {
   cohort: string;
   course: CourseId;
   part: Part;
+  slot: TimeSlot | null; // 오전반/저녁반 수업 링크 (구분 추가 전 강의는 비어 있어요)
   title: string;
   youtube_id: string;
   created_at: string;

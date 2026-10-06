@@ -165,11 +165,6 @@ export async function saveSettings(fd: FormData) {
   // 교재 회차는 자동으로 번갈아 정해지고, 필요할 때만 여기서 바꿔요
   const round = clean(fd.get("round"));
   if (/^\d{4}-\d{2}$/.test(c) && (round === "1" || round === "2")) await setSetting(`round_${c}`, round);
-  for (const key of ["live_start_am", "live_start_pm", "live_solve_am", "live_solve_pm"]) {
-    const value = clean(fd.get(key));
-    const id = value ? youtubeId(value) : null;
-    if (!value || id) await setSetting(key, id ?? "");
-  }
   const cafeLink = clean(fd.get("cafe_homework_url"));
   if (!cafeLink) await setSetting("cafe_homework_url", "");
   else {
@@ -230,14 +225,17 @@ export async function uploadLecture(_: FormState, fd: FormData): Promise<FormSta
   const cohort = clean(fd.get("cohort"));
   const course = clean(fd.get("course")) as CourseId;
   const part = clean(fd.get("part")) as Part;
+  const slot = clean(fd.get("slot"));
   const title = clean(fd.get("title"));
   const yt = youtubeId(clean(fd.get("url")));
   if (!/^\d{4}-\d{2}$/.test(cohort)) return { error: "기수를 선택해 주세요." };
   if (!LECTURE_COURSES.includes(course)) return { error: "반을 선택해 주세요." };
   if (!Object.hasOwn(PARTS, part)) return { error: "RC/LC를 선택해 주세요." };
+  if (!isTimeSlot(slot)) return { error: "오전반/저녁반을 선택해 주세요." };
   if (!title) return { error: "강의 제목을 입력해 주세요." };
   if (!yt) return { error: "유튜브 링크를 확인해 주세요." };
-  await addLecture({ cohort, course, part, title, youtube_id: yt });
+  await addLecture({ cohort, course, part, slot, title, youtube_id: yt });
+  revalidatePath("/class");
   revalidatePath("/admin/lectures");
   return { ok: `'${title}' 강의를 올렸어요.` };
 }
@@ -248,10 +246,11 @@ export async function editLecture(fd: FormData) {
   const cohort = clean(fd.get("cohort"));
   const course = clean(fd.get("course")) as CourseId;
   const part = clean(fd.get("part")) as Part;
+  const slot = clean(fd.get("slot"));
   const title = clean(fd.get("title"));
   const yt = youtubeId(clean(fd.get("url")));
   if (!validCohort(cohort) || !LECTURE_COURSES.includes(course) || !Object.hasOwn(PARTS, part) || !title || !yt) return;
-  await updateLecture(clean(fd.get("id")), { cohort, course, part, title, youtube_id: yt });
+  await updateLecture(clean(fd.get("id")), { cohort, course, part, slot: isTimeSlot(slot) ? slot : null, title, youtube_id: yt });
   revalidatePath("/admin/lectures");
   revalidatePath("/class");
 }

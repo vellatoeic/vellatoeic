@@ -1,4 +1,4 @@
-import { COURSES, PARTS, LECTURE_COURSES, cohortLabel, type Part } from "@/lib/config";
+import { COURSES, PARTS, LECTURE_COURSES, TIME_SLOTS, cohortLabel, type Part } from "@/lib/config";
 import { listLectures, currentCohort, isPreview } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { editLecture, removeLecture } from "@/app/actions";
@@ -22,8 +22,9 @@ export default async function Lectures() {
       <div className="card space-y-2 text-sm text-slate-600">
         <p className="font-jua text-lg text-sky-ink">유튜브 업로드 방법</p>
         <p>1. 유튜브에 강의를 올릴 때 공개 범위를 <b className="text-sky-deep">&apos;일부 공개&apos;</b>로 선택해요.</p>
-        <p>2. 영상 링크를 복사해서 아래에 붙여넣고 반·RC/LC·제목을 고르면 끝!</p>
+        <p>2. 영상 링크를 복사해서 아래에 붙여넣고 반·RC/LC·오전반/저녁반·제목을 고르면 끝!</p>
         <p>3. 해당 기수에서 그 반을 신청하고 납부가 확인된 학생에게만 보여요.</p>
+        <p>4. 가장 최근에 올린 링크가 학생 강의실 &apos;라이브 바로가기&apos;에 바로 연결돼요. (오전반 학생은 오전반 링크, 저녁반 학생은 저녁반 링크)</p>
       </div>
 
       <UploadForm defaultCohort={now} />
@@ -48,7 +49,7 @@ export default async function Lectures() {
                         <li key={l.id} className="rounded-2xl bg-sky-soft px-4 py-2">
                           <details className="group">
                             <summary className="flex list-none items-center gap-3">
-                              <span className="font-jua w-6 text-sky-deep">{i + 1}</span>
+                              <span className={`font-jua shrink-0 rounded-full px-2 py-0.5 text-xs ${l.slot ? "bg-white text-sky-deep" : "bg-amber-100 text-amber-700"}`}>{l.slot ? TIME_SLOTS[l.slot] : `${i + 1} · 구분 없음`}</span>
                               <a
                                 href={`https://youtu.be/${l.youtube_id}`}
                                 target="_blank"
@@ -67,11 +68,18 @@ export default async function Lectures() {
                               <input type="hidden" name="id" value={l.id} />
                               <label><span className="text-xs text-slate-500">강의 제목</span><input name="title" defaultValue={l.title} required className="input !py-2" /></label>
                               <label><span className="text-xs text-slate-500">유튜브 링크</span><input name="url" defaultValue={`https://youtu.be/${l.youtube_id}`} required className="input !py-2" /></label>
-                              <div className="grid grid-cols-3 gap-2">
+                              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                                 <label><span className="text-xs text-slate-500">기수</span><input type="month" name="cohort" defaultValue={l.cohort} required className="input !py-2" /></label>
                                 <label><span className="text-xs text-slate-500">반</span>
                                   <select name="course" defaultValue={l.course} className="input !py-2">
                                     {LECTURE_COURSES.map((co) => <option key={co} value={co}>{COURSES[co].label}</option>)}
+                                  </select>
+                                </label>
+                                <label><span className="text-xs text-slate-500">오전/저녁</span>
+                                  <select name="slot" defaultValue={l.slot ?? ""} className="input !py-2">
+                                    <option value="">구분 없음</option>
+                                    <option value="am">오전반</option>
+                                    <option value="pm">저녁반</option>
                                   </select>
                                 </label>
                                 <label><span className="text-xs text-slate-500">RC/LC</span>

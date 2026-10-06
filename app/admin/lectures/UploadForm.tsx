@@ -3,12 +3,13 @@
 import { keep } from "@/lib/keep";
 import { useActionState, useRef, useEffect, useState } from "react";
 import { uploadLecture, type FormState } from "@/app/actions";
-import { COURSES, PARTS, LECTURE_COURSES, type CourseId, type Part } from "@/lib/config";
+import { COURSES, PARTS, LECTURE_COURSES, TIME_SLOTS, type CourseId, type Part, type TimeSlot } from "@/lib/config";
 
 export default function UploadForm({ defaultCohort }: { defaultCohort: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(uploadLecture, {});
   const [course, setCourse] = useState<CourseId>("start");
   const [part, setPart] = useState<Part>("rc");
+  const [slot, setSlot] = useState<TimeSlot | null>(null);
   const ref = useRef<HTMLFormElement>(null);
 
   // 올리고 나면 제목·링크 칸만 비우기 (반·파트는 유지해서 연속 업로드 편하게)
@@ -27,6 +28,7 @@ export default function UploadForm({ defaultCohort }: { defaultCohort: string })
       <p className="font-jua text-2xl text-sky-ink">강의 올리기</p>
       <input type="hidden" name="course" value={course} />
       <input type="hidden" name="part" value={part} />
+      {slot && <input type="hidden" name="slot" value={slot} />}
       <div className="flex flex-wrap items-center gap-2">
         <input type="month" name="cohort" defaultValue={defaultCohort} className="input !w-44 !py-2" />
         {LECTURE_COURSES.map((c) => (
@@ -38,6 +40,12 @@ export default function UploadForm({ defaultCohort }: { defaultCohort: string })
         {(Object.keys(PARTS) as Part[]).map((p) => (
           <button type="button" key={p} onClick={() => setPart(p)} className={pill(part === p)}>
             {PARTS[p]}
+          </button>
+        ))}
+        <span className="mx-1 text-slate-300">|</span>
+        {(Object.keys(TIME_SLOTS) as TimeSlot[]).map((s) => (
+          <button type="button" key={s} onClick={() => setSlot(s)} className={pill(slot === s)}>
+            {TIME_SLOTS[s]}
           </button>
         ))}
       </div>

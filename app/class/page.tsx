@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BOOKS, COURSES, PARTS, TRACKS, TRACK_PARTS, cohortLabel, todayKST } from "@/lib/config";
+import { BOOKS, COURSES, PARTS, TIME_SLOTS, TRACKS, TRACK_PARTS, cohortLabel, dayLabel, todayKST } from "@/lib/config";
 import { getApplications, listAudios, listLectures, listMissions, listStamps, currentCohort, getSetting } from "@/lib/db";
 import { missionCount, missionFor } from "@/lib/mission";
 import { audioBooksFor, dayDiff, studentAudioWindow } from "@/lib/audio";
@@ -23,17 +23,7 @@ export default async function ClassRoom() {
 
   // 스티커판: 같은 기수·같은 수업 학생들의 출석 날짜 = 수업일
   const cohort = await currentCohort();
-  const [liveStartAm, liveStartPm, liveSolveAm, liveSolvePm, cafeUrl] = await Promise.all([
-    getSetting("live_start_am"),
-    getSetting("live_start_pm"),
-    getSetting("live_solve_am"),
-    getSetting("live_solve_pm"),
-    getSetting("cafe_homework_url"),
-  ]);
-  const liveLinks = {
-    start: [{ label: "시작반 오전 라이브", id: liveStartAm }, { label: "시작반 저녁 라이브", id: liveStartPm }],
-    solve: [{ label: "문풀반 오전 라이브", id: liveSolveAm }, { label: "문풀반 저녁 라이브", id: liveSolvePm }],
-  };
+  const cafeUrl = await getSetting("cafe_homework_url");
   const today = todayKST();
   const stamps = await listStamps(paid.map((a) => a.id));
   const missions = await listMissions(apps.map((a) => a.id));
@@ -97,6 +87,9 @@ export default async function ClassRoom() {
 
       {paid.map((a) => {
         const mine = lectures.filter((l) => covers(a, l));
+        // 라이브 바로가기: 내 반·내 수강 시간에 가장 최근 올라온 강의 링크 (반·RC/LC·오전/저녁별 하나씩)
+        const latest = new Map(mine.filter((l) => !a.slot || !l.slot || l.slot === a.slot).map((l) => [`${l.course}-${l.part}-${l.slot ?? ""}`, l]));
+        const live = [...latest.values()].sort((x, y) => y.created_at.localeCompare(x.created_at));
         return (
           <section key={a.id} className="card">
             <div className="flex flex-wrap items-center gap-2">
@@ -105,18 +98,23 @@ export default async function ClassRoom() {
                 {COURSES[a.course].label} {TRACKS[a.track]}
               </h2>
             </div>
-            {a.cohort === cohort && a.status !== "pending" && (
+            {a.cohort === cohort && (
               <div className="mt-4 rounded-2xl bg-sky-soft p-4">
-                <p className="font-jua text-lg text-sky-ink">오늘 수업 라이브</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {(a.course === "intensive" ? [...liveLinks.start, ...liveLinks.solve] : liveLinks[a.course]).filter((link) => link.id).map((link) => (
-                    <a key={link.label} href={`https://youtu.be/${link.id}`} target="_blank" rel="noreferrer" className="btn-ghost !py-2">{link.label} 보기 ↗</a>
-                  ))}
-                  {(a.course === "intensive" ? [...liveLinks.start, ...liveLinks.solve] : liveLinks[a.course]).every((link) => !link.id) && (
-                    <p className="text-sm text-slate-600">수업이 시작되면 여기에 올라와요</p>
-                  )}
-                </div>
-                <p className="mt-2 text-xs text-slate-500">(종강일까지 시청 가능)</p>
+                <p className="font-jua text-lg text-sky-ink">📺 라이브 바로가기 {a.slot && <span className="text-sm text-slate-500">({TIME_SLOTS[a.slot]})</span>}</p>
+                {live.length === 0 ? <p className="mt-2 text-sm text-slate-600">수업이 시작되면 여기에 올라와요</p> : (
+                  <div className="mt-2 grid gap-2">
+                    {live.map((l) => (
+                      <a key={l.id} href={`https://youtu.be/${l.youtube_id}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5">
+                        <span className="flex-1">
+                          <b className="block text-sky-ink">{COURSES[l.course].label} {PARTS[l.part]}{l.slot ? ` · ${TIME_SLOTS[l.slot]}` : ""}</b>
+                          <span className="text-xs text-slate-500">{l.title} · {dayLabel(new Date(Date.parse(l.created_at) + 9 * 3600 * 1000).toISOString().slice(0, 10))} 업로드</span>
+                        </span>
+                        <span className="text-sky-deep">보기 ↗</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+                <p className="mt-2 text-xs text-slate-500">가장 최근에 올라온 수업 링크예요 (종강일까지 시청 가능)</p>
               </div>
             )}
             {(() => {
@@ -178,8 +176,8 @@ export default async function ClassRoom() {
                           href={`/class/${l.id}`}
                           className="flex items-center gap-3 rounded-2xl bg-sky-soft px-4 py-3 transition hover:bg-sky-main/40"
                         >
-                          <span className="font-jua flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sky-deep">
-                            {i + 1}
+                          <span className="font-jua flex h-8 min-w-8 shrink-0 items-center justify-center rounded-full bg-white px-2 text-sm text-sky-deep">
+                            {l.slot ? TIME_SLOTS[l.slot] : i + 1}
                           </span>
                           <span className="flex-1 text-slate-800">{l.title}</span>
                           <span className="text-sky-deep">▶</span>
