@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { cancelMyHomeworkDone, markHomeworkDone } from "@/app/actions";
 import { homeworkAssignmentDays, isHomeworkStickerEligible, weekDaysInMonth, type ScheduleClass } from "@/lib/schedule";
 import Cloud from "@/components/Cloud";
@@ -42,6 +42,12 @@ export default function StickerBoard({
   const homeworkByDay = useMemo(() => new Map(homework.map((item) => [item.day, item])), [homework]);
   const homeworkAssignments = useMemo(() => homeworkAssignmentDays(scheduleDays).filter((day) => day <= today), [scheduleDays, today]);
   const [selectedHomeworkDay, setSelectedHomeworkDay] = useState("");
+  const homeworkBox = useRef<HTMLDivElement>(null);
+  // 달력에서 수업 날짜를 누르면 아래 숙제 칸에서 그 날짜를 골라요.
+  function pickHomeworkDay(day: string) {
+    setSelectedHomeworkDay(day);
+    homeworkBox.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
   const homeworkTargetDay = homeworkAssignments.includes(selectedHomeworkDay)
     ? selectedHomeworkDay
     : homeworkAssignments.find((day) => !homeworkByDay.has(day)) ?? homeworkAssignments[homeworkAssignments.length - 1] ?? "";
@@ -236,14 +242,15 @@ export default function StickerBoard({
           </div>
         )}
 
-        <div className="mt-[14px] rounded-[22px] border-2 border-[#ffe58a] bg-gradient-to-br from-[#fff9e0] to-white p-4 shadow-[0_2px_0_#d5ecf9]">
+        <div ref={homeworkBox} className="mt-[14px] rounded-[22px] border-2 border-[#ffe58a] bg-gradient-to-br from-[#fff9e0] to-white p-4 shadow-[0_2px_0_#d5ecf9]">
           {homeworkAssignments.length > 0 ? (
             <label className="mb-3 block">
               <span className="mb-1 block text-sm font-bold text-[#7d6728]">수강일을 선택하여 숙제를 확인해주세요</span>
               <select value={homeworkTargetDay} onChange={(event) => setSelectedHomeworkDay(event.target.value)} className="w-full rounded-xl border border-[#ffe58a] bg-white px-3 py-2 text-sm text-[#5a3b00]">
                 {homeworkAssignments.map((day) => {
                   const stamp = homeworkByDay.get(day);
-                  const marked = stamp ? (isHomeworkStickerEligible(day, stamp.created_at) ? " · 제출 완료 ⭐" : " · 제출 기록 있음") : "";
+                  const first = day === homeworkAssignments[0];
+                  const marked = stamp ? (isHomeworkStickerEligible(day, stamp.created_at) ? (first ? " · ⭐" : " · 제출 완료 ⭐") : " · 제출 기록 있음") : "";
                   return <option key={day} value={day}>{Number(day.slice(5, 7))}/{Number(day.slice(8, 10))} 수업{marked}</option>;
                 })}
               </select>
@@ -253,7 +260,7 @@ export default function StickerBoard({
           )}
           <a href={cafeUrl || undefined} target="_blank" rel="noreferrer" aria-disabled={!cafeUrl} onClick={checkFirstHomework} className={`block w-full rounded-2xl bg-[#ffd23f] px-3 py-[13px] text-center font-jua text-lg text-[#5a3b00] shadow-[0_4px_0_#e0b400] ${cafeUrl ? "" : "pointer-events-none opacity-50"}`}>📝 숙제 확인</a>
           {firstLessonSelected && !selectedHomework && <p className="mt-2 text-center text-xs text-[#a7741a]">첫 수업은 [숙제 확인]만 눌러도 별 스티커를 받아요 ⭐</p>}
-          {selectedHomework ? (
+          {selectedHomework && firstLessonSelected ? null : selectedHomework ? (
             <div className="mt-2 rounded-2xl border-2 border-dashed border-[#e0b400] bg-white px-3 py-2.5 text-center text-[#a7741a]">
               <p className="font-jua text-[15px]">{selectedHomeworkHasSticker ? "숙제 제출 완료! ⭐" : "제출 기록 완료 · 제출일이 수업 다음 날 이후라 스티커는 없어요."}</p>
               <form action={cancelMyHomeworkDone} className="mt-1">
@@ -302,8 +309,17 @@ export default function StickerBoard({
               const rotation = ((Number(day.slice(-2)) * 7) % 25) - 12;
               const cloudNew = newStickers.includes(`${day}:attendance`);
               const starNew = newStickers.includes(`${day}:homework`);
+              const pickable = homeworkAssignments.includes(day);
+              const picked = pickable && day === homeworkTargetDay;
               return (
-                <div key={day} className={`relative min-h-[74px] min-w-0 rounded-[14px] px-px pb-1 pt-1 ${holiday ? "border-2 border-transparent bg-transparent" : !isLesson ? "border-2 border-transparent bg-transparent" : future || missed ? "border-2 border-dashed border-[#c4e2f4] bg-white" : isToday ? "border-2 border-[#2b8fc7] bg-[#eaf6fd]" : "border-2 border-[#e1f1fb] bg-[#f7fcff]"}`}>
+                <div
+                  key={day}
+                  role={pickable ? "button" : undefined}
+                  tabIndex={pickable ? 0 : undefined}
+                  aria-label={pickable ? `${Number(day.slice(5, 7))}월 ${Number(day.slice(-2))}일 숙제 확인` : undefined}
+                  onClick={pickable ? () => pickHomeworkDay(day) : undefined}
+                  onKeyDown={pickable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickHomeworkDay(day); } } : undefined}
+                  className={`relative min-h-[74px]${pickable ? " cursor-pointer" : ""}${picked ? " ring-2 ring-[#ffd23f] ring-offset-1" : ""} min-w-0 rounded-[14px] px-px pb-1 pt-1 ${holiday ? "border-2 border-transparent bg-transparent" : !isLesson ? "border-2 border-transparent bg-transparent" : future || missed ? "border-2 border-dashed border-[#c4e2f4] bg-white" : isToday ? "border-2 border-[#2b8fc7] bg-[#eaf6fd]" : "border-2 border-[#e1f1fb] bg-[#f7fcff]"}`}>
                   {isToday && <span className="absolute -right-1 -top-2 rounded-full bg-[#2b8fc7] px-1.5 py-0.5 font-jua text-[10px] text-white">오늘</span>}
                   <div className={`pl-1 text-left font-jua text-sm ${holiday ? "text-[#e5707e]" : isToday ? "text-[#2b8fc7]" : isLesson ? "text-[#5b88a6]" : "text-[#c6dceb]"}`}>{Number(day.slice(-2))}</div>
                   {holiday && <div className="mt-2 truncate font-jua text-[10px] text-[#e5707e]">{holiday}</div>}
@@ -322,6 +338,7 @@ export default function StickerBoard({
           <div className="mt-3 flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-[#5b88a6]">
             <span className="flex items-center gap-[3px]"><CloudSticker fill="#79c6ef" size={22} />출석</span>
             <span className="flex items-center gap-[3px]"><StarSticker size={18} />숙제</span>
+            <span className="w-full text-center text-[#a7741a]">수업 날짜를 누르면 그날 숙제를 확인할 수 있어요</span>
           </div>
         </div>
 
