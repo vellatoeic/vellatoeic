@@ -142,6 +142,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
     getSetting("blog_url"),
   ]);
   const round = await roundFor(now);
+  // 이번 모집 기수에서 아직 입금 확인이 안 된 학생 (수업 전에 확인해야 라이브·강의가 열려요)
+  const waiting = everything.filter((a) => a.cohort === now && a.status === "pending").sort((a, b) => a.created_at.localeCompare(b.created_at));
   const cohorts = [...new Set([now, ...everything.map((a) => a.cohort)])].sort().reverse();
   const all = c === "all" ? everything : everything.filter((a) => a.cohort === c);
 
@@ -183,6 +185,27 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   return (
     <div className="space-y-5 pt-8">
       <AdminTabs active="apps" />
+
+      {waiting.length > 0 && (
+        <CloseOnSubmitForm action={bulkConfirmPayment} className="block rounded-3xl border-2 border-amber-300 bg-amber-50 p-5">
+          <p className="font-jua text-2xl text-amber-700">⚠️ 수업 전 입금 대기 {waiting.length}명</p>
+          <p className="mt-1 text-sm text-slate-600">통장 입금 내역과 맞춰 보고 체크한 뒤 [납부 확인]을 눌러 주세요. 확인되면 학생 강의실에 라이브가 열려요.</p>
+          <label className="mt-3 flex items-center gap-2 text-sm font-bold text-sky-ink"><SelectAll group="pending-alert" /> {waiting.length}명 전체 선택</label>
+          <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+            {waiting.map((a) => (
+              <li key={a.id}>
+                <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm">
+                  <input type="checkbox" name="ids" value={a.id} data-group="pending-alert" className="h-4 w-4 accent-sky-deep" />
+                  <b className="text-sky-ink">{a.name}</b>
+                  {a.depositor !== a.name && <span className="text-slate-500">(입금자 {a.depositor})</span>}
+                  <span className="ml-auto text-slate-600">{won(a.amount)}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <button className="btn mt-3 w-full !py-3 !text-base">체크한 학생 납부 확인</button>
+        </CloseOnSubmitForm>
+      )}
 
       <details className="card !p-4">
         <summary className="font-jua cursor-pointer text-lg text-sky-ink">⚙️ 기본 설정 (모집 기수 · 계좌 · 카페·블로그 주소)</summary>

@@ -2,6 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BOOKS, CLASSROOM, COURSES, KINDS, TRACKS, cohortLabel, pickupLabel, slotLabel, won } from "@/lib/config";
 import { getApplication, getSetting } from "@/lib/db";
+import { classDaysLabel, classTimes } from "@/lib/live";
+import HowToWatch from "@/components/HowToWatch";
+import AddToHome from "@/components/AddToHome";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +93,9 @@ export default async function MyPage({ params, searchParams }: { params: Promise
           <p className="text-sm text-sky-deep">강의실에서 라이브와 강의 영상을 볼 수 있어요!</p>
         </div>
       )}
+
+      {a.kind === "online" && <HowToWatch days={classDaysLabel(a)} times={classTimes(a)} />}
+      <AddToHome />
 
       <section className="card">
         <h2 className="font-jua text-xl text-sky-ink">신청 내용</h2>

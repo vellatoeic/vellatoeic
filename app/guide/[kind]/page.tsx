@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { CLASSROOM, KINDS, type Kind } from "@/lib/config";
 import { currentCohort, roundFor } from "@/lib/db";
 import ApplyForm from "./ApplyForm";
+import HowToWatch from "@/components/HowToWatch";
 
 // 교재 회차가 기수마다 바뀌어서 매번 새로 읽어요
 export const dynamic = "force-dynamic";
@@ -54,6 +55,8 @@ export default async function KindGuide({ params }: { params: Promise<{ kind: st
           ))}
         </ul>
       </section>
+
+      {kind === "online" && <HowToWatch />}
 
       <ApplyForm kind={kind} round={round} />
     </div>

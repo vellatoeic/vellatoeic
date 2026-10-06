@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { BOOKS, COURSES, PARTS, TIME_SLOTS, TRACKS, TRACK_PARTS, cohortLabel, dayLabel, todayKST } from "@/lib/config";
+import { BOOKS, COURSES, PARTS, TIME_SLOTS, TRACKS, TRACK_PARTS, cohortLabel, dayLabel, todayKST, won } from "@/lib/config";
+import { liveState } from "@/lib/live";
+import AddToHome from "@/components/AddToHome";
 import { getApplications, listAudios, listLectures, listMissions, listStamps, currentCohort, getSetting } from "@/lib/db";
 import { missionCount, missionFor } from "@/lib/mission";
 import { audioBooksFor, dayDiff, studentAudioWindow } from "@/lib/audio";
@@ -23,7 +25,8 @@ export default async function ClassRoom() {
 
   // 스티커판: 같은 기수·같은 수업 학생들의 출석 날짜 = 수업일
   const cohort = await currentCohort();
-  const cafeUrl = await getSetting("cafe_homework_url");
+  const [cafeUrl, account] = await Promise.all([getSetting("cafe_homework_url"), getSetting("bank_account")]);
+  const pending = apps.filter((a) => a.status === "pending");
   const today = todayKST();
   const stamps = await listStamps(paid.map((a) => a.id));
   const missions = await listMissions(apps.map((a) => a.id));
@@ -52,6 +55,37 @@ export default async function ClassRoom() {
     }] as const;
   })));
 
+  // 맨 위 "🔴 라이브 입장": 이번 달 납부 완료 반의 수업 30분 전 ~ 종료까지 빨간색, 그 외엔 다음 라이브 안내
+  const liveApp = paid.find((a) => a.cohort === cohort);
+  const liveButton = (() => {
+    if (!liveApp) return null;
+    const schedule = schedulesByClass.get(`${liveApp.cohort}:${scheduleClassFor(liveApp.course, liveApp.track)}`);
+    const state = liveState(liveApp, schedule?.days ?? []);
+    if (!state.open) {
+      return (
+        <div className="rounded-3xl bg-slate-200 px-5 py-4 text-center text-slate-500">
+          <p className="font-jua text-2xl">🔴 라이브 입장</p>
+          <p className="mt-1 text-sm">{state.next ? `다음 라이브: ${state.next}` : "이번 달 라이브가 모두 끝났어요"}</p>
+        </div>
+      );
+    }
+    const slot = state.slot;
+    const link = lectures
+      .filter((l) => covers(liveApp, l) && (!l.slot || l.slot === slot))
+      .sort((x, y) => y.created_at.localeCompare(x.created_at))[0];
+    return link ? (
+      <a href={`https://youtu.be/${link.youtube_id}`} target="_blank" rel="noreferrer" className="block rounded-3xl bg-red-500 px-5 py-4 text-center text-white shadow-[0_5px_0_#b91c1c] active:translate-y-1 active:shadow-none">
+        <p className="font-jua text-2xl">🔴 라이브 입장</p>
+        <p className="mt-1 text-sm opacity-90">{state.label} · 눌러서 입장해요</p>
+      </a>
+    ) : (
+      <div className="rounded-3xl bg-red-100 px-5 py-4 text-center text-red-600">
+        <p className="font-jua text-2xl">🔴 라이브 곧 시작</p>
+        <p className="mt-1 text-sm">{state.label} · 라이브 링크가 올라오면 여기서 바로 입장해요. 잠시 후 새로고침해 주세요.</p>
+      </div>
+    );
+  })();
+
   return (
     <div className="space-y-6 pt-8">
       <div className="flex items-end justify-between">
@@ -63,6 +97,19 @@ export default async function ClassRoom() {
           <button className="text-sm text-slate-500 underline">로그아웃</button>
         </form>
       </div>
+
+
+      {pending.map((a) => (
+        <div key={a.id} className="rounded-3xl border-2 border-amber-300 bg-amber-50 p-5 text-center">
+          <p className="font-jua text-2xl text-amber-700">⏳ 입금 확인 중이에요</p>
+          <p className="mt-1 text-slate-700">확인되면 라이브 입장 버튼이 열려요.</p>
+          <p className="font-jua mt-3 text-3xl text-sky-ink">{won(a.amount)}</p>
+          <p className="mt-2 rounded-2xl bg-white p-3 font-bold text-sky-ink">{account || "계좌 안내 준비 중이에요"}</p>
+          <p className="mt-2 text-sm text-slate-600">입금자명: <b>{a.depositor}</b> · {COURSES[a.course].label} {TRACKS[a.track]}</p>
+        </div>
+      ))}
+
+      {liveButton}
 
       {latestMission < 4 && (
         <Link href="/mission" className="flex items-center gap-3 rounded-[20px] border-2 border-[#ffd23f] bg-white p-4 shadow-[0_3px_0_#cfe6f5]">
@@ -77,13 +124,7 @@ export default async function ClassRoom() {
 
       <p className="rounded-2xl bg-sky-soft px-4 py-3 text-sm text-sky-deep">강의 영상은 개강일 이후부터 열람할 수 있어요.</p>
 
-      {paid.length === 0 && (
-        <div className="card text-center">
-          <p className="font-jua text-xl text-sky-ink">납부 확인 후 강의실이 열려요</p>
-          <p className="mt-2 text-slate-600">입금이 확인되면 수강 신청한 반의 강의를 바로 볼 수 있어요.</p>
-          <Link href={`/my/${apps[0].id}`} className="btn-ghost mt-4">납부 상태 확인하기</Link>
-        </div>
-      )}
+      <AddToHome />
 
       {paid.map((a) => {
         const mine = lectures.filter((l) => covers(a, l));
