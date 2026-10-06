@@ -34,6 +34,17 @@ export type Lecture = {
   created_at: string;
 };
 
+export type LcAudio = {
+  id: string;
+  cohort: string;
+  course: "start" | "solve";
+  title: string;
+  storage_path: string;
+  size_bytes: number;
+  sort_order: number;
+  created_at: string;
+};
+
 export type Mission = {
   app_id: string;
   prev_score: string | null;
@@ -99,9 +110,10 @@ type Mem = {
   specialRegistrations: SpecialRegistration[];
   specialMaterials: SpecialMaterial[];
   missions: Mission[];
+  audios: LcAudio[];
 };
 const g = globalThis as unknown as { __vellaMem?: Mem };
-const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [] });
+const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [] });
 mem.specialLectures ??= [];
 mem.specialRegistrations ??= [];
 mem.specialMaterials ??= [];
@@ -110,6 +122,7 @@ mem.attendance ??= [];
 mem.homework ??= [];
 mem.photos ??= {};
 mem.missions ??= [];
+mem.audios ??= [];
 
 const isUuid = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
 
@@ -248,6 +261,91 @@ export async function deleteLecture(id: string) {
     return;
   }
   mem.lectures = mem.lectures.filter((l) => l.id !== id);
+}
+
+// ── LC 음원 (파일은 비공개 보관함에 브라우저에서 바로 올려요) ──────
+export const AUDIO_BUCKET = "lc-audio";
+const sortAudios = (list: LcAudio[]) => [...list].sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at));
+
+export async function listAudios(cohort?: string): Promise<LcAudio[]> {
+  if (sb) {
+    let query = sb.from("lc_audios").select("*").order("sort_order").order("created_at");
+    if (cohort) query = query.eq("cohort", cohort);
+    const { data, error } = await query;
+    if (error) throw error;
+    return data as LcAudio[];
+  }
+  return sortAudios(mem.audios.filter((a) => !cohort || a.cohort === cohort));
+}
+
+export async function getAudio(id: string): Promise<LcAudio | null> {
+  if (!isUuid(id)) return null;
+  if (sb) {
+    const { data, error } = await sb.from("lc_audios").select("*").eq("id", id).maybeSingle();
+    if (error) throw error;
+    return (data as LcAudio) ?? null;
+  }
+  return mem.audios.find((a) => a.id === id) ?? null;
+}
+
+export async function createAudio(audio: Pick<LcAudio, "cohort" | "course" | "title" | "storage_path" | "size_bytes" | "sort_order">) {
+  if (sb) {
+    const { error } = await sb.from("lc_audios").insert(audio);
+    if (error) throw error;
+    return;
+  }
+  mem.audios.push({ ...audio, id: crypto.randomUUID(), created_at: new Date().toISOString() });
+}
+
+export async function setAudioOrder(id: string, sort_order: number) {
+  if (!isUuid(id)) return;
+  if (sb) {
+    const { error } = await sb.from("lc_audios").update({ sort_order }).eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  const audio = mem.audios.find((a) => a.id === id);
+  if (audio) audio.sort_order = sort_order;
+}
+
+// 음원 기록과 보관함 파일을 함께 지워요.
+export async function deleteAudios(list: LcAudio[]) {
+  if (list.length === 0) return;
+  const ids = list.map((a) => a.id);
+  if (sb) {
+    const { error: removeError } = await sb.storage.from(AUDIO_BUCKET).remove(list.map((a) => a.storage_path));
+    if (removeError) throw removeError;
+    const { error } = await sb.from("lc_audios").delete().in("id", ids);
+    if (error) throw error;
+    return;
+  }
+  mem.audios = mem.audios.filter((a) => !ids.includes(a.id));
+}
+
+// 브라우저가 바로 올릴 수 있는 서명된 업로드 주소 (2시간 유효). 미리보기에서는 없어요.
+export async function audioUploadUrl(path: string): Promise<string | null> {
+  if (!sb) return null;
+  const { data, error } = await sb.storage.from(AUDIO_BUCKET).createSignedUploadUrl(path);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+// 업로드가 실제로 끝났는지 보관함에서 확인하고 파일 크기를 돌려줘요.
+export async function uploadedAudioSize(path: string): Promise<number | null> {
+  if (!sb) return 0;
+  const slash = path.lastIndexOf("/");
+  const { data, error } = await sb.storage.from(AUDIO_BUCKET).list(path.slice(0, slash), { search: path.slice(slash + 1), limit: 1 });
+  if (error) throw error;
+  const file = data?.find((f) => f.name === path.slice(slash + 1));
+  return file ? Number((file.metadata as { size?: number } | null)?.size ?? 0) : null;
+}
+
+// 짧게 만료되는 다운로드 주소 (링크 공유 방지)
+export async function audioDownloadUrl(path: string, fileName: string): Promise<string | null> {
+  if (!sb) return null;
+  const { data, error } = await sb.storage.from(AUDIO_BUCKET).createSignedUrl(path, 60, { download: fileName });
+  if (error) throw error;
+  return data?.signedUrl ?? null;
 }
 
 // ── 첫 수업 미션 ─────────────────────────────────

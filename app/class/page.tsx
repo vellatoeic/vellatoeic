@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { COURSES, PARTS, TRACKS, TRACK_PARTS, cohortLabel, todayKST } from "@/lib/config";
-import { getApplications, listLectures, listMissions, listStamps, currentCohort, getSetting } from "@/lib/db";
+import { getApplications, listAudios, listLectures, listMissions, listStamps, currentCohort, getSetting } from "@/lib/db";
 import { missionCount, missionFor } from "@/lib/mission";
+import { audioCoursesFor, dayDiff, studentAudioWindow, takesLcAudio } from "@/lib/audio";
 import { getStudentIds } from "@/lib/auth";
 import { canWatch, covers } from "@/lib/access";
 import { studentLogout } from "@/app/actions";
@@ -36,6 +37,15 @@ export default async function ClassRoom() {
   const today = todayKST();
   const stamps = await listStamps(paid.map((a) => a.id));
   const missions = await listMissions(apps.map((a) => a.id));
+  // LC 음원: 본인 반 첫 수업일부터 14일 동안만 보여요.
+  const audioBoxes = new Map(await Promise.all(paid.filter(takesLcAudio).map(async (a) => {
+    const period = await studentAudioWindow(a);
+    const courses = audioCoursesFor(a);
+    const list = period && today >= period.start && today <= period.end
+      ? (await listAudios(a.cohort)).filter((x) => courses.includes(x.course)).sort((x, y) => x.course.localeCompare(y.course) || x.sort_order - y.sort_order)
+      : [];
+    return [a.id, { period, list }] as const;
+  })));
   const latestMission = missionCount(missionFor([...apps].sort((a, b) => b.cohort.localeCompare(a.cohort))[0].id, missions));
   const boardKeys = [...new Map(paid.map((a) => {
     const klass = scheduleClassFor(a.course, a.track);
@@ -109,6 +119,34 @@ export default async function ClassRoom() {
                 <p className="mt-2 text-xs text-slate-500">(종강일까지 시청 가능)</p>
               </div>
             )}
+            {(() => {
+              const box = audioBoxes.get(a.id);
+              if (!box?.period || today > box.period.end) return null;
+              const [, m, d] = box.period.end.split("-").map(Number);
+              const left = dayDiff(today, box.period.end);
+              if (today < box.period.start) {
+                const [, sm, sd] = box.period.start.split("-").map(Number);
+                return <p className="mt-4 rounded-2xl bg-sky-soft p-4 text-sm text-slate-600">🎧 LC 음원은 첫 수업일({sm}/{sd})부터 14일 동안 받을 수 있어요.</p>;
+              }
+              return (
+                <div className="mt-4 rounded-2xl bg-sky-soft p-4">
+                  <p className="font-jua text-lg text-sky-ink">🎧 LC 음원</p>
+                  <p className="text-sm text-sky-deep">{m}/{d}까지 다운로드 가능 ({left === 0 ? "D-DAY" : `D-${left}`})</p>
+                  {box.list.length === 0 ? <p className="mt-2 text-sm text-slate-500">음원이 올라오면 여기에 보여요.</p> : (
+                    <ol className="mt-2 space-y-1.5">
+                      {box.list.map((x) => (
+                        <li key={x.id}>
+                          <a href={`/class/audio/${x.id}`} className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-[15px] text-slate-800">
+                            <span className="flex-1">{x.title}</span>
+                            <span className="text-sm text-sky-deep">다운로드 ↓</span>
+                          </a>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              );
+            })()}
             {(() => {
               const klass = scheduleClassFor(a.course, a.track);
               const schedule = schedulesByClass.get(`${a.cohort}:${klass}`)!;

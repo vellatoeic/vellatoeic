@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { logout } from "@/app/actions";
 
-export default function AdminTabs({ active }: { active: "apps" | "roster" | "stamps" | "lectures" | "schedule" | "special" | "delivery" }) {
+export default function AdminTabs({ active }: { active: "apps" | "roster" | "stamps" | "lectures" | "schedule" | "special" | "delivery" | "audio" }) {
   const tab = (on: boolean) =>
     `rounded-full px-4 py-2 font-bold ${on ? "bg-sky-deep text-white" : "bg-white text-sky-ink"}`;
   return (
@@ -14,6 +14,7 @@ export default function AdminTabs({ active }: { active: "apps" | "roster" | "sta
         <Link href="/admin/stamps" className={tab(active === "stamps")}>출석·숙제</Link>
         <Link href="/admin/schedule" className={tab(active === "schedule")}>수업일 설정</Link>
         <Link href="/admin/lectures" className={tab(active === "lectures")}>강의 관리</Link>
+        <Link href="/admin/audio" className={tab(active === "audio")}>LC 음원</Link>
         <Link href="/admin/special" className={tab(active === "special")}>특강 관리</Link>
       </div>
       <form action={logout}>
