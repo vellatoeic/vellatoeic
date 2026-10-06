@@ -5,6 +5,7 @@ import { AUDIO_BOOKS, audioExpiresOn } from "@/lib/audio";
 import { cleanupExpiredAudios, moveAudio, removeAudio } from "@/app/actions";
 import AdminTabs from "../AdminTabs";
 import LoginForm from "../LoginForm";
+import CloseOnSubmitForm from "../CloseOnSubmitForm";
 import AudioUploader from "./AudioUploader";
 
 export const dynamic = "force-dynamic";
@@ -71,10 +72,10 @@ export default async function AudioAdmin({ searchParams }: { searchParams: Promi
                 </form>
                 <details className="relative text-sm">
                   <summary className="cursor-pointer list-none text-red-400">삭제</summary>
-                  <form action={removeAudio} className="absolute right-0 z-10 mt-1">
+                  <CloseOnSubmitForm action={removeAudio} className="absolute right-0 z-10 mt-1">
                     <input type="hidden" name="id" value={a.id} />
                     <button className="whitespace-nowrap rounded-xl bg-red-50 px-3 py-1.5 font-bold text-red-600 shadow">정말 삭제</button>
-                  </form>
+                  </CloseOnSubmitForm>
                 </details>
               </li>
             ))}

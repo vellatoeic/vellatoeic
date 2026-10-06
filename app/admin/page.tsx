@@ -5,6 +5,7 @@ import { isAdmin } from "@/lib/auth";
 import { changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove } from "@/app/actions";
 import LoginForm from "./LoginForm";
 import AdminTabs from "./AdminTabs";
+import CloseOnSubmitForm from "./CloseOnSubmitForm";
 import SelectAll from "./SelectAll";
 
 export const dynamic = "force-dynamic";
@@ -64,7 +65,7 @@ function Row({ a, group, mission }: { a: Application; group: string; mission?: M
         <details className="shrink-0 text-right text-sm">
           <summary className="cursor-pointer list-none rounded-full bg-sky-soft px-3 py-1 font-bold text-sky-ink">관리</summary>
           <div className="mt-2 flex flex-col items-end gap-2">
-            <form action={changeStatus} className="flex flex-wrap justify-end gap-2">
+            <CloseOnSubmitForm action={changeStatus} className="flex flex-wrap justify-end gap-2">
               <input type="hidden" name="id" value={a.id} />
               {a.status === "pending" && <button name="status" value="paid" className="btn !px-4 !py-1.5 !text-sm">납부 확인</button>}
               {a.status === "paid" && a.kind === "online" && (
@@ -75,8 +76,8 @@ function Row({ a, group, mission }: { a: Application; group: string; mission?: M
                   {a.status === "shipped" ? "교재 상태 되돌리기" : "미납으로 되돌리기"}
                 </button>
               )}
-            </form>
-            <form action={changeSlot} className="flex items-center gap-2">
+            </CloseOnSubmitForm>
+            <CloseOnSubmitForm action={changeSlot} className="flex items-center gap-2">
               <input type="hidden" name="id" value={a.id} />
               <select name="slot" defaultValue={a.slot ?? ""} className="input !w-32 !py-1.5 text-sm">
                 <option value="">시간 미정</option>
@@ -84,10 +85,10 @@ function Row({ a, group, mission }: { a: Application; group: string; mission?: M
                 <option value="pm">저녁반</option>
               </select>
               <button className="btn-ghost !py-1.5 text-sm">시간 저장</button>
-            </form>
+            </CloseOnSubmitForm>
             <details className="text-sm">
               <summary className="cursor-pointer text-slate-500">반 변경</summary>
-              <form action={changeClass} className="mt-2 flex gap-2">
+              <CloseOnSubmitForm action={changeClass} className="mt-2 flex gap-2">
                 <input type="hidden" name="id" value={a.id} />
                 <select name="class" defaultValue={`${a.course}:${a.track}`} className="input !w-56 !py-2">
                   {a.track === "alt" && (
@@ -104,22 +105,22 @@ function Row({ a, group, mission }: { a: Application; group: string; mission?: M
                   )}
                 </select>
                 <button className="btn-ghost !py-2">저장</button>
-              </form>
+              </CloseOnSubmitForm>
             </details>
             <details className="text-sm">
               <summary className="cursor-pointer text-slate-500">비밀번호 변경</summary>
-              <form action={resetPin} className="mt-2 flex gap-2">
+              <CloseOnSubmitForm action={resetPin} className="mt-2 flex gap-2">
                 <input type="hidden" name="id" value={a.id} />
                 <input name="pin" placeholder="새 4자리" inputMode="numeric" maxLength={4} className="input !w-28 !py-2" />
                 <button className="btn-ghost !py-2">저장</button>
-              </form>
+              </CloseOnSubmitForm>
             </details>
             <details className="text-sm">
               <summary className="cursor-pointer text-red-400">삭제</summary>
-              <form action={removeApplication} className="mt-2">
+              <CloseOnSubmitForm action={removeApplication} className="mt-2">
                 <input type="hidden" name="id" value={a.id} />
                 <button className="rounded-xl bg-red-50 px-3 py-2 font-bold text-red-600">정말 삭제 (되돌릴 수 없어요)</button>
-              </form>
+              </CloseOnSubmitForm>
             </details>
           </div>
         </details>
@@ -186,7 +187,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
       <details className="card !p-4">
         <summary className="font-jua cursor-pointer text-lg text-sky-ink">⚙️ 기본 설정 (모집 기수 · 계좌 · 카페·블로그 주소)</summary>
         <div className="mt-4">
-          <form action={saveSettings} className="card grid gap-4 sm:grid-cols-[10rem_7rem_1fr_auto] sm:items-end">
+          <CloseOnSubmitForm action={saveSettings} className="card grid gap-4 sm:grid-cols-[10rem_7rem_1fr_auto] sm:items-end">
           <label>
             <span className="label">현재 모집 기수</span>
             <input type="month" name="current_cohort" defaultValue={now} className="input" />
@@ -218,7 +219,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
           <p className="text-xs text-slate-500 sm:col-span-3">
             새로 들어오는 신청은 &apos;현재 모집 기수&apos;로 저장돼요.<br />다음 달 모집을 시작할 때 바꿔 주세요.
           </p>
-        </form>
+        </CloseOnSubmitForm>
         </div>
       </details>
 
@@ -273,7 +274,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
       {list.length === 0 && <p className="card text-center text-slate-500">해당하는 신청이 없어요.</p>}
 
       {list.length > 0 && (
-        <form id="bulk" action={bulkConfirmPayment} className="card sticky top-2 z-10 flex flex-wrap items-center gap-2 !p-3 text-sm shadow-md">
+        <CloseOnSubmitForm id="bulk" action={bulkConfirmPayment} className="card sticky top-2 z-10 flex flex-wrap items-center gap-2 !p-3 text-sm shadow-md">
           <label className="flex items-center gap-2 font-bold text-sky-ink">
             <SelectAll group="*" /> 보이는 {list.length}명 전체 선택
           </label>
@@ -311,7 +312,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
             </button>
           </details>
           <p className="w-full text-xs text-slate-500">납부 확인은 미납 학생만, 교재 완료는 납부 완료된 불라방 학생만 바뀌어요.</p>
-        </form>
+        </CloseOnSubmitForm>
       )}
 
       {groups.map((g) => {

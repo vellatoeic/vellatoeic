@@ -73,6 +73,7 @@
 - DB 변경이 있으면 SQL 파일은 작업당 하나만 만들고, 재실행해도 안전하도록 가능한 DDL에 if not exists를 사용해요. 답변 맨 위에 크게 "⚠️ SQL 실행 필요"라고 표시하고, Vella가 "실행했어"라고 확인하기 전에는 push하지 않아요.
 - SQL에 DROP, DELETE, TRUNCATE, UPDATE가 있으면 실행 전에 별도로 "🔴 위험: 검토 필요"라고 표시하고, 어떤 기존 데이터/구조에 영향을 주는지 쉬운 말로 설명해요.
 - 새 작업을 시작하기 전에 supabase/APPLIED.md와 supabase/*.sql을 대조해 실행 완료 SQL이 기록에서 빠졌는지 확인해요. SQL 실행을 확인받으면 파일 이름과 실행 내용을 supabase/APPLIED.md에 기록해요.
+- 관리 화면에서 접는 상자(details) 안의 저장·수정·삭제 칸은 app/admin/CloseOnSubmitForm으로 만들어, 누르면 상자가 바로 접히게 해요(따로 접는 수고가 없게).
 - 운영 규칙이 바뀌면 이 파일도 같이 고칠 것.
 
 <!-- BEGIN:nextjs-agent-rules -->

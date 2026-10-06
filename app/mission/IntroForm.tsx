@@ -1,7 +1,7 @@
 "use client";
 
 import { keep } from "@/lib/keep";
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { saveMissionIntro, type FormState } from "@/app/actions";
 
 type Intro = { prev_score: string; target_score: string; exam_month: string; affiliation: string; instagram: string; message: string };
@@ -10,8 +10,13 @@ const field = "mt-1 block w-full rounded-xl border-2 border-[#d9edf9] bg-[#f9fdf
 
 export default function IntroForm({ intro }: { intro: Intro }) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveMissionIntro, {});
+  const ref = useRef<HTMLFormElement>(null);
+  // '소개 수정하기'로 펼친 경우, 저장되면 바로 접어요.
+  useEffect(() => {
+    if (state.ok) ref.current?.closest("details")?.removeAttribute("open");
+  }, [state]);
   return (
-    <form onSubmit={keep(action)} className="mt-3">
+    <form ref={ref} onSubmit={keep(action)} className="mt-3">
       <div className="grid grid-cols-2 gap-2">
         <label className="text-xs text-[#5b88a6]">이전 토익 점수<input name="prev_score" defaultValue={intro.prev_score} placeholder="예: 처음이에요 / 550" className={field} /></label>
         <label className="text-xs text-[#5b88a6]">목표 점수<input name="target_score" defaultValue={intro.target_score} placeholder="예: 750" className={field} /></label>

@@ -4,6 +4,7 @@ import { addSpecialLecture, removeSpecialLecture, removeSpecialMaterial, removeS
 import { specialWhen } from "@/lib/special";
 import AdminTabs from "../AdminTabs";
 import LoginForm from "../LoginForm";
+import CloseOnSubmitForm from "../CloseOnSubmitForm";
 import MaterialUpload from "./MaterialUpload";
 
 export const dynamic = "force-dynamic";
@@ -36,10 +37,10 @@ function Roster({ title, items }: { title: string; items: SpecialRegistration[] 
               <b className="text-sky-ink">{r.name}</b>
               <details className="text-sm">
                 <summary className="cursor-pointer text-red-400">삭제</summary>
-                <form action={removeSpecialRegistration} className="mt-1">
+                <CloseOnSubmitForm action={removeSpecialRegistration} className="mt-1">
                   <input type="hidden" name="id" value={r.id} />
                   <button className="rounded-xl bg-red-50 px-3 py-1 font-bold text-red-600">{r.name} 신청 삭제</button>
-                </form>
+                </CloseOnSubmitForm>
               </details>
             </li>
           ))}
@@ -64,10 +65,10 @@ export default async function SpecialAdminPage() {
 
       <details className="card">
         <summary className="font-jua cursor-pointer text-lg text-sky-ink">+ 특강 추가하기</summary>
-        <form action={addSpecialLecture} className="mt-3 grid gap-3">
+        <CloseOnSubmitForm action={addSpecialLecture} className="mt-3 grid gap-3">
           <LectureFields />
           <button className="btn justify-self-start !py-2 !text-sm">특강 추가</button>
-        </form>
+        </CloseOnSubmitForm>
       </details>
 
       {rows.length === 0 && <p className="card text-center text-slate-500">등록된 특강이 없어요.</p>}
@@ -85,18 +86,18 @@ export default async function SpecialAdminPage() {
 
             <details className="rounded-2xl bg-sky-soft p-4">
               <summary className="cursor-pointer font-bold text-sky-ink">날짜·시간·제목·유튜브 링크 수정</summary>
-              <form action={saveSpecialLecture} className="mt-3 grid gap-3">
+              <CloseOnSubmitForm action={saveSpecialLecture} className="mt-3 grid gap-3">
                 <input type="hidden" name="id" value={event.id} />
                 <LectureFields event={event} />
                 <label><span className="label">불라방 유튜브 링크</span><input type="url" name="youtube_url" defaultValue={event.youtube_id ? `https://youtu.be/${event.youtube_id}` : ""} placeholder="https://youtu.be/..." className="input" /></label>
                 <button className="btn-ghost justify-self-start !py-2">저장</button>
-              </form>
+              </CloseOnSubmitForm>
               <details className="mt-4 text-sm">
                 <summary className="cursor-pointer text-red-400">특강 삭제</summary>
-                <form action={removeSpecialLecture} className="mt-2">
+                <CloseOnSubmitForm action={removeSpecialLecture} className="mt-2">
                   <input type="hidden" name="id" value={event.id} />
                   <button className="rounded-xl bg-red-50 px-3 py-2 font-bold text-red-600">이 특강과 신청 명단·자료 모두 삭제 (되돌릴 수 없어요)</button>
-                </form>
+                </CloseOnSubmitForm>
               </details>
             </details>
 
