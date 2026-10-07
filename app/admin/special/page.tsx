@@ -74,7 +74,10 @@ function Roster({ title, items, onsiteForm }: { title: string; items: SpecialReg
 export default async function SpecialAdminPage() {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
   await expireSpecialDeposits(DEPOSIT_MINUTES);
-  const [events, depositEvents, waitingDeposits] = await Promise.all([listSpecialLectures(), listDepositEvents(), listWaitingDeposits()]);
+  const [events, depositEvents, waitingDeposits, allRegistrations] = await Promise.all([listSpecialLectures(), listDepositEvents(20), listWaitingDeposits(), listSpecialRegistrations()]);
+  const registrationName = new Map(allRegistrations.map((r) => [r.id, r.name]));
+  const eventTitle = new Map(events.map((e) => [e.id, e.title]));
+  const registrationEvent = new Map(allRegistrations.map((r) => [r.id, eventTitle.get(r.special_lecture_id) ?? ""]));
   const toCheck = depositEvents.filter((e) => e.result === "review" || e.result === "unmatched");
   const webhookOn = (process.env.DEPOSIT_WEBHOOK_TOKEN ?? "").length >= 16;
   const rows = await Promise.all(events.map(async (event) => ({
@@ -117,18 +120,54 @@ export default async function SpecialAdminPage() {
           <p>아이폰 단축어가 은행 입금 문자를 보내면, 입금자명과 {won(SPECIAL_DEPOSIT)}이 맞는 &apos;입금 대기&apos; 현장 신청을 자동으로 확정해요. 문자 원문은 저장하지 않아요.</p>
           <p className="font-bold text-sky-ink">은행 문자가 잘 읽히는지 확인하기</p>
           <SmsTest />
-          {depositEvents.length > 0 && (
-            <>
-              <p className="font-bold text-sky-ink">최근 입금 문자 기록</p>
-              <ul className="space-y-1">
-                {depositEvents.slice(0, 10).map((e) => (
-                  <li key={e.id}>{kst(e.received_at)} · {e.name || "?"} · {e.amount ? won(e.amount) : "?"} · {{ matched: "자동 확정", review: "확인 필요", unmatched: "확인 필요", resolved: "직접 확정", dismissed: "무시" }[e.result]}</li>
-                ))}
-              </ul>
-            </>
-          )}
         </div>
       </details>
+
+      <section className="card space-y-3">
+        <div className="flex items-baseline justify-between">
+          <h2 className="font-jua text-xl text-sky-ink">📨 입금 문자 수신 기록</h2>
+          <span className="text-xs text-slate-400">최근 20건 · 새로고침하면 바로 보여요</span>
+        </div>
+        {depositEvents.length === 0 ? (
+          <p className="text-sm text-slate-500">아직 받은 입금 문자가 없어요. 단축어로 테스트하면 여기에 바로 나타나요.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-sky-main text-slate-500">
+                  <th className="py-2 pr-2">받은 시각</th>
+                  <th className="py-2 pr-2">입금자명</th>
+                  <th className="py-2 pr-2">금액</th>
+                  <th className="py-2">매칭 결과</th>
+                </tr>
+              </thead>
+              <tbody>
+                {depositEvents.map((e) => {
+                  const result = {
+                    matched: { label: "자동 확정", tone: "bg-emerald-100 text-emerald-700" },
+                    resolved: { label: "직접 확정", tone: "bg-emerald-100 text-emerald-700" },
+                    review: { label: "확인 필요 · 같은 이름 여러 건", tone: "bg-red-100 text-red-600" },
+                    unmatched: { label: !e.name ? "확인 필요 · 문자를 못 읽음" : e.amount !== SPECIAL_DEPOSIT ? "확인 필요 · 금액이 1만 원이 아님" : "확인 필요 · 맞는 신청 없음", tone: "bg-red-100 text-red-600" },
+                    dismissed: { label: "무시", tone: "bg-slate-100 text-slate-500" },
+                  }[e.result];
+                  const linked = e.registration_id ? registrationName.get(e.registration_id) : null;
+                  return (
+                    <tr key={e.id} className="border-b border-sky-soft align-top">
+                      <td className="whitespace-nowrap py-2 pr-2 text-slate-500">{kst(e.received_at)}</td>
+                      <td className="py-2 pr-2 font-bold text-sky-ink">{e.name || "?"}</td>
+                      <td className="whitespace-nowrap py-2 pr-2">{e.amount ? won(e.amount) : "?"}</td>
+                      <td className="py-2">
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold ${result.tone}`}>{result.label}</span>
+                        {linked && <span className="ml-1 text-xs text-slate-500">→ {linked}{registrationEvent.get(e.registration_id!) ? ` (${registrationEvent.get(e.registration_id!)})` : ""}</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <details className="card">
         <summary className="font-jua cursor-pointer text-lg text-sky-ink">+ 특강 추가하기</summary>
