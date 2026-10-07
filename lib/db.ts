@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { thisMonthKST, roundOf, type BookId, type CourseId, type Kind, type Part, type Pickup, type Status, type TimeSlot, type Track } from "./config";
+import { thisMonthKST, roundOf, type BookId, type CourseId, type Kind, type Part, type Pickup, type Status, type TimeSlot, type Track, type DepositStatus } from "./config";
 
 export type Application = {
   id: string;
@@ -97,6 +97,7 @@ export type SpecialRegistration = {
   application_id: string | null;
   mode: "onsite" | "online";
   name: string;
+  deposit: DepositStatus | null; // 현장 신청 보증금 (불라방은 없음)
   created_at: string;
 };
 
@@ -577,7 +578,18 @@ export async function getSpecialRegistrationsFor(application_ids: string[]): Pro
   return mem.specialRegistrations.filter((registration) => registration.application_id && ok.includes(registration.application_id));
 }
 
-export async function createSpecialRegistration(registration: Pick<SpecialRegistration, "special_lecture_id" | "application_id" | "mode" | "name">): Promise<string> {
+export async function updateSpecialDeposits(ids: string[], deposit: DepositStatus) {
+  const ok = ids.filter(isUuid);
+  if (ok.length === 0) return;
+  if (sb) {
+    const { error } = await sb.from("special_lecture_registrations").update({ deposit }).in("id", ok).eq("mode", "onsite");
+    if (error) throw error;
+    return;
+  }
+  for (const r of mem.specialRegistrations) if (ok.includes(r.id) && r.mode === "onsite") r.deposit = deposit;
+}
+
+export async function createSpecialRegistration(registration: Pick<SpecialRegistration, "special_lecture_id" | "application_id" | "mode" | "name" | "deposit">): Promise<string> {
   if (sb) {
     const { data, error } = await sb.from("special_lecture_registrations").insert(registration).select("id").single();
     if (error) throw error;

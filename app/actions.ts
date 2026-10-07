@@ -8,7 +8,7 @@ import {
 } from "@/lib/config";
 import {
   createApplication, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  saveMission, type Mission, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
+  saveMission, type Mission, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateSpecialDeposits, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
 } from "@/lib/db";
 import { canWatch, isActive, loginApps } from "@/lib/access";
 import { activeStudentApps } from "@/lib/student";
@@ -489,12 +489,12 @@ export async function registerSpecialLecture(_: FormState, fd: FormData): Promis
   // 특강 신청 후에는 강의실 로그인 상태가 돼서 이 페이지에서 바로 신청 내용을 볼 수 있어요.
   await setStudent(mine.map((a) => a.id));
   const already = (await getSpecialRegistrationsFor(paid.map((a) => a.id))).some((r) => r.special_lecture_id === eventId);
-  if (!already) await createSpecialRegistration({ special_lecture_id: eventId, application_id: paid[0].id, mode, name: paid[0].name });
+  if (!already) await createSpecialRegistration({ special_lecture_id: eventId, application_id: paid[0].id, mode, name: paid[0].name, deposit: mode === "onsite" ? "pending" : null });
   revalidatePath("/special");
   if (already) return { ok: "이미 신청한 특강이에요. 아래에서 신청 내용을 확인해 주세요." };
   return {
     ok: mode === "onsite"
-      ? "신청이 완료됐어요. 특강 당일 10시까지 필기구를 챙겨 703호로 와주세요."
+      ? "신청이 완료됐어요. 아래 '내 특강 신청'에서 보증금 1만원 입금 계좌를 확인해 주세요. 특강 당일 10시까지 필기구를 챙겨 703호로 와주세요."
       : "신청이 완료됐어요. 자료는 특강 하루 전, 참여 링크는 특강 시작 전에 이 페이지에 올라와요.",
   };
 }
@@ -552,6 +552,16 @@ export async function saveSpecialLecture(fd: FormData) {
 export async function removeSpecialLecture(fd: FormData) {
   if (!(await isAdmin())) return;
   await deleteSpecialLecture(clean(fd.get("id")));
+  revalidatePath("/admin/special");
+  revalidatePath("/special");
+}
+
+// 현장 신청 보증금 상태를 체크한 학생들에게 한 번에 바꿔요. (입금 확인 → 참여 후 환급 완료 / 불참)
+export async function bulkSpecialDeposit(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const to = clean(fd.get("deposit"));
+  if (!["pending", "paid", "refunded", "forfeited"].includes(to)) return;
+  await updateSpecialDeposits(fd.getAll("ids").map(clean).filter(Boolean), to as "pending" | "paid" | "refunded" | "forfeited");
   revalidatePath("/admin/special");
   revalidatePath("/special");
 }

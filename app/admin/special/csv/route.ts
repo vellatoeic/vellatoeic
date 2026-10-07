@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isAdmin } from "@/lib/auth";
 import { getSpecialLecture, listSpecialRegistrations } from "@/lib/db";
 import { csvResponse } from "@/lib/csv";
+import { DEPOSIT_LABEL } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +14,11 @@ export async function GET(req: NextRequest) {
   const registrations = (await listSpecialRegistrations(event.id))
     .sort((a, b) => Number(a.mode === "online") - Number(b.mode === "online") || a.name.localeCompare(b.name, "ko"));
   return csvResponse(`특강명단_${event.event_date}.csv`, [
-    ["참여 방법", "이름", "신청 시각"],
+    ["참여 방법", "이름", "보증금", "신청 시각"],
     ...registrations.map((r) => [
       r.mode === "onsite" ? "현장" : "불라방",
       r.name,
+      r.mode === "onsite" ? DEPOSIT_LABEL[r.deposit ?? "pending"] : "",
       new Date(r.created_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }),
     ]),
   ]);

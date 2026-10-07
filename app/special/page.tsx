@@ -1,6 +1,6 @@
 import { activeStudentApps } from "@/lib/student";
-import { getSpecialRegistrationsFor, listSpecialLectures, listSpecialMaterials } from "@/lib/db";
-import { CLASSROOM } from "@/lib/config";
+import { getSetting, getSpecialRegistrationsFor, listSpecialLectures, listSpecialMaterials } from "@/lib/db";
+import { CLASSROOM, SPECIAL_DEPOSIT, won } from "@/lib/config";
 import { specialLogout } from "@/app/actions";
 import { specialRegistrationOpen, specialWhen } from "@/lib/special";
 import SpecialForm from "./SpecialForm";
@@ -11,6 +11,7 @@ export const metadata = { title: "특강 신청 · vella_toeic", robots: { index
 
 export default async function SpecialPage() {
   const [events, mine] = await Promise.all([listSpecialLectures(), activeStudentApps().then(({ apps }) => getSpecialRegistrationsFor(apps.map((a) => a.id)))]);
+  const account = await getSetting("bank_account");
   const open = events.filter((event) => specialRegistrationOpen(event.event_date, event.starts_at));
   const eventById = new Map(events.map((event) => [event.id, event]));
   const myRows = await Promise.all(
@@ -47,7 +48,24 @@ export default async function SpecialPage() {
                 <p className="text-sm text-slate-500">{registration.name}</p>
               </div>
               {registration.mode === "onsite" ? (
-                <p className="rounded-2xl bg-sky-soft p-4 text-sm text-slate-700">특강 당일 10시까지 필기구를 챙겨 {CLASSROOM}로 와주세요.</p>
+                <div className="space-y-3">
+                  {registration.deposit === "paid" ? (
+                    <p className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-800"><b>보증금 확인 완료 ✓</b><br />특강에 함께하면 {won(SPECIAL_DEPOSIT)}을 전액 돌려드려요. 그날 만나요!</p>
+                  ) : registration.deposit === "refunded" ? (
+                    <p className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-800"><b>보증금 {won(SPECIAL_DEPOSIT)}을 돌려드렸어요.</b><br />약속 지켜 줘서 고마워요 :)</p>
+                  ) : registration.deposit === "forfeited" ? (
+                    <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">이번 특강에는 함께하지 못해서 보증금은 환급되지 않았어요.<br />다음 특강에서 꼭 만나요!</p>
+                  ) : (
+                    <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-4 text-sm text-slate-700">
+                      <p className="font-jua text-lg text-amber-700">🤝 보증금 {won(SPECIAL_DEPOSIT)} 안내</p>
+                      <p className="mt-1">보증금은 &apos;이 특강, 꼭 함께하자&apos;는 우리 사이의 작은 약속이에요.<br />특강에 참여하면 <b>100% 전액 돌려드려요.</b></p>
+                      <p className="mt-3 rounded-xl bg-white p-3 text-center font-bold text-sky-ink">{account || "계좌 안내 준비 중이에요"}</p>
+                      <p className="mt-2 text-center">입금자명: <b>{registration.name}</b> · {won(SPECIAL_DEPOSIT)}</p>
+                      <p className="mt-1 text-center text-xs text-slate-500">입금이 확인되면 &apos;보증금 확인 완료&apos;로 바뀌어요. 입금 확인은 일괄 처리됩니다.</p>
+                    </div>
+                  )}
+                  <p className="rounded-2xl bg-sky-soft p-4 text-sm text-slate-700">특강 당일 10시까지 필기구를 챙겨 {CLASSROOM}로 와주세요.</p>
+                </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {(materials.length === 0 || !event.youtube_id) && (
