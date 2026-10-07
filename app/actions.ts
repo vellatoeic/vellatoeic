@@ -3,14 +3,15 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
-  COURSES, PARTS, LECTURE_COURSES, booksFor, isAlt, isTimeSlot, calcAmount, youtubeId, todayKST,
+  COURSES, PARTS, LECTURE_COURSES, DEPOSIT_HOURS, booksFor, isAlt, isTimeSlot, calcAmount, youtubeId, todayKST,
   type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
 } from "@/lib/config";
 import {
   createApplication, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  saveMission, type Mission, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateSpecialDeposits, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
+  saveMission, type Mission, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
 } from "@/lib/db";
 import { canWatch, isActive, loginApps } from "@/lib/access";
+import { parseBankSms } from "@/lib/bankSms";
 import { activeStudentApps } from "@/lib/student";
 import { SCHEDULE_CLASSES, holidayKey, homeworkAssignmentDays, parseHolidays, parseSchoolDays, previousMonth, scheduleKey, scheduleClassFor, schoolDaysFor, shiftSchoolDays, type ScheduleClass } from "@/lib/schedule";
 import { specialRegistrationOpen } from "@/lib/special";
@@ -488,13 +489,17 @@ export async function registerSpecialLecture(_: FormState, fd: FormData): Promis
 
   // 특강 신청 후에는 강의실 로그인 상태가 돼서 이 페이지에서 바로 신청 내용을 볼 수 있어요.
   await setStudent(mine.map((a) => a.id));
-  const already = (await getSpecialRegistrationsFor(paid.map((a) => a.id))).some((r) => r.special_lecture_id === eventId);
+  await expireSpecialDeposits(DEPOSIT_HOURS);
+  const existing = (await getSpecialRegistrationsFor(paid.map((a) => a.id))).filter((r) => r.special_lecture_id === eventId);
+  // 입금 기한이 지나 취소된 신청은 지우고 새로 받아요.
+  for (const r of existing.filter((x) => x.deposit === "cancelled")) await deleteSpecialRegistration(r.id);
+  const already = existing.some((r) => r.deposit !== "cancelled");
   if (!already) await createSpecialRegistration({ special_lecture_id: eventId, application_id: paid[0].id, mode, name: paid[0].name, deposit: mode === "onsite" ? "pending" : null });
   revalidatePath("/special");
   if (already) return { ok: "이미 신청한 특강이에요. 아래에서 신청 내용을 확인해 주세요." };
   return {
     ok: mode === "onsite"
-      ? "신청이 완료됐어요. 아래 '내 특강 신청'에서 보증금 1만원 입금 계좌를 확인해 주세요. 특강 당일 10시까지 필기구를 챙겨 703호로 와주세요."
+      ? "신청이 완료됐어요. 보증금 1만 원을 본인 이름으로 입금해 주세요. 특강에 참여하면 현장에서 100% 돌려드려요. 계좌는 아래 '내 특강 신청'에 있어요."
       : "신청이 완료됐어요. 자료는 특강 하루 전, 참여 링크는 특강 시작 전에 이 페이지에 올라와요.",
   };
 }
@@ -556,14 +561,45 @@ export async function removeSpecialLecture(fd: FormData) {
   revalidatePath("/special");
 }
 
-// 현장 신청 보증금: 체크한 학생들의 입금 확인을 한 번에 해요.
-export async function bulkSpecialDeposit(fd: FormData) {
+// 현장 신청 명단 일괄 처리: 보증금 확정/대기, 당일 참석, 보증금 환급
+export async function bulkSpecialOnsite(fd: FormData) {
   if (!(await isAdmin())) return;
-  const to = clean(fd.get("deposit"));
-  if (to !== "pending" && to !== "paid") return; // 보증금은 받는 것까지만 관리해요 (환급은 현장에서)
-  await updateSpecialDeposits(fd.getAll("ids").map(clean).filter(Boolean), to);
+  const ids = fd.getAll("ids").map(clean).filter(Boolean);
+  const op = clean(fd.get("op"));
+  const patch =
+    op === "confirm" ? { deposit: "paid" as const, deposit_paid_at: new Date().toISOString() }
+    : op === "pending" ? { deposit: "pending" as const, deposit_paid_at: null }
+    : op === "attended" ? { attended: true }
+    : op === "absent" ? { attended: false }
+    : op === "refunded" ? { deposit_refunded: true }
+    : op === "unrefunded" ? { deposit_refunded: false }
+    : null;
+  if (!patch) return;
+  await updateOnsiteRegistrations(ids, patch);
   revalidatePath("/admin/special");
   revalidatePath("/special");
+}
+
+// '확인 필요' 입금 문자를 특정 현장 신청에 연결해 확정하거나, 무시해요.
+export async function resolveDepositEvent(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const eventId = clean(fd.get("event_id"));
+  const registrationId = clean(fd.get("registration_id"));
+  if (registrationId) {
+    await updateOnsiteRegistrations([registrationId], { deposit: "paid", deposit_paid_at: new Date().toISOString() });
+    await updateDepositEvent(eventId, { result: "resolved", registration_id: registrationId });
+  } else {
+    await updateDepositEvent(eventId, { result: "dismissed" });
+  }
+  revalidatePath("/admin/special");
+  revalidatePath("/special");
+}
+
+// 관리자용: 은행 문자 예시를 붙여 넣어 이름·금액이 제대로 읽히는지 확인 (저장하지 않아요)
+export async function testBankSms(_: FormState, fd: FormData): Promise<FormState> {
+  if (!(await isAdmin())) return { error: "관리자 로그인이 필요해요." };
+  const parsed = parseBankSms(String(fd.get("sms") ?? "").slice(0, 2000));
+  return parsed ? { ok: `입금자명: ${parsed.name} · 금액: ${parsed.amount.toLocaleString("ko-KR")}원` } : { error: "이 문자에서는 입금자명·금액을 읽지 못했어요. 문자 예시를 Claude에게 보내 주세요." };
 }
 
 export async function removeSpecialRegistration(fd: FormData) {

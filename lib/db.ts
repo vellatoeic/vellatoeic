@@ -98,6 +98,9 @@ export type SpecialRegistration = {
   mode: "onsite" | "online";
   name: string;
   deposit: DepositStatus | null; // 현장 신청 보증금 (불라방은 없음)
+  deposit_paid_at: string | null;
+  attended: boolean; // 특강 당일 참석
+  deposit_refunded: boolean; // 보증금 현장 환급
   created_at: string;
 };
 
@@ -135,9 +138,10 @@ type Mem = {
   audios: LcAudio[];
   faq: FaqItem[];
   questions: StudentQuestion[];
+  depositEvents: DepositEvent[];
 };
 const g = globalThis as unknown as { __vellaMem?: Mem };
-const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [] });
+const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [] });
 mem.specialLectures ??= [];
 mem.specialRegistrations ??= [];
 mem.specialMaterials ??= [];
@@ -149,6 +153,7 @@ mem.missions ??= [];
 mem.audios ??= [];
 mem.faq ??= [];
 mem.questions ??= [];
+mem.depositEvents ??= [];
 
 const isUuid = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
 
@@ -578,15 +583,80 @@ export async function getSpecialRegistrationsFor(application_ids: string[]): Pro
   return mem.specialRegistrations.filter((registration) => registration.application_id && ok.includes(registration.application_id));
 }
 
-export async function updateSpecialDeposits(ids: string[], deposit: DepositStatus) {
+type SpecialRegistrationPatch = Partial<Pick<SpecialRegistration, "deposit" | "deposit_paid_at" | "attended" | "deposit_refunded">>;
+
+// 현장 신청 여러 건의 보증금·참석·환급 상태를 한 번에 바꿔요.
+export async function updateOnsiteRegistrations(ids: string[], patch: SpecialRegistrationPatch) {
   const ok = ids.filter(isUuid);
   if (ok.length === 0) return;
   if (sb) {
-    const { error } = await sb.from("special_lecture_registrations").update({ deposit }).in("id", ok).eq("mode", "onsite");
+    const { error } = await sb.from("special_lecture_registrations").update(patch).in("id", ok).eq("mode", "onsite");
     if (error) throw error;
     return;
   }
-  for (const r of mem.specialRegistrations) if (ok.includes(r.id) && r.mode === "onsite") r.deposit = deposit;
+  for (const r of mem.specialRegistrations) if (ok.includes(r.id) && r.mode === "onsite") Object.assign(r, patch);
+}
+
+// 신청 후 24시간 안에 입금이 없으면 자동 취소해요. (페이지를 열거나 입금 문자가 올 때마다 확인)
+export async function expireSpecialDeposits(hours: number) {
+  const cutoff = new Date(Date.now() - hours * 3600 * 1000).toISOString();
+  if (sb) {
+    const { error } = await sb.from("special_lecture_registrations").update({ deposit: "cancelled" })
+      .eq("mode", "onsite").eq("deposit", "pending").lt("created_at", cutoff);
+    if (error) throw error;
+    return;
+  }
+  for (const r of mem.specialRegistrations) if (r.mode === "onsite" && r.deposit === "pending" && r.created_at < cutoff) r.deposit = "cancelled";
+}
+
+// 입금을 기다리는 현장 신청 (입금 대기·확인 필요)
+export async function listWaitingDeposits(): Promise<SpecialRegistration[]> {
+  if (sb) {
+    const { data, error } = await sb.from("special_lecture_registrations").select("*").eq("mode", "onsite").in("deposit", ["pending", "review"]);
+    if (error) throw error;
+    return data as SpecialRegistration[];
+  }
+  return mem.specialRegistrations.filter((r) => r.mode === "onsite" && (r.deposit === "pending" || r.deposit === "review"));
+}
+
+// ── 입금 문자 기록 (원문 없이 이름·금액·시각·결과만) ──
+export type DepositEvent = {
+  id: string;
+  target: "special" | "book";
+  name: string;
+  amount: number;
+  received_at: string;
+  result: "matched" | "review" | "unmatched" | "resolved" | "dismissed";
+  registration_id: string | null;
+};
+
+export async function createDepositEvent(e: Pick<DepositEvent, "target" | "name" | "amount" | "result" | "registration_id">) {
+  if (sb) {
+    const { error } = await sb.from("deposit_events").insert(e);
+    if (error) throw error;
+    return;
+  }
+  mem.depositEvents.push({ ...e, id: crypto.randomUUID(), received_at: new Date().toISOString() });
+}
+
+export async function listDepositEvents(limit = 50): Promise<DepositEvent[]> {
+  if (sb) {
+    const { data, error } = await sb.from("deposit_events").select("*").order("received_at", { ascending: false }).limit(limit);
+    if (error) throw error;
+    return data as DepositEvent[];
+  }
+  return [...mem.depositEvents].sort((a, b) => b.received_at.localeCompare(a.received_at)).slice(0, limit);
+}
+
+export async function updateDepositEvent(id: string, patch: Partial<Pick<DepositEvent, "result" | "registration_id">>) {
+  if (!isUuid(id)) return;
+  if (sb) {
+    const { error } = await sb.from("deposit_events").update(patch).eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  const e = mem.depositEvents.find((x) => x.id === id);
+  if (e) Object.assign(e, patch);
 }
 
 export async function createSpecialRegistration(registration: Pick<SpecialRegistration, "special_lecture_id" | "application_id" | "mode" | "name" | "deposit">): Promise<string> {
@@ -596,7 +666,7 @@ export async function createSpecialRegistration(registration: Pick<SpecialRegist
     return data.id as string;
   }
   const id = crypto.randomUUID();
-  mem.specialRegistrations.push({ ...registration, id, created_at: new Date().toISOString() });
+  mem.specialRegistrations.push({ ...registration, id, deposit_paid_at: null, attended: false, deposit_refunded: false, created_at: new Date().toISOString() });
   return id;
 }
 

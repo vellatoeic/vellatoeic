@@ -79,8 +79,9 @@ export function booksFor(course: CourseId, track: Track, round: 1 | 2, continuin
 export const CLASSROOM = "703호"; // 현장 수업 강의실
 // 특강 현장 신청 보증금 (참여하면 100% 환급)
 export const SPECIAL_DEPOSIT = 10000;
-export type DepositStatus = "pending" | "paid" | "refunded" | "forfeited";
-export const DEPOSIT_LABEL: Record<DepositStatus, string> = { pending: "입금 대기", paid: "입금 확인", refunded: "입금 확인", forfeited: "입금 확인" };
+export const DEPOSIT_HOURS = 24; // 신청 후 이 시간 안에 입금이 없으면 자동 취소
+export type DepositStatus = "pending" | "paid" | "review" | "cancelled";
+export const DEPOSIT_LABEL: Record<DepositStatus, string> = { pending: "입금 대기", paid: "확정", review: "확인 필요", cancelled: "취소" };
 export const SITE_URL = "https://vellatoeic.vercel.app"; // 학생에게 안내하는 정식 주소 (출석 QR에 들어가요)
 
 export const KINDS: Record<Kind, { label: string; short: string }> = {

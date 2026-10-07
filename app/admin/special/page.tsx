@@ -1,7 +1,8 @@
 import { isAdmin } from "@/lib/auth";
-import { listSpecialLectures, listSpecialMaterials, listSpecialRegistrations, isPreview, type SpecialLecture, type SpecialRegistration } from "@/lib/db";
-import { addSpecialLecture, bulkSpecialDeposit, removeSpecialLecture, removeSpecialMaterial, removeSpecialRegistration, saveSpecialLecture } from "@/app/actions";
-import { SPECIAL_DEPOSIT, won } from "@/lib/config";
+import { expireSpecialDeposits, listDepositEvents, listSpecialLectures, listSpecialMaterials, listSpecialRegistrations, listWaitingDeposits, isPreview, type SpecialLecture, type SpecialRegistration } from "@/lib/db";
+import { addSpecialLecture, bulkSpecialOnsite, removeSpecialLecture, removeSpecialMaterial, removeSpecialRegistration, resolveDepositEvent, saveSpecialLecture } from "@/app/actions";
+import { DEPOSIT_HOURS, DEPOSIT_LABEL, SPECIAL_DEPOSIT, won, type DepositStatus } from "@/lib/config";
+import SmsTest from "./SmsTest";
 import SelectAll from "../SelectAll";
 import { specialWhen } from "@/lib/special";
 import AdminTabs from "../AdminTabs";
@@ -28,30 +29,44 @@ function LectureFields({ event }: { event?: SpecialLecture }) {
 }
 
 
-function Roster({ title, items, depositForm }: { title: string; items: SpecialRegistration[]; depositForm?: string }) {
-  const waiting = (r: SpecialRegistration) => !r.deposit || r.deposit === "pending";
-  const sorted = [...items].sort((a, b) => (depositForm ? Number(waiting(b)) - Number(waiting(a)) : 0) || a.name.localeCompare(b.name, "ko"));
+const DEPOSIT_TONE: Record<DepositStatus, string> = {
+  pending: "bg-amber-100 text-amber-700",
+  paid: "bg-emerald-100 text-emerald-700",
+  review: "bg-red-100 text-red-600",
+  cancelled: "bg-slate-100 text-slate-400",
+};
+const kst = (iso: string) => new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+function Roster({ title, items, onsiteForm }: { title: string; items: SpecialRegistration[]; onsiteForm?: string }) {
+  const rank: Record<DepositStatus, number> = { review: 0, pending: 1, paid: 2, cancelled: 3 };
+  const sorted = [...items].sort((a, b) => (onsiteForm ? rank[a.deposit ?? "pending"] - rank[b.deposit ?? "pending"] : 0) || a.name.localeCompare(b.name, "ko"));
   return (
     <div className="mt-3">
       <h4 className="font-jua text-sky-deep">{title} · {items.length}명</h4>
       {sorted.length === 0 ? <p className="mt-1 text-xs text-slate-400">신청자 없음</p> : (
         <ul className="divide-y divide-sky-soft">
-          {sorted.map((r) => (
-            <li key={r.id} className="flex items-center justify-between gap-3 py-2 text-[15px]">
-              <span className="flex items-center gap-2">
-                {depositForm && <input type="checkbox" name="ids" value={r.id} form={depositForm} aria-label={`${r.name} 선택`} className="h-4 w-4 accent-sky-deep" />}
-                <b className="text-sky-ink">{r.name}</b>
-                {depositForm && <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${waiting(r) ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>보증금 {waiting(r) ? "입금 대기" : "입금 확인"}</span>}
-              </span>
-              <details className="text-sm">
-                <summary className="cursor-pointer text-red-400">삭제</summary>
-                <CloseOnSubmitForm action={removeSpecialRegistration} className="mt-1">
-                  <input type="hidden" name="id" value={r.id} />
-                  <button className="rounded-xl bg-red-50 px-3 py-1 font-bold text-red-600">{r.name} 신청 삭제</button>
-                </CloseOnSubmitForm>
-              </details>
-            </li>
-          ))}
+          {sorted.map((r) => {
+            const d = r.deposit ?? "pending";
+            return (
+              <li key={r.id} className={`flex items-center justify-between gap-3 py-2 text-[15px] ${d === "cancelled" ? "opacity-50" : ""}`}>
+                <span className="flex flex-wrap items-center gap-1.5">
+                  {onsiteForm && <input type="checkbox" name="ids" value={r.id} form={onsiteForm} aria-label={`${r.name} 선택`} className="h-4 w-4 accent-sky-deep" />}
+                  <b className="text-sky-ink">{r.name}</b>
+                  {onsiteForm && <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${DEPOSIT_TONE[d]}`}>{DEPOSIT_LABEL[d]}</span>}
+                  {onsiteForm && r.attended && <span className="rounded-full bg-sky-main/50 px-2 py-0.5 text-xs font-bold text-sky-ink">✓ 참석</span>}
+                  {onsiteForm && r.deposit_refunded && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">✓ 환급 완료</span>}
+                  {onsiteForm && d === "pending" && <span className="text-xs text-slate-400">신청 {kst(r.created_at)}</span>}
+                </span>
+                <details className="text-sm">
+                  <summary className="cursor-pointer text-red-400">삭제</summary>
+                  <CloseOnSubmitForm action={removeSpecialRegistration} className="mt-1">
+                    <input type="hidden" name="id" value={r.id} />
+                    <button className="rounded-xl bg-red-50 px-3 py-1 font-bold text-red-600">{r.name} 신청 삭제</button>
+                  </CloseOnSubmitForm>
+                </details>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
@@ -60,7 +75,10 @@ function Roster({ title, items, depositForm }: { title: string; items: SpecialRe
 
 export default async function SpecialAdminPage() {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
-  const events = await listSpecialLectures();
+  await expireSpecialDeposits(DEPOSIT_HOURS);
+  const [events, depositEvents, waitingDeposits] = await Promise.all([listSpecialLectures(), listDepositEvents(), listWaitingDeposits()]);
+  const toCheck = depositEvents.filter((e) => e.result === "review" || e.result === "unmatched");
+  const webhookOn = (process.env.DEPOSIT_WEBHOOK_TOKEN ?? "").length >= 16;
   const rows = await Promise.all(events.map(async (event) => ({
     event,
     registrations: await listSpecialRegistrations(event.id),
@@ -70,6 +88,49 @@ export default async function SpecialAdminPage() {
   return (
     <div className="space-y-6 pt-8">
       <AdminTabs active="special" />
+
+      {toCheck.length > 0 && (
+        <section className="rounded-3xl border-2 border-red-200 bg-red-50 p-5">
+          <p className="font-jua text-xl text-red-600">⚠️ 입금 문자 확인 필요 {toCheck.length}건</p>
+          <p className="mt-1 text-sm text-slate-600">자동으로 확정하지 못한 입금이에요. 맞는 신청을 골라 확정하거나, 관계없는 입금이면 [무시]를 눌러 주세요.</p>
+          <ul className="mt-3 space-y-2">
+            {toCheck.map((e) => (
+              <li key={e.id} className="rounded-2xl bg-white p-3 text-sm">
+                <p><b className="text-sky-ink">{e.name || "(이름 못 읽음)"}</b> · {e.amount ? won(e.amount) : "금액 못 읽음"} · {kst(e.received_at)} · <span className="text-red-500">{e.result === "review" ? "같은 이름 대기 신청 여러 건" : "일치하는 신청 없음"}</span></p>
+                <CloseOnSubmitForm action={resolveDepositEvent} className="mt-2 flex flex-wrap gap-2">
+                  <input type="hidden" name="event_id" value={e.id} />
+                  <select name="registration_id" className="input !w-auto min-w-0 flex-1 !py-2">
+                    <option value="">관계없는 입금 (무시)</option>
+                    {waitingDeposits
+                      .sort((x, y) => Number(y.name === e.name) - Number(x.name === e.name))
+                      .map((r) => <option key={r.id} value={r.id}>{r.name} · {DEPOSIT_LABEL[r.deposit ?? "pending"]} · 신청 {kst(r.created_at)}</option>)}
+                  </select>
+                  <button className="btn !py-2 !text-sm">처리</button>
+                </CloseOnSubmitForm>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <details className="card">
+        <summary className="font-jua cursor-pointer text-lg text-sky-ink">📩 입금 문자 자동 확인 {webhookOn ? "· 켜짐" : "· 꺼짐 (토큰 설정 필요)"}</summary>
+        <div className="mt-3 space-y-3 text-sm text-slate-600">
+          <p>아이폰 단축어가 은행 입금 문자를 보내면, 입금자명과 {won(SPECIAL_DEPOSIT)}이 맞는 &apos;입금 대기&apos; 현장 신청을 자동으로 확정해요. 문자 원문은 저장하지 않아요.</p>
+          <p className="font-bold text-sky-ink">은행 문자가 잘 읽히는지 확인하기</p>
+          <SmsTest />
+          {depositEvents.length > 0 && (
+            <>
+              <p className="font-bold text-sky-ink">최근 입금 문자 기록</p>
+              <ul className="space-y-1">
+                {depositEvents.slice(0, 10).map((e) => (
+                  <li key={e.id}>{kst(e.received_at)} · {e.name || "?"} · {e.amount ? won(e.amount) : "?"} · {{ matched: "자동 확정", review: "확인 필요", unmatched: "확인 필요", resolved: "직접 확정", dismissed: "무시" }[e.result]}</li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      </details>
 
       <details className="card">
         <summary className="font-jua cursor-pointer text-lg text-sky-ink">+ 특강 추가하기</summary>
@@ -138,18 +199,27 @@ export default async function SpecialAdminPage() {
                 <h3 className="font-jua text-lg text-sky-ink">신청 명단 {registrations.length}명</h3>
                 <a href={`/admin/special/csv?id=${event.id}`} className="btn-ghost !py-2 text-sm">CSV 받기</a>
               </div>
-              <Roster title="현장" items={onsite} depositForm={`deposit-${event.id}`} />
+              <Roster title="현장" items={onsite} onsiteForm={`onsite-${event.id}`} />
               {onsite.length > 0 && (
-                <CloseOnSubmitForm id={`deposit-${event.id}`} action={bulkSpecialDeposit} className="mt-2 space-y-2 rounded-2xl bg-amber-50 p-3 text-sm">
+                <CloseOnSubmitForm id={`onsite-${event.id}`} action={bulkSpecialOnsite} className="mt-2 space-y-2 rounded-2xl bg-amber-50 p-3 text-sm">
                   <p className="text-slate-600">
-                    보증금 {won(SPECIAL_DEPOSIT)} · 입금 대기 {onsite.filter((r) => !r.deposit || r.deposit === "pending").length}명 · 입금 확인 {onsite.filter((r) => r.deposit && r.deposit !== "pending").length}명
+                    보증금 {won(SPECIAL_DEPOSIT)} · {(["pending", "paid", "review", "cancelled"] as const).map((d) => `${DEPOSIT_LABEL[d]} ${onsite.filter((r) => (r.deposit ?? "pending") === d).length}`).join(" · ")} · 참석 {onsite.filter((r) => r.attended).length} · 환급 {onsite.filter((r) => r.deposit_refunded).length}
                   </p>
                   <label className="flex items-center gap-2 font-bold text-sky-ink"><SelectAll group="*" /> 현장 신청 전체 선택</label>
                   <div className="flex flex-wrap gap-2">
-                    <button name="deposit" value="paid" className="btn !py-2 !text-sm">선택 입금 확인</button>
-                    <button name="deposit" value="pending" className="btn-ghost !py-2 text-sm">입금 대기로 되돌리기</button>
+                    <button name="op" value="confirm" className="btn !py-2 !text-sm">입금 확정</button>
+                    <button name="op" value="attended" className="btn !py-2 !text-sm">✓ 참석</button>
+                    <button name="op" value="refunded" className="btn !py-2 !text-sm">✓ 환급 완료</button>
                   </div>
-                  <p className="text-xs text-slate-500">입금을 확인하면 학생 화면에 &apos;보증금 입금 확인 완료! 특강 당일 현장에서 환급해 드려요&apos;가 보여요. 환급은 현장에서 직접 해 주세요.</p>
+                  <details>
+                    <summary className="cursor-pointer text-xs text-slate-500">되돌리기</summary>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button name="op" value="pending" className="btn-ghost !py-1.5 text-xs">입금 대기로</button>
+                      <button name="op" value="absent" className="btn-ghost !py-1.5 text-xs">참석 해제</button>
+                      <button name="op" value="unrefunded" className="btn-ghost !py-1.5 text-xs">환급 해제</button>
+                    </div>
+                  </details>
+                  <p className="text-xs text-slate-500">입금 문자가 오면 자동으로 확정돼요. 신청 후 {DEPOSIT_HOURS}시간 안에 입금이 없으면 자동 취소돼요. 특강 당일 온 학생은 [참석], 현장에서 보증금을 돌려준 학생은 [환급 완료]를 눌러 주세요.</p>
                 </CloseOnSubmitForm>
               )}
               <Roster title="불라방" items={online} />
