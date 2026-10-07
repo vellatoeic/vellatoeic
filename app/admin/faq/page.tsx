@@ -1,6 +1,6 @@
 import { isAdmin } from "@/lib/auth";
 import { isPreview, listFaq, listQuestions, type FaqItem } from "@/lib/db";
-import { addFaq, moveFaq, promoteQuestion, removeFaq, saveFaq, toggleFaq, toggleQuestionChecked } from "@/app/actions";
+import { addFaq, moveFaq, promoteQuestion, removeFaq, renameFaqCategory, saveFaq, toggleFaq, toggleQuestionChecked } from "@/app/actions";
 import AdminTabs from "../AdminTabs";
 import LoginForm from "../LoginForm";
 import CloseOnSubmitForm from "../CloseOnSubmitForm";
@@ -79,7 +79,17 @@ export default async function FaqAdmin() {
         const list = items.filter((f) => f.category === c);
         return (
           <section key={c} className="card space-y-2">
-            <h3 className="font-jua text-xl text-sky-ink">{c} <span className="text-sm text-slate-400">· {list.length}개 (숨김 {list.filter((f) => !f.published).length})</span></h3>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-jua text-xl text-sky-ink">{c} <span className="text-sm text-slate-400">· {list.length}개 (숨김 {list.filter((f) => !f.published).length})</span></h3>
+              <details className="text-sm">
+                <summary className="cursor-pointer text-slate-500">카테고리 이름 바꾸기</summary>
+                <CloseOnSubmitForm action={renameFaqCategory} className="mt-2 flex gap-2">
+                  <input type="hidden" name="from" value={c} />
+                  <input name="to" defaultValue={c} required className="input !w-56 !py-1.5" />
+                  <button className="btn !py-1.5 !text-sm">저장</button>
+                </CloseOnSubmitForm>
+              </details>
+            </div>
             <ul className="divide-y divide-sky-soft">
               {list.map((f, i) => (
                 <li key={f.id} className="py-2">

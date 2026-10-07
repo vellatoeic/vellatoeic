@@ -430,6 +430,17 @@ export async function saveFaq(fd: FormData) {
   revalidatePath("/faq");
 }
 
+// 카테고리 이름 바꾸기: 그 카테고리의 모든 질문을 한 번에 새 이름으로 옮겨요.
+export async function renameFaqCategory(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const from = clean(fd.get("from"));
+  const to = clean(fd.get("to"));
+  if (!from || !to || from === to) return;
+  for (const f of (await listFaq()).filter((x) => x.category === from)) await updateFaq(f.id, { category: to });
+  revalidatePath("/admin/faq");
+  revalidatePath("/faq");
+}
+
 export async function toggleFaq(fd: FormData) {
   if (!(await isAdmin())) return;
   const item = await getFaq(clean(fd.get("id")));

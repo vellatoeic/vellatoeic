@@ -37,14 +37,19 @@ export default async function FaqPage({ searchParams }: { searchParams: Promise<
     <div className="space-y-6 pt-8">
       <div className="text-center">
         <h1 className="font-jua text-4xl text-sky-ink">자주 묻는 질문</h1>
-        <p className="mt-2 text-slate-600">질문을 누르면 답이 펼쳐져요.</p>
+        <p className="mt-2 text-slate-600">주제를 누르면 질문이, 질문을 누르면 답이 펼쳐져요.</p>
       </div>
 
       {categories.length === 0 && <p className="card text-center text-slate-500">아직 등록된 질문이 없어요.</p>}
 
+      {/* 큰 제목(카테고리)마다 접어 두고, 누르면 그 안의 질문이 보여요. */}
       {categories.map((c) => (
-        <section key={c} className="space-y-2">
-          <h2 className="font-jua px-1 text-xl text-sky-ink">{c}</h2>
+        <details key={c} className="group/cat rounded-3xl bg-sky-main/30 p-2">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5">
+            <span className="font-jua text-xl text-sky-ink">{c} <span className="text-sm text-slate-500">· {published.filter((f) => f.category === c).length}개</span></span>
+            <span className="text-sky-deep transition group-open/cat:rotate-90">›</span>
+          </summary>
+          <div className="mt-1 space-y-2">
           {published.filter((f) => f.category === c).map((f) => (
             <details key={f.id} className="group rounded-2xl bg-white shadow-[0_2px_0_#d5ecf9]">
               <summary className="flex cursor-pointer list-none items-start gap-2 px-4 py-3.5">
@@ -55,7 +60,8 @@ export default async function FaqPage({ searchParams }: { searchParams: Promise<
               <p className="whitespace-pre-line border-t border-sky-soft px-4 py-3 text-[15px] leading-relaxed text-slate-700">{f.answer}</p>
             </details>
           ))}
-        </section>
+          </div>
+        </details>
       ))}
 
       <section className="card space-y-3">
