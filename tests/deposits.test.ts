@@ -22,14 +22,14 @@ test("이름·금액이 한 명과 맞으면 자동 확정", async () => {
   assert.equal((await find(id)).deposit, "paid");
 });
 
-test("같은 이름 대기 신청이 2건이면 확정하지 않고 '확인 필요'", async () => {
+test("같은 이름 대기 신청이 2건이면 확정하지 않고 기록만 '확인 필요' (신청은 그대로)", async () => {
   const { add, find } = await setup();
   const a = await add("이두리");
   const b = await add("이두리");
   const r = await handleBankSms("[카카오뱅크] 이두리님이 10,000원을 입금했습니다.");
   assert.equal(r.result, "review");
-  assert.equal((await find(a)).deposit, "review");
-  assert.equal((await find(b)).deposit, "review");
+  assert.equal((await find(a)).deposit, "pending");
+  assert.equal((await find(b)).deposit, "pending");
 });
 
 test("맞는 신청이 없으면 '확인 필요'로 기록만", async () => {
@@ -37,11 +37,13 @@ test("맞는 신청이 없으면 '확인 필요'로 기록만", async () => {
   assert.equal((await handleBankSms("[우리은행] 입금 10,000원 10/07 1002***1 없는사람 잔액 1원")).result, "unmatched");
 });
 
-test("금액이 1만 원이 아니면 확정하지 않아요", async () => {
+test("금액이 1만 원이 아니면 무시하고 기록도 남기지 않아요", async () => {
   const { add, find } = await setup();
   const id = await add("박세나");
-  assert.equal((await handleBankSms("[신한은행] 입금 20,000원 박세나")).result, "unmatched");
+  const before = (await listDepositEvents(1000)).length;
+  assert.equal((await handleBankSms("[신한은행] 입금 20,000원 박세나")).result, "ignored");
   assert.equal((await find(id)).deposit, "pending");
+  assert.equal((await listDepositEvents(1000)).length, before);
 });
 
 test("불라방 신청은 보증금 대상이 아니에요", async () => {
@@ -66,6 +68,14 @@ test("신청 후 30분 안이면 취소되지 않아요", async () => {
   const id = await add("한아직");
   (await find(id)).created_at = new Date(Date.now() - 29 * 60 * 1000).toISOString();
   await expireSpecialDeposits(30);
+  assert.equal((await find(id)).deposit, "pending");
+});
+
+test("웹훅은 30분 지난 대기 신청을 확정하지 않고, 취소 등 다른 변경도 하지 않아요", async () => {
+  const { add, find } = await setup();
+  const id = await add("오지각");
+  (await find(id)).created_at = new Date(Date.now() - 40 * 60 * 1000).toISOString();
+  assert.equal((await handleBankSms("[신한은행] 입금 10,000원 오지각")).result, "unmatched");
   assert.equal((await find(id)).deposit, "pending");
 });
 

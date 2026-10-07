@@ -74,10 +74,7 @@ function Roster({ title, items, onsiteForm }: { title: string; items: SpecialReg
 export default async function SpecialAdminPage() {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
   await expireSpecialDeposits(DEPOSIT_MINUTES);
-  const [events, depositEvents, waitingDeposits, allRegistrations] = await Promise.all([listSpecialLectures(), listDepositEvents(20), listWaitingDeposits(), listSpecialRegistrations()]);
-  const registrationName = new Map(allRegistrations.map((r) => [r.id, r.name]));
-  const eventTitle = new Map(events.map((e) => [e.id, e.title]));
-  const registrationEvent = new Map(allRegistrations.map((r) => [r.id, eventTitle.get(r.special_lecture_id) ?? ""]));
+  const [events, depositEvents, waitingDeposits] = await Promise.all([listSpecialLectures(), listDepositEvents(20), listWaitingDeposits()]);
   const toCheck = depositEvents.filter((e) => e.result === "review" || e.result === "unmatched");
   const webhookOn = (process.env.DEPOSIT_WEBHOOK_TOKEN ?? "").length >= 16;
   const rows = await Promise.all(events.map(async (event) => ({
@@ -126,7 +123,7 @@ export default async function SpecialAdminPage() {
       <section className="card space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="font-jua text-xl text-sky-ink">📨 입금 문자 수신 기록</h2>
-          <span className="text-xs text-slate-400">최근 20건 · 새로고침하면 바로 보여요</span>
+          <span className="text-xs text-slate-400">최근 20건 · 1만 원 입금만 기록돼요</span>
         </div>
         {depositEvents.length === 0 ? (
           <p className="text-sm text-slate-500">아직 받은 입금 문자가 없어요. 단축어로 테스트하면 여기에 바로 나타나요.</p>
@@ -147,10 +144,9 @@ export default async function SpecialAdminPage() {
                     matched: { label: "자동 확정", tone: "bg-emerald-100 text-emerald-700" },
                     resolved: { label: "직접 확정", tone: "bg-emerald-100 text-emerald-700" },
                     review: { label: "확인 필요 · 같은 이름 여러 건", tone: "bg-red-100 text-red-600" },
-                    unmatched: { label: !e.name ? "확인 필요 · 문자를 못 읽음" : e.amount !== SPECIAL_DEPOSIT ? "확인 필요 · 금액이 1만 원이 아님" : "확인 필요 · 맞는 신청 없음", tone: "bg-red-100 text-red-600" },
+                    unmatched: { label: !e.name ? "확인 필요 · 문자를 못 읽음" : "확인 필요 · 맞는 신청 없음", tone: "bg-red-100 text-red-600" },
                     dismissed: { label: "무시", tone: "bg-slate-100 text-slate-500" },
                   }[e.result];
-                  const linked = e.registration_id ? registrationName.get(e.registration_id) : null;
                   return (
                     <tr key={e.id} className="border-b border-sky-soft align-top">
                       <td className="whitespace-nowrap py-2 pr-2 text-slate-500">{kst(e.received_at)}</td>
@@ -158,7 +154,6 @@ export default async function SpecialAdminPage() {
                       <td className="whitespace-nowrap py-2 pr-2">{e.amount ? won(e.amount) : "?"}</td>
                       <td className="py-2">
                         <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold ${result.tone}`}>{result.label}</span>
-                        {linked && <span className="ml-1 text-xs text-slate-500">→ {linked}{registrationEvent.get(e.registration_id!) ? ` (${registrationEvent.get(e.registration_id!)})` : ""}</span>}
                       </td>
                     </tr>
                   );
