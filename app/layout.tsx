@@ -18,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ko">
       <body className="min-h-dvh">
         <header className="print:hidden sticky top-0 z-10 border-b border-sky-main/40 bg-sky-soft/90 backdrop-blur">
-          <nav className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
+          <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 lg:px-8">
             <Link href="/" className="font-jua leading-tight text-sky-ink">
               <span className="block text-xs text-sky-ink/60">토익의 시작</span>
               <span className="flex items-center gap-1.5 text-2xl">

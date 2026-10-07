@@ -37,27 +37,29 @@ export default async function Home() {
   const open = (await listSpecialLectures()).filter((event) => specialRegistrationOpen(event.event_date, event.starts_at));
 
   return (
-    <div className="relative -mx-4 overflow-hidden px-4 pb-6">
-      <div className="mx-auto max-w-md">
+    // 휴대폰·태블릿: 한 줄로 쌓아요(태블릿은 조금 넓게). 컴퓨터: 왼쪽에 인사·수강 형태, 오른쪽에 메뉴를 나란히 놓아요.
+    <div className="relative -mx-4 overflow-hidden px-4 pb-6 lg:mx-[calc(50%-min(32rem,50vw-1rem))] lg:pb-12">
       {CLOUDS.map((c) => <Cloud key={c} className={`pointer-events-none absolute opacity-85 ${c}`} />)}
 
-      <div className="relative">
-        <div className="pb-5 pt-10 text-center">
-          <h1 className="font-jua text-[40px] text-sky-ink">반가워요:)</h1>
-          <p className="mt-2 text-[15px] text-[#5b88a6]">수강 신청을 마치셨나요?</p>
+      <div className="relative mx-auto max-w-md sm:max-w-lg lg:grid lg:min-h-[calc(100dvh-14rem)] lg:max-w-none lg:grid-cols-2 lg:items-center lg:gap-12 lg:py-24">
+        <div>
+          <div className="pb-5 pt-10 text-center lg:pt-0 lg:text-left">
+            <h1 className="font-jua text-[40px] text-sky-ink lg:text-6xl">반가워요:)</h1>
+            <p className="mt-2 text-[15px] text-[#5b88a6] lg:text-lg">수강 신청을 마치셨나요?</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5 lg:gap-4">
+            {KIND_BUTTONS.map((k) => (
+              <Link key={k.href} href={k.href} className="rounded-[22px] bg-sky-deep px-2.5 pb-[18px] pt-[22px] text-center font-jua text-[19px] text-white shadow-[0_5px_0_#1f6f9d] transition hover:bg-[#4fb0e6] active:translate-y-1 active:shadow-[0_1px_0_#1f6f9d] lg:py-8 lg:text-2xl">
+                <span className="mb-1.5 block text-[30px] lg:text-4xl">{k.icon}</span>
+                {k.label}
+                <small className="mt-1 block font-body text-[11.5px] opacity-90 lg:text-sm">{k.sub}</small>
+              </Link>
+            ))}
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5">
-          {KIND_BUTTONS.map((k) => (
-            <Link key={k.href} href={k.href} className="rounded-[22px] bg-sky-deep px-2.5 pb-[18px] pt-[22px] text-center font-jua text-[19px] text-white shadow-[0_5px_0_#1f6f9d] transition hover:bg-[#4fb0e6] active:translate-y-1 active:shadow-[0_1px_0_#1f6f9d]">
-              <span className="mb-1.5 block text-[30px]">{k.icon}</span>
-              {k.label}
-              <small className="mt-1 block font-body text-[11.5px] opacity-90">{k.sub}</small>
-            </Link>
-          ))}
-        </div>
-
-        <div className="mt-[18px] grid gap-2.5">
+        <div className="mt-[18px] grid gap-2.5 lg:mt-0 lg:gap-3">
           <MenuItem href="/class" icon="☁️" bg="#e3f4fd" title="강의실" sub="출석 · 스티커판 · 강의 영상" />
           <MenuItem href="/mission" icon="✅" bg="#e8f8ef" title="첫 수업 미션" sub="첫 수업 시간에 다 같이 해요" />
           <MenuItem href="/faq" icon="❓" bg="#f3efff" title="자주 묻는 질문" sub="교재비 · 강의실 · 라이브 · 출석 · 숙제" />
@@ -65,7 +67,6 @@ export default async function Home() {
             <MenuItem href="/special" icon="🎤" bg="#fff5cc" title="특강 신청" sub={open.map((e) => specialDay(e.event_date)).join(" · ")} />
           )}
         </div>
-      </div>
       </div>
     </div>
   );
