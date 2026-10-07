@@ -1,8 +1,8 @@
 import { BOOKS, COURSES, KINDS, TRACKS, TIME_SLOTS, bookStatusLabel, cohortLabel, won, type CourseId, type TimeSlot, type Track } from "@/lib/config";
-import { listApplications, listMissions, getSetting, currentCohort, roundFor, isPreview, type Application, type Mission } from "@/lib/db";
+import { listApplications, listDepositEvents, listMissions, getSetting, currentCohort, roundFor, isPreview, type Application, type Mission } from "@/lib/db";
 import { missionCount } from "@/lib/mission";
 import { isAdmin } from "@/lib/auth";
-import { changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove } from "@/app/actions";
+import { changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove, resolveBookDepositEvent } from "@/app/actions";
 import LoginForm from "./LoginForm";
 import AdminTabs from "./AdminTabs";
 import CloseOnSubmitForm from "./CloseOnSubmitForm";
@@ -52,6 +52,7 @@ function Row({ a, group, mission }: { a: Application; group: string; mission?: M
             {won(a.amount)} · {a.books.map((b) => BOOKS[b]).join(", ")}
             {a.phone && ` · ${a.phone.replace(/(\d{3})(\d{3,4})(\d{4})/, "$1-$2-$3")}`}
             {a.address && ` · ${a.address}`}
+            {a.pickup_date && ` · 데스크 수령 ${a.pickup_date.slice(5).replace("-", "/")} ${a.pickup_time ?? ""}`}
             {" · "}{new Date(a.created_at).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" })} 신청
           </p>
           {mission?.intro_at && (
@@ -155,6 +156,9 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   const round = await roundFor(now);
   // 이번 모집 기수에서 아직 입금 확인이 안 된 학생 (수업 전에 확인해야 라이브·강의가 열려요)
   const waiting = everything.filter((a) => a.cohort === now && a.status === "pending").sort((a, b) => a.created_at.localeCompare(b.created_at));
+  // 자동으로 확정하지 못한 교재비 입금 문자 (같은 입금자명이 여러 명이거나 금액이 다를 때)
+  const bookChecks = (await listDepositEvents(50)).filter((e) => e.target === "book" && (e.result === "review" || e.result === "unmatched"));
+  const pendingAll = everything.filter((a) => a.status === "pending");
   // 수강 시간이 아직 비어 있는 학생 (예전 신청). 오전/저녁을 정해 주세요.
   const unslotted = everything.filter((a) => a.cohort === now && !a.slot && a.status !== "refunded").sort((a, b) => a.name.localeCompare(b.name, "ko"));
   const cohorts = [...new Set([now, ...everything.map((a) => a.cohort)])].sort().reverse();
@@ -203,7 +207,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
       {waiting.length > 0 && (
         <CloseOnSubmitForm action={bulkConfirmPayment} className="block rounded-3xl border-2 border-amber-300 bg-amber-50 p-5">
           <p className="font-jua text-2xl text-amber-700">⚠️ 수업 전 입금 대기 {waiting.length}명</p>
-          <p className="mt-1 text-sm text-slate-600">통장 입금 내역과 맞춰 보고 체크한 뒤 [납부 확인]을 눌러 주세요. 확인되면 학생 강의실에 라이브가 열려요.</p>
+          <p className="mt-1 text-sm text-slate-600">입금 문자 자동 확인이 켜져 있으면 입금자명·금액이 맞는 학생은 자동으로 납부 확인돼요. 남은 학생은 통장과 맞춰 보고 체크한 뒤 [납부 확인]을 눌러 주세요.</p>
           <label className="mt-3 flex items-center gap-2 text-sm font-bold text-sky-ink"><SelectAll group="pending-alert" /> {waiting.length}명 전체 선택</label>
           <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
             {waiting.map((a) => (
@@ -219,6 +223,30 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
           </ul>
           <button className="btn mt-3 w-full !py-3 !text-base">체크한 학생 납부 확인</button>
         </CloseOnSubmitForm>
+      )}
+
+      {bookChecks.length > 0 && (
+        <section className="rounded-3xl border-2 border-red-200 bg-red-50 p-5">
+          <p className="font-jua text-xl text-red-600">⚠️ 교재비 입금 문자 확인 필요 {bookChecks.length}건</p>
+          <p className="mt-1 text-sm text-slate-600">입금자명이 같은 학생이 여러 명이거나 금액이 달라서 자동으로 확정하지 못했어요. 맞는 학생을 골라 [처리]하거나, 관계없으면 무시해 주세요.</p>
+          <ul className="mt-3 space-y-2">
+            {bookChecks.map((e) => (
+              <li key={e.id} className="rounded-2xl bg-white p-3 text-sm">
+                <p><b className="text-sky-ink">{e.name}</b> · {won(e.amount)} · {new Date(e.received_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                <CloseOnSubmitForm action={resolveBookDepositEvent} className="mt-2 flex flex-wrap gap-2">
+                  <input type="hidden" name="event_id" value={e.id} />
+                  <select name="application_id" className="input !w-auto min-w-0 flex-1 !py-2">
+                    <option value="">관계없는 입금 (무시)</option>
+                    {[...pendingAll]
+                      .sort((x, y) => Number(y.depositor === e.name) - Number(x.depositor === e.name))
+                      .map((a) => <option key={a.id} value={a.id}>{a.depositor}{a.depositor !== a.name ? ` (${a.name})` : ""} · {won(a.amount)} · {COURSES[a.course].label} {TRACKS[a.track]}</option>)}
+                  </select>
+                  <button className="btn !py-2 !text-sm">처리</button>
+                </CloseOnSubmitForm>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {unslotted.length > 0 && (

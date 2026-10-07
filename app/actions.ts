@@ -64,6 +64,10 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   const phone = clean(fd.get("phone")).replace(/[^0-9]/g, "");
   const depositor = clean(fd.get("depositor")) || name;
   const address = clean(fd.get("address"));
+  // 불라방 1층 데스크 수령 희망 날짜·시간 (미리 준비할 수 있게)
+  const deskPickup = kind === "online" && pickup === "classroom";
+  const pickupDate = clean(fd.get("pickup_date"));
+  const pickupTime = clean(fd.get("pickup_time"));
   const pin = clean(fd.get("pin"));
   const slot = clean(fd.get("slot"));
 
@@ -74,6 +78,8 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   if (!["classroom", "delivery"].includes(pickup)) return { error: "교재 수령 방법을 선택해 주세요." };
   if (!/^[가-힣a-zA-Z ]{2,20}$/.test(name)) return { error: "이름을 한글 또는 영문으로 정확히 입력해 주세요." };
   if (kind === "online" && !/^01[0-9]{8,9}$/.test(phone)) return { error: "연락처를 정확히 입력해 주세요. (예: 01012345678)" };
+  if (deskPickup && (!/^\d{4}-\d{2}-\d{2}$/.test(pickupDate) || pickupDate < todayKST())) return { error: "교재 받을 날짜를 오늘 이후로 골라 주세요." };
+  if (deskPickup && !/^([01]\d|2[0-3]):[0-5]\d$/.test(pickupTime)) return { error: "교재 받을 시간을 골라 주세요." };
   if (pickup === "delivery" && address.length < 10) return { error: "택배 받을 주소를 입력해 주세요." };
   if (!/^\d{4}$/.test(pin)) return { error: "강의실 비밀번호를 숫자 4자리로 정해 주세요." };
   if (pin !== clean(fd.get("pin2"))) return { error: "비밀번호 확인이 맞지 않아요. 같은 숫자 4자리를 두 번 입력해 주세요." };
@@ -101,6 +107,8 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
     phone: kind === "online" ? phone : null,
     depositor,
     address: pickup === "delivery" ? address : null,
+    pickup_date: deskPickup ? pickupDate : null,
+    pickup_time: deskPickup ? pickupTime : null,
     amount: calcAmount(books, pickup),
     pin_hash: hashPin(pin),
   });
@@ -589,6 +597,21 @@ export async function resolveDepositEvent(fd: FormData) {
   }
   revalidatePath("/admin/special");
   revalidatePath("/special");
+}
+
+// '확인 필요' 교재비 입금 문자를 특정 수강 신청에 연결해 납부 확인하거나, 무시해요.
+export async function resolveBookDepositEvent(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const eventId = clean(fd.get("event_id"));
+  const applicationId = clean(fd.get("application_id"));
+  if (applicationId) {
+    const [app] = await getApplications([applicationId]);
+    if (app?.status === "pending") await updateApplications([app.id], { status: "paid" });
+    await updateDepositEvent(eventId, { result: "resolved", application_id: applicationId });
+  } else {
+    await updateDepositEvent(eventId, { result: "dismissed" });
+  }
+  revalidatePath("/admin");
 }
 
 // 관리자용: 은행 문자 예시를 붙여 넣어 이름·금액이 제대로 읽히는지 확인 (저장하지 않아요)

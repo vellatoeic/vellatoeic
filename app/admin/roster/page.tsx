@@ -5,6 +5,7 @@ import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
 import PrintButton from "./PrintButton";
 import Link from "next/link";
+import { specialDay } from "@/lib/special";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
@@ -97,7 +98,35 @@ export default async function Roster() {
         <h3 className="font-jua text-xl text-sky-ink">
           1층 데스크 수령 <span className="text-base text-slate-400">· {desk.length}명</span>
         </h3>
-        {desk.length > 0 ? <Table apps={desk} /> : <p className="mt-2 text-sm text-slate-500">아직 없어요.</p>}
+        <p className="mt-1 text-sm text-slate-500">학생이 고른 수령 희망 날짜·시간 순서예요. 미리 준비해 두세요.</p>
+        {desk.length === 0 ? <p className="mt-2 text-sm text-slate-500">아직 없어요.</p> : (
+          <table className="mt-3 w-full text-left text-[15px]">
+            <thead>
+              <tr className="border-b border-sky-main text-sm text-slate-500">
+                <th className="w-8 py-2">✓</th>
+                <th className="py-2">수령 희망</th>
+                <th className="py-2">이름</th>
+                <th className="py-2">교재</th>
+                <th className="py-2 text-right">상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...desk]
+                .sort((a, b) => `${a.pickup_date ?? "9999"} ${a.pickup_time ?? ""}`.localeCompare(`${b.pickup_date ?? "9999"} ${b.pickup_time ?? ""}`) || a.name.localeCompare(b.name, "ko"))
+                .map((a) => (
+                  <tr key={a.id} className={`border-b border-sky-soft ${a.status === "pending" ? "bg-amber-50" : a.status === "shipped" ? "text-slate-400" : ""}`}>
+                    <td className="py-2"><span className="inline-block h-4 w-4 rounded border-2 border-sky-main" /></td>
+                    <td className="whitespace-nowrap py-2 font-bold text-sky-ink">{a.pickup_date ? `${specialDay(a.pickup_date)} ${a.pickup_time ?? ""}` : <span className="font-normal text-slate-400">미정</span>}</td>
+                    <td className="py-2">{a.name}{a.depositor !== a.name && <span className="ml-1 text-xs text-slate-400">({a.depositor})</span>}</td>
+                    <td className="py-2 text-sm text-slate-600">{a.books.map((b) => BOOKS[b]).join(", ")}</td>
+                    <td className={`whitespace-nowrap py-2 text-right font-bold ${a.status === "pending" ? "text-amber-600" : "text-sky-deep"}`}>
+                      {a.status === "pending" ? "미납" : a.status === "shipped" ? "수령 완료" : "준비"}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        )}
       </section>
       <p className="card text-sm text-slate-600 print:hidden">
         택배 수령 {delivery.length}명의 이름·연락처·주소는 <Link href="/admin/delivery" className="font-bold text-sky-deep underline">[택배 발송]</Link> 탭에서 볼 수 있어요.

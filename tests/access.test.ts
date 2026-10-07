@@ -14,7 +14,7 @@ const id = () => `00000000-0000-4000-8000-${String(++n).padStart(12, "0")}`;
 
 function student(name: string, p: Partial<Application>): Application {
   return {
-    id: id(), cohort: C, kind: "online", course: "start", track: "all", continuing: false, slot: "am",
+    id: id(), cohort: C, kind: "online", course: "start", track: "all", continuing: false, slot: "am", pickup_date: null, pickup_time: null,
     books: [], pickup: "classroom", name, phone: null, depositor: name, address: null, amount: 0,
     status: "paid", pin_hash: hashPin("1234"), created_at: "2026-10-01T00:00:00Z", ...p,
   };

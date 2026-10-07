@@ -10,6 +10,8 @@ export type Application = {
   track: Track;
   continuing: boolean; // 격일반을 지난달에 이어 듣는 수강생 (LC만 새로 받음)
   slot: TimeSlot | null; // 수강 시간 (오전반/저녁반). 시간 추가 전 신청은 비어 있어요.
+  pickup_date: string | null; // 불라방 1층 데스크 수령 희망 날짜
+  pickup_time: string | null; // 불라방 1층 데스크 수령 희망 시간 (예: 14:00)
   books: BookId[];
   pickup: Pickup;
   name: string;
@@ -625,10 +627,11 @@ export type DepositEvent = {
   amount: number;
   received_at: string;
   result: "matched" | "review" | "unmatched" | "resolved" | "dismissed";
-  registration_id: string | null;
+  registration_id: string | null; // 특강 보증금이면 특강 신청
+  application_id: string | null; // 교재비면 수강 신청
 };
 
-export async function createDepositEvent(e: Pick<DepositEvent, "target" | "name" | "amount" | "result" | "registration_id">) {
+export async function createDepositEvent(e: Pick<DepositEvent, "target" | "name" | "amount" | "result" | "registration_id" | "application_id">) {
   if (sb) {
     const { error } = await sb.from("deposit_events").insert(e);
     if (error) throw error;
@@ -646,7 +649,7 @@ export async function listDepositEvents(limit = 50): Promise<DepositEvent[]> {
   return [...mem.depositEvents].sort((a, b) => b.received_at.localeCompare(a.received_at)).slice(0, limit);
 }
 
-export async function updateDepositEvent(id: string, patch: Partial<Pick<DepositEvent, "result" | "registration_id">>) {
+export async function updateDepositEvent(id: string, patch: Partial<Pick<DepositEvent, "result" | "registration_id" | "application_id">>) {
   if (!isUuid(id)) return;
   if (sb) {
     const { error } = await sb.from("deposit_events").update(patch).eq("id", id);

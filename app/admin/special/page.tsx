@@ -75,7 +75,7 @@ export default async function SpecialAdminPage() {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
   await expireSpecialDeposits(DEPOSIT_MINUTES);
   const [events, depositEvents, waitingDeposits] = await Promise.all([listSpecialLectures(), listDepositEvents(20), listWaitingDeposits()]);
-  const toCheck = depositEvents.filter((e) => e.result === "review" || e.result === "unmatched");
+  const toCheck = depositEvents.filter((e) => e.target === "special" && (e.result === "review" || e.result === "unmatched"));
   const webhookOn = (process.env.DEPOSIT_WEBHOOK_TOKEN ?? "").length >= 16;
   const rows = await Promise.all(events.map(async (event) => ({
     event,
@@ -123,7 +123,7 @@ export default async function SpecialAdminPage() {
       <section className="card space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="font-jua text-xl text-sky-ink">📨 입금 문자 수신 기록</h2>
-          <span className="text-xs text-slate-400">최근 20건 · 1만 원 입금만 기록돼요</span>
+          <span className="text-xs text-slate-400">최근 20건 · 특강 보증금·교재비</span>
         </div>
         {depositEvents.length === 0 ? (
           <p className="text-sm text-slate-500">아직 받은 입금 문자가 없어요. 단축어로 테스트하면 여기에 바로 나타나요.</p>
@@ -133,6 +133,7 @@ export default async function SpecialAdminPage() {
               <thead>
                 <tr className="border-b border-sky-main text-slate-500">
                   <th className="py-2 pr-2">받은 시각</th>
+                  <th className="py-2 pr-2">종류</th>
                   <th className="py-2 pr-2">입금자명</th>
                   <th className="py-2 pr-2">금액</th>
                   <th className="py-2">매칭 결과</th>
@@ -150,6 +151,7 @@ export default async function SpecialAdminPage() {
                   return (
                     <tr key={e.id} className="border-b border-sky-soft align-top">
                       <td className="whitespace-nowrap py-2 pr-2 text-slate-500">{kst(e.received_at)}</td>
+                      <td className="whitespace-nowrap py-2 pr-2 text-slate-500">{e.target === "book" ? "교재비" : "특강"}</td>
                       <td className="py-2 pr-2 font-bold text-sky-ink">{e.name || "?"}</td>
                       <td className="whitespace-nowrap py-2 pr-2">{e.amount ? won(e.amount) : "?"}</td>
                       <td className="py-2">

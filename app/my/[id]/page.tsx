@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { BOOKS, CLASSROOM, COURSES, KINDS, TRACKS, cohortLabel, pickupLabel, slotLabel, won } from "@/lib/config";
 import { getApplication, getSetting } from "@/lib/db";
 import { classDaysLabel, classTimes } from "@/lib/live";
+import { specialDay } from "@/lib/special";
 import HowToWatch from "@/components/HowToWatch";
 import AddToHome from "@/components/AddToHome";
 
@@ -78,6 +79,7 @@ export default async function MyPage({ params, searchParams }: { params: Promise
           </p>
           <p className="text-xs text-slate-400">입금이 확인되면 이 화면이 &apos;납부 확인&apos;으로 바뀌어요.</p>
           <p className="text-xs text-slate-400">입금 확인은 일괄처리됩니다.</p>
+          {a.pickup === "delivery" && <p className="text-xs text-slate-500">입금이 확인되면 바로 택배를 접수해요 📦</p>}
         </section>
       )}
 
@@ -87,12 +89,12 @@ export default async function MyPage({ params, searchParams }: { params: Promise
             {a.pickup === "delivery"
               ? a.status === "shipped"
                 ? <>교재를 택배로 보냈어요.<br />곧 도착해요!</>
-                : "납부가 확인됐어요. 교재를 순서대로 발송할게요."
+                : <><b className="font-jua text-xl text-sky-ink">불라방 택배 접수 완료!</b><br />다다다닥 달려갑니다💨<br /><span className="text-base text-slate-500">수령일까지 평일 기준 2~3일 소요됩니다.</span></>
               : a.kind === "onsite"
                 ? <>납부가 확인됐어요.<br />첫 수업 날 {CLASSROOM}에서 교재를 일괄 지급해요.<br />수강 시간에 맞춰 등원해 주세요!</>
                 : a.status === "shipped"
                   ? "교재 수령이 확인됐어요. 수업 준비 완료!"
-                  : "납부가 확인됐어요. 1층 데스크에서 교재를 받아 가세요!"}
+                  : <>납부가 확인됐어요.<br />{a.pickup_date ? <><b>{specialDay(a.pickup_date)} {a.pickup_time}</b>에 </> : ""}1층 데스크에서 교재를 받아 가세요!</>}
           </p>
         </section>
       )}
@@ -117,6 +119,7 @@ export default async function MyPage({ params, searchParams }: { params: Promise
           <dt className="text-slate-500">교재</dt><dd>{a.books.map((b) => BOOKS[b]).join(", ")}</dd>
           <dt className="text-slate-500">수령 방법</dt><dd>{pickupLabel(a.kind, a.pickup)}</dd>
           {a.address && (<><dt className="text-slate-500">주소</dt><dd>{a.address}</dd></>)}
+          {a.pickup_date && (<><dt className="text-slate-500">수령 희망</dt><dd>{specialDay(a.pickup_date)} {a.pickup_time} · 1층 데스크</dd></>)}
           <dt className="text-slate-500">교재비</dt><dd className="font-bold">{won(a.amount)}</dd>
         </dl>
       </section>

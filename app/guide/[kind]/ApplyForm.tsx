@@ -3,7 +3,7 @@
 import { startTransition, useActionState, useRef, useState, type FormEvent } from "react";
 import { submitApplication, type FormState } from "@/app/actions";
 import {
-  BOOKS, COURSES, KINDS, TRACKS, PICKUPS, SHIPPING_FEE, TIME_SLOTS, booksFor, isAlt, calcAmount, slotLabel, won,
+  BOOKS, COURSES, KINDS, TRACKS, PICKUPS, SHIPPING_FEE, TIME_SLOTS, booksFor, isAlt, calcAmount, slotLabel, todayKST, won,
   type CourseId, type Kind, type Pickup, type TimeSlot, type Track,
 } from "@/lib/config";
 
@@ -225,6 +225,16 @@ export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 })
           </div>
           <span className="mt-1 block text-xs text-slate-500">강의실·특강 신청에 계속 쓰니 꼭 기억해 주세요.</span>
         </label>
+        {online && pickup === "classroom" && (
+          <div className="space-y-2 sm:col-span-2">
+            <span className="label">1층 데스크 교재 수령 희망 날짜·시간</span>
+            <div className="grid grid-cols-2 gap-2">
+              <input type="date" name="pickup_date" min={todayKST()} required className="input" aria-label="수령 희망 날짜" />
+              <input type="time" name="pickup_time" step={1800} required className="input" aria-label="수령 희망 시간" />
+            </div>
+            <span className="block text-xs text-slate-500">미리 교재를 준비해 둘게요. 납부가 확인된 뒤 고른 날짜에 1층 데스크에서 받아 가세요.</span>
+          </div>
+        )}
         {pickup === "delivery" && (
           <div className="space-y-2 sm:col-span-2">
             <span className="label">택배 받을 주소</span>
@@ -291,6 +301,7 @@ export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 })
               {online && (<><dt className="text-slate-500">연락처</dt><dd className="font-bold">{phone}</dd></>)}
               <dt className="text-slate-500">입금자명</dt><dd>{String(confirm.get("depositor") ?? "").trim() || String(confirm.get("name")).trim()}</dd>
               {online && (<><dt className="text-slate-500">교재 수령</dt><dd>{PICKUPS[pickup].label}</dd></>)}
+              {online && pickup === "classroom" && (<><dt className="text-slate-500">수령 희망</dt><dd className="font-bold">{String(confirm.get("pickup_date"))} {String(confirm.get("pickup_time"))} · 1층 데스크</dd></>)}
               {pickup === "delivery" && (<><dt className="text-slate-500">택배 주소</dt><dd className="font-bold">{String(confirm.get("address"))}</dd></>)}
               <dt className="text-slate-500">교재</dt><dd>{books.map((b) => BOOKS[b]).join(", ")}</dd>
               <dt className="text-slate-500">교재비</dt><dd className="font-jua text-xl text-sky-ink">{won(amount)}</dd>
