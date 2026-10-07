@@ -341,7 +341,7 @@ export async function cleanupExpiredAudios() {
 }
 
 // ── 문풀반 데일리 테스트 ───────────────────────
-// 학생: 결과 입력. 그날 23:59까지는 제출·수정, 같은 달 지난 테스트는 '밀린 테스트'로 한 번 제출(늦은 제출 표시).
+// 학생: 결과 입력. 그날 23:59까지는 제출·수정, 같은 달 지난 테스트는 '밀린 테스트'로 한 번 제출. (늦게 낸 것은 저장만 하고 화면에 표시하지 않아요)
 export async function submitTestResult(_: FormState, fd: FormData): Promise<FormState> {
   const appId = clean(fd.get("app_id"));
   const day = clean(fd.get("day"));
@@ -368,7 +368,7 @@ export async function submitTestResult(_: FormState, fd: FormData): Promise<Form
   revalidatePath("/class");
   revalidatePath("/class/tests");
   revalidatePath("/admin/tests");
-  return { ok: late ? "늦은 제출로 저장했어요." : "저장했어요! 오늘 23:59까지 고칠 수 있어요." };
+  return { ok: late ? "저장했어요!" : "저장했어요! 오늘 23:59까지 고칠 수 있어요." };
 }
 
 // 관리자: 특정 날짜 테스트 번호·문항 수 직접 고치기 / 자동 계산으로 되돌리기

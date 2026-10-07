@@ -169,7 +169,7 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
               <p className="mb-1.5 text-sm font-bold text-slate-500">학생별 점수</p>
               <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
                 {[...results].sort((a, b) => b.r.score - a.r.score).map(({ s, r }) => (
-                  <li key={s.app.id} className="flex justify-between gap-2"><span>{s.app.name}{r.late && <span className="text-xs text-amber-600"> 늦음</span>}</span><b className="text-sky-ink">{r.score}</b></li>
+                  <li key={s.app.id} className="flex justify-between gap-2"><span>{s.app.name}</span><b className="text-sky-ink">{r.score}</b></li>
                 ))}
               </ul>
               {missing.length > 0 && <p className="mt-2 rounded-xl bg-amber-50 p-2 text-sm text-amber-700">미제출 {missing.length}명: {missing.map((s) => s.app.name).join(", ")}</p>}

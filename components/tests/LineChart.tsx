@@ -1,5 +1,5 @@
 // 테스트 번호별 정답률 꺾은선 그래프 (한 줄, 범례 없이 제목이 이름 역할). 점 위에 손가락/마우스를 올리면 값이 보여요.
-export default function LineChart({ title, points }: { title: string; points: { label: string; pct: number; late?: boolean }[] }) {
+export default function LineChart({ title, points }: { title: string; points: { label: string; pct: number }[] }) {
   const W = 340, H = 170, L = 32, R = 10, T = 12, B = 26;
   const iw = W - L - R, ih = H - T - B;
   const x = (i: number) => L + (points.length === 1 ? iw / 2 : (i / (points.length - 1)) * iw);
@@ -24,14 +24,13 @@ export default function LineChart({ title, points }: { title: string; points: { 
           <path d={path} fill="none" stroke="#2b8fc7" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
           {points.map((p, i) => (
             <g key={i}>
-              <circle cx={x(i)} cy={y(p.pct)} r={4.5} fill={p.late ? "#ffffff" : "#2b8fc7"} stroke="#2b8fc7" strokeWidth={2} />
-              <circle cx={x(i)} cy={y(p.pct)} r={14} fill="transparent"><title>{`${p.label} · ${p.pct}%${p.late ? " (늦은 제출)" : ""}`}</title></circle>
+              <circle cx={x(i)} cy={y(p.pct)} r={4.5} fill="#2b8fc7" stroke="#ffffff" strokeWidth={2} />
+              <circle cx={x(i)} cy={y(p.pct)} r={14} fill="transparent"><title>{`${p.label}번 · ${p.pct}%`}</title></circle>
               {i % step === 0 && <text x={x(i)} y={H - 8} textAnchor="middle" fontSize={10} fill="#7aa3bd">{p.label}</text>}
             </g>
           ))}
         </svg>
       )}
-      {points.some((p) => p.late) && <p className="mt-1 text-xs text-slate-400">빈 점 = 늦은 제출</p>}
     </figure>
   );
 }

@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       s.app.name, SCHEDULE_CLASSES[s.klass], s.app.slot ? TIME_SLOTS[s.app.slot] : "", s.avg.word ?? "", s.avg.rc ?? "", s.missing, s.declining ? "예" : "",
       ...columns.map((col) => {
         const r = s.results.find((x) => `${x.kind === "word" ? "단어" : "RC"} ${x.test_no}` === col);
-        return r ? `${r.score}/${r.questions}${r.late ? " 늦음" : ""}` : "";
+        return r ? `${r.score}/${r.questions}` : "";
       }),
     ]),
   ]);

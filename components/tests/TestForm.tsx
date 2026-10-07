@@ -10,7 +10,7 @@ type Props = {
   label: string; // 예: RC TEST 22
   questions: number;
   existing?: { score: number; wrong: number[]; late: boolean } | null;
-  late?: boolean; // 밀린 테스트(늦은 제출)
+  late?: boolean; // 밀린 테스트 (한 번만 제출)
 };
 
 // 테스트 결과 입력: 맞은 개수(필수) + RC 틀린 번호(선택). 맞은 개수와 틀린 번호 수가 안 맞으면 바로 알려줘요.
@@ -37,7 +37,7 @@ export default function TestForm({ appId, day, kind, label, questions, existing,
     <form onSubmit={submit} className="rounded-2xl bg-white p-4 shadow-[0_2px_0_#d5ecf9]">
       <div className="flex items-baseline justify-between gap-2">
         <p className="font-jua text-lg text-sky-ink">{label} <span className="text-sm text-slate-500">({questions}문항)</span></p>
-        {existing && <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">제출함 {existing.late ? "· 늦은 제출" : ""}</span>}
+        {existing && <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">제출함</span>}
       </div>
       <label className="mt-2 flex items-center gap-2">
         <span className="text-sm text-slate-600">맞은 개수</span>
@@ -72,7 +72,7 @@ export default function TestForm({ appId, day, kind, label, questions, existing,
       {state.ok && <p className="mt-2 text-sm font-bold text-emerald-600">{state.ok}</p>}
       {!locked && (
         <button className="btn mt-3 w-full !py-2.5 !text-base" disabled={pending || score === "" || mismatch}>
-          {pending ? "저장 중…" : existing ? "고쳐서 저장" : late ? "늦은 제출하기" : "제출하기"}
+          {pending ? "저장 중…" : existing ? "고쳐서 저장" : "제출하기"}
         </button>
       )}
     </form>

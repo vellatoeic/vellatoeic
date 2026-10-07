@@ -28,7 +28,7 @@ export default async function TestsPage() {
   const series = (kind: TestKind) => all
     .filter((r) => r.kind === kind)
     .sort((a, b) => a.day.localeCompare(b.day))
-    .map((r) => ({ label: String(r.test_no), pct: Math.round((r.score / r.questions) * 100), late: r.late, r }));
+    .map((r) => ({ label: String(r.test_no), pct: Math.round((r.score / r.questions) * 100), r }));
 
   return (
     <div className="space-y-5 pt-8">
@@ -36,7 +36,7 @@ export default async function TestsPage() {
       <h1 className="font-jua text-3xl text-sky-ink">데일리 테스트</h1>
 
       <section className="space-y-2">
-        <h2 className="font-jua text-xl text-sky-ink">⏰ 밀린 테스트 <span className="text-sm text-slate-500">({cohortLabel(current.cohort)} · 늦은 제출로 표시돼요)</span></h2>
+        <h2 className="font-jua text-xl text-sky-ink">⏰ 밀린 테스트 <span className="text-sm text-slate-500">({cohortLabel(current.cohort)} · 지난 수업 테스트도 낼 수 있어요)</span></h2>
         {missed.length === 0 ? <p className="rounded-2xl bg-white p-4 text-sm text-slate-500">밀린 테스트가 없어요 👍</p> : missed.map((t) => (
           <div key={`${t.day}-${t.spec.kind}`}>
             <p className="mb-1 px-1 text-xs text-slate-500">{md(t.day)} 수업</p>
@@ -62,7 +62,7 @@ export default async function TestsPage() {
                         <tr key={r.id} className="border-t border-sky-soft">
                           <td className="py-1">{md(r.day)}</td>
                           <td>{r.test_no}</td>
-                          <td>{r.score}/{r.questions}{r.late ? " · 늦은 제출" : ""}</td>
+                          <td>{r.score}/{r.questions}</td>
                           <td>{pct}%</td>
                         </tr>
                       ))}
