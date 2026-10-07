@@ -6,6 +6,8 @@ import { classDaysLabel, classTimes } from "@/lib/live";
 import { specialDay } from "@/lib/special";
 import HowToWatch from "@/components/HowToWatch";
 import AddToHome from "@/components/AddToHome";
+import BookReceived from "@/components/BookReceived";
+import { activeStudentApps } from "@/lib/student";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,9 @@ export default async function MyPage({ params, searchParams }: { params: Promise
     );
   }
   const account = await getSetting("bank_account");
+  // 본인으로 로그인돼 있을 때만 '교재 받았어요' 버튼을 보여줘요.
+  const isMine = (await activeStudentApps()).apps.some((x) => x.id === a.id);
+  const deskWaiting = a.kind === "online" && a.pickup === "classroom" && a.status === "paid";
 
   const online = a.kind === "online";
   const steps = !online
@@ -105,6 +110,8 @@ export default async function MyPage({ params, searchParams }: { params: Promise
           <p className="text-sm text-sky-deep">강의실에서 라이브와 강의 영상을 볼 수 있어요!</p>
         </div>
       )}
+
+      {deskWaiting && isMine && <BookReceived id={a.id} when={a.pickup_date ? `${specialDay(a.pickup_date)} ${a.pickup_time ?? ""}` : undefined} />}
 
       {a.kind === "online" && <HowToWatch days={classDaysLabel(a)} times={classTimes(a)} />}
       <AddToHome />

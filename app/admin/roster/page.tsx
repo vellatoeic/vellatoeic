@@ -98,7 +98,7 @@ export default async function Roster() {
         <h3 className="font-jua text-xl text-sky-ink">
           1층 데스크 수령 <span className="text-base text-slate-400">· {desk.length}명</span>
         </h3>
-        <p className="mt-1 text-sm text-slate-500">학생이 고른 수령 희망 날짜·시간 순서예요. 미리 준비해 두세요.</p>
+        <p className="mt-1 text-sm text-slate-500">학생이 고른 수령 희망 날짜·시간 순서예요. 미리 준비해 두세요.<br />교재를 받은 학생은 직접 [교재 받았어요]를 눌러서 &apos;수령 완료&apos;로 바뀌어요.</p>
         {desk.length === 0 ? <p className="mt-2 text-sm text-slate-500">아직 없어요.</p> : (
           <table className="mt-3 w-full text-left text-[15px]">
             <thead>

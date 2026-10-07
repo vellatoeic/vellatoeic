@@ -614,6 +614,19 @@ export async function resolveBookDepositEvent(fd: FormData) {
   revalidatePath("/admin");
 }
 
+// 학생이 1층 데스크에서 교재를 받고 직접 '받았어요'를 눌러요. (본인 신청 · 불라방 데스크 수령 · 납부 완료만)
+export async function confirmBookReceived(fd: FormData) {
+  const id = clean(fd.get("id"));
+  const { apps } = await activeStudentApps();
+  const app = apps.find((a) => a.id === id);
+  if (!app || app.kind !== "online" || app.pickup !== "classroom" || app.status !== "paid") return;
+  await updateApplication(app.id, { status: "shipped" });
+  revalidatePath(`/my/${app.id}`);
+  revalidatePath("/class");
+  revalidatePath("/admin/roster");
+  revalidatePath("/admin");
+}
+
 // 관리자용: 은행 문자 예시를 붙여 넣어 이름·금액이 제대로 읽히는지 확인 (저장하지 않아요)
 export async function testBankSms(_: FormState, fd: FormData): Promise<FormState> {
   if (!(await isAdmin())) return { error: "관리자 로그인이 필요해요." };

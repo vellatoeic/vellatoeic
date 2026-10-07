@@ -2,6 +2,8 @@ import Link from "next/link";
 import { BOOKS, COURSES, PARTS, TIME_SLOTS, TRACKS, TRACK_PARTS, cohortLabel, todayKST, won } from "@/lib/config";
 import { liveState } from "@/lib/live";
 import AddToHome from "@/components/AddToHome";
+import BookReceived from "@/components/BookReceived";
+import { specialDay } from "@/lib/special";
 import { listAudios, listLectures, listMissions, listStamps, currentCohort, getSetting } from "@/lib/db";
 import { missionCount, missionFor } from "@/lib/mission";
 import { audioBooksFor, dayDiff, studentAudioWindow } from "@/lib/audio";
@@ -138,6 +140,10 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
       )}
 
       {liveButton}
+
+      {apps.filter((a) => a.kind === "online" && a.pickup === "classroom" && a.status === "paid").map((a) => (
+        <BookReceived key={a.id} id={a.id} when={a.pickup_date ? `${specialDay(a.pickup_date)} ${a.pickup_time ?? ""}` : undefined} />
+      ))}
 
       {latestMission < 4 && (
         <Link href="/mission" className="flex items-center gap-3 rounded-[20px] border-2 border-[#ffd23f] bg-white p-4 shadow-[0_3px_0_#cfe6f5]">
