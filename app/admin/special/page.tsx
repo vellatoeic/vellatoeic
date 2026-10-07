@@ -148,11 +148,11 @@ export default async function SpecialAdminPage() {
                   <label className="flex items-center gap-2 font-bold text-sky-ink"><SelectAll group="*" /> 현장 신청 전체 선택</label>
                   <div className="flex flex-wrap gap-2">
                     <button name="deposit" value="paid" className="btn !py-2 !text-sm">선택 입금 확인</button>
-                    <button name="deposit" value="refunded" className="btn !py-2 !text-sm">선택 환급 완료 (참석)</button>
+                    <button name="deposit" value="refunded" className="btn !py-2 !text-sm">선택 환급 완료 (현장에서 돌려줌)</button>
                     <button name="deposit" value="forfeited" className="btn-ghost !py-2 text-sm">선택 불참 · 미환급</button>
                     <button name="deposit" value="pending" className="btn-ghost !py-2 text-sm">입금 대기로 되돌리기</button>
                   </div>
-                  <p className="text-xs text-slate-500">특강 당일 참석한 학생은 [환급 완료]로, 오지 않은 학생은 [불참]으로 바꿔 주세요. 학생 화면 안내도 함께 바뀌어요.</p>
+                  <p className="text-xs text-slate-500">특강 당일 현장에서 보증금을 돌려준 학생은 [환급 완료]로, 오지 않은 학생은 [불참]으로 바꿔 주세요. 학생 화면 안내도 함께 바뀌어요.</p>
                 </CloseOnSubmitForm>
               )}
               <Roster title="불라방" items={online} />

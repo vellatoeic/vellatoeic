@@ -38,7 +38,7 @@ export default function SpecialForm({ events }: { events: Option[] }) {
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="flex items-start gap-3 rounded-xl bg-sky-soft p-3">
             <input type="radio" name="mode" value="onsite" required className="mt-1 accent-sky-deep" />
-            <span><b className="block text-sky-ink">현장</b><span className="text-sm text-slate-600">703호에서 들어요.<br />보증금 1만원 · 참여하면 100% 환급</span></span>
+            <span><b className="block text-sky-ink">현장</b><span className="text-sm text-slate-600">703호에서 들어요.<br />보증금 1만원 · 특강 당일 현장에서 100% 환급</span></span>
           </label>
           <label className="flex items-start gap-3 rounded-xl bg-sky-soft p-3">
             <input type="radio" name="mode" value="online" required className="mt-1 accent-sky-deep" />
