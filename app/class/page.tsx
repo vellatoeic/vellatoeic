@@ -213,9 +213,16 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
                 return <p className="mt-4 rounded-2xl bg-sky-soft p-4 text-sm text-slate-600">🎧 LC 음원은 첫 수업일({sm}/{sd})부터 14일 동안 받을 수 있어요.</p>;
               }
               return (
-                <div className="mt-4 rounded-2xl bg-sky-soft p-4">
-                  <p className="font-jua text-lg text-sky-ink">🎧 LC 음원 <span className="text-sm text-slate-500">({audioBooksFor(a).map((b) => BOOKS[b]).join(", ")} 교재)</span></p>
-                  <p className="text-sm text-sky-deep">{m}/{d}까지 다운로드 가능 ({left === 0 ? "D-DAY" : `D-${left}`})</p>
+                // 눌러서 접고 펼 수 있어요. 마감이 3일 이내면 놓치지 않게 펼친 채로 시작해요.
+                <details open={left <= 3} className="group mt-4 rounded-2xl bg-sky-soft p-4">
+                  <summary className="flex cursor-pointer list-none items-start justify-between gap-2">
+                    <span>
+                      <span className="block font-jua text-lg text-sky-ink">🎧 LC 음원 <span className="text-sm text-slate-500">({audioBooksFor(a).map((b) => BOOKS[b]).join(", ")} 교재 · {box.list.length}개)</span></span>
+                      <span className="block text-sm text-sky-deep">{m}/{d}까지 다운로드 가능 ({left === 0 ? "D-DAY" : `D-${left}`})</span>
+                    </span>
+                    <span className="shrink-0 text-sm text-slate-400 group-open:hidden">펼치기 ▾</span>
+                    <span className="hidden shrink-0 text-sm text-slate-400 group-open:inline">접기 ▴</span>
+                  </summary>
                   {box.list.length === 0 ? <p className="mt-2 text-sm text-slate-500">음원이 올라오면 여기에 보여요.</p> : (
                     <ol className="mt-2 space-y-1.5">
                       {box.list.map((x) => (
@@ -228,7 +235,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
                       ))}
                     </ol>
                   )}
-                </div>
+                </details>
               );
             })()}
             {(() => {
