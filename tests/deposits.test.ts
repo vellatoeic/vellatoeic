@@ -51,14 +51,22 @@ test("불라방 신청은 보증금 대상이 아니에요", async () => {
   assert.equal((await find(id)).deposit, null);
 });
 
-test("신청 후 24시간이 지나면 자동 취소되고, 늦은 입금은 확정되지 않아요", async () => {
+test("신청 후 30분이 지나면 자동 취소되고, 늦은 입금은 확정되지 않아요", async () => {
   const { add, find } = await setup();
   const id = await add("정늦음");
-  (await find(id)).created_at = new Date(Date.now() - 25 * 3600 * 1000).toISOString();
-  await expireSpecialDeposits(24);
+  (await find(id)).created_at = new Date(Date.now() - 31 * 60 * 1000).toISOString();
+  await expireSpecialDeposits(30);
   assert.equal((await find(id)).deposit, "cancelled");
   assert.equal((await handleBankSms("[신한은행] 입금 10,000원 정늦음")).result, "unmatched");
   assert.equal((await find(id)).deposit, "cancelled");
+});
+
+test("신청 후 30분 안이면 취소되지 않아요", async () => {
+  const { add, find } = await setup();
+  const id = await add("한아직");
+  (await find(id)).created_at = new Date(Date.now() - 29 * 60 * 1000).toISOString();
+  await expireSpecialDeposits(30);
+  assert.equal((await find(id)).deposit, "pending");
 });
 
 test("문자 원문은 저장하지 않고 이름·금액·시각·결과만 남겨요", async () => {

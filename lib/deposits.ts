@@ -1,5 +1,5 @@
 import "server-only";
-import { DEPOSIT_HOURS, SPECIAL_DEPOSIT } from "./config";
+import { DEPOSIT_MINUTES, SPECIAL_DEPOSIT } from "./config";
 import { parseBankSms, sameName, type ParsedDeposit } from "./bankSms";
 import { createDepositEvent, expireSpecialDeposits, listWaitingDeposits, updateOnsiteRegistrations, type DepositEvent } from "./db";
 
@@ -15,7 +15,7 @@ const specialDepositHandler: DepositHandler = {
   target: "special",
   handles: (d) => d.amount === SPECIAL_DEPOSIT,
   async match(d) {
-    await expireSpecialDeposits(DEPOSIT_HOURS);
+    await expireSpecialDeposits(DEPOSIT_MINUTES);
     const waiting = (await listWaitingDeposits()).filter((r) => sameName(r.name, d.name));
     if (waiting.length === 1) {
       await updateOnsiteRegistrations([waiting[0].id], { deposit: "paid", deposit_paid_at: new Date().toISOString() });

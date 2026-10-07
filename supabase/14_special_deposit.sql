@@ -3,16 +3,11 @@
 
 begin;
 
--- 1) 현장 신청 보증금 상태: 입금 대기(pending) · 확정(paid) · 확인 필요(review) · 취소(cancelled)
+-- 1) 현장 신청 보증금 상태: 입금 대기(pending) · 확정(paid) · 확인 필요(review, 입금 문자 확인용) · 취소(cancelled, 신청 후 30분 안에 입금 없음)
 alter table public.special_lecture_registrations
   add column if not exists deposit text check (deposit in ('pending', 'paid', 'review', 'cancelled'));
 alter table public.special_lecture_registrations
   add column if not exists deposit_paid_at timestamptz;
--- 특강 당일 참석 체크, 보증금 현장 환급 체크
-alter table public.special_lecture_registrations
-  add column if not exists attended boolean not null default false;
-alter table public.special_lecture_registrations
-  add column if not exists deposit_refunded boolean not null default false;
 
 -- 2) 입금 문자 기록. 문자 원문은 저장하지 않고 이름·금액·시각·처리 결과만 남겨요.
 --    target은 어떤 입금인지 구분해요 (지금은 특강 보증금 special, 나중에 교재비 book).

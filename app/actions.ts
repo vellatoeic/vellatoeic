@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
-  COURSES, PARTS, LECTURE_COURSES, DEPOSIT_HOURS, booksFor, isAlt, isTimeSlot, calcAmount, youtubeId, todayKST,
+  COURSES, PARTS, LECTURE_COURSES, DEPOSIT_MINUTES, booksFor, isAlt, isTimeSlot, calcAmount, youtubeId, todayKST,
   type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
 } from "@/lib/config";
 import {
@@ -489,7 +489,7 @@ export async function registerSpecialLecture(_: FormState, fd: FormData): Promis
 
   // 특강 신청 후에는 강의실 로그인 상태가 돼서 이 페이지에서 바로 신청 내용을 볼 수 있어요.
   await setStudent(mine.map((a) => a.id));
-  await expireSpecialDeposits(DEPOSIT_HOURS);
+  await expireSpecialDeposits(DEPOSIT_MINUTES);
   const existing = (await getSpecialRegistrationsFor(paid.map((a) => a.id))).filter((r) => r.special_lecture_id === eventId);
   // 입금 기한이 지나 취소된 신청은 지우고 새로 받아요.
   for (const r of existing.filter((x) => x.deposit === "cancelled")) await deleteSpecialRegistration(r.id);
@@ -561,7 +561,7 @@ export async function removeSpecialLecture(fd: FormData) {
   revalidatePath("/special");
 }
 
-// 현장 신청 명단 일괄 처리: 보증금 확정/대기, 당일 참석, 보증금 환급
+// 현장 신청 명단 일괄 처리: 보증금 확정 / 입금 대기로 되돌리기 (환급은 현장에서 직접)
 export async function bulkSpecialOnsite(fd: FormData) {
   if (!(await isAdmin())) return;
   const ids = fd.getAll("ids").map(clean).filter(Boolean);
@@ -569,10 +569,6 @@ export async function bulkSpecialOnsite(fd: FormData) {
   const patch =
     op === "confirm" ? { deposit: "paid" as const, deposit_paid_at: new Date().toISOString() }
     : op === "pending" ? { deposit: "pending" as const, deposit_paid_at: null }
-    : op === "attended" ? { attended: true }
-    : op === "absent" ? { attended: false }
-    : op === "refunded" ? { deposit_refunded: true }
-    : op === "unrefunded" ? { deposit_refunded: false }
     : null;
   if (!patch) return;
   await updateOnsiteRegistrations(ids, patch);

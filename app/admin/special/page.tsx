@@ -1,7 +1,7 @@
 import { isAdmin } from "@/lib/auth";
 import { expireSpecialDeposits, listDepositEvents, listSpecialLectures, listSpecialMaterials, listSpecialRegistrations, listWaitingDeposits, isPreview, type SpecialLecture, type SpecialRegistration } from "@/lib/db";
 import { addSpecialLecture, bulkSpecialOnsite, removeSpecialLecture, removeSpecialMaterial, removeSpecialRegistration, resolveDepositEvent, saveSpecialLecture } from "@/app/actions";
-import { DEPOSIT_HOURS, DEPOSIT_LABEL, SPECIAL_DEPOSIT, won, type DepositStatus } from "@/lib/config";
+import { DEPOSIT_MINUTES, DEPOSIT_LABEL, SPECIAL_DEPOSIT, won, type DepositStatus } from "@/lib/config";
 import SmsTest from "./SmsTest";
 import SelectAll from "../SelectAll";
 import { specialWhen } from "@/lib/special";
@@ -32,7 +32,7 @@ function LectureFields({ event }: { event?: SpecialLecture }) {
 const DEPOSIT_TONE: Record<DepositStatus, string> = {
   pending: "bg-amber-100 text-amber-700",
   paid: "bg-emerald-100 text-emerald-700",
-  review: "bg-red-100 text-red-600",
+  review: "bg-amber-100 text-amber-700",
   cancelled: "bg-slate-100 text-slate-400",
 };
 const kst = (iso: string) => new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -52,9 +52,7 @@ function Roster({ title, items, onsiteForm }: { title: string; items: SpecialReg
                 <span className="flex flex-wrap items-center gap-1.5">
                   {onsiteForm && <input type="checkbox" name="ids" value={r.id} form={onsiteForm} aria-label={`${r.name} 선택`} className="h-4 w-4 accent-sky-deep" />}
                   <b className="text-sky-ink">{r.name}</b>
-                  {onsiteForm && <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${DEPOSIT_TONE[d]}`}>{DEPOSIT_LABEL[d]}</span>}
-                  {onsiteForm && r.attended && <span className="rounded-full bg-sky-main/50 px-2 py-0.5 text-xs font-bold text-sky-ink">✓ 참석</span>}
-                  {onsiteForm && r.deposit_refunded && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">✓ 환급 완료</span>}
+                  {onsiteForm && <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${DEPOSIT_TONE[d]}`}>{d === "review" ? "입금 대기" : DEPOSIT_LABEL[d]}</span>}
                   {onsiteForm && d === "pending" && <span className="text-xs text-slate-400">신청 {kst(r.created_at)}</span>}
                 </span>
                 <details className="text-sm">
@@ -75,7 +73,7 @@ function Roster({ title, items, onsiteForm }: { title: string; items: SpecialReg
 
 export default async function SpecialAdminPage() {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
-  await expireSpecialDeposits(DEPOSIT_HOURS);
+  await expireSpecialDeposits(DEPOSIT_MINUTES);
   const [events, depositEvents, waitingDeposits] = await Promise.all([listSpecialLectures(), listDepositEvents(), listWaitingDeposits()]);
   const toCheck = depositEvents.filter((e) => e.result === "review" || e.result === "unmatched");
   const webhookOn = (process.env.DEPOSIT_WEBHOOK_TOKEN ?? "").length >= 16;
@@ -203,23 +201,14 @@ export default async function SpecialAdminPage() {
               {onsite.length > 0 && (
                 <CloseOnSubmitForm id={`onsite-${event.id}`} action={bulkSpecialOnsite} className="mt-2 space-y-2 rounded-2xl bg-amber-50 p-3 text-sm">
                   <p className="text-slate-600">
-                    보증금 {won(SPECIAL_DEPOSIT)} · {(["pending", "paid", "review", "cancelled"] as const).map((d) => `${DEPOSIT_LABEL[d]} ${onsite.filter((r) => (r.deposit ?? "pending") === d).length}`).join(" · ")} · 참석 {onsite.filter((r) => r.attended).length} · 환급 {onsite.filter((r) => r.deposit_refunded).length}
+                    보증금 {won(SPECIAL_DEPOSIT)} · 입금 대기 {onsite.filter((r) => !r.deposit || r.deposit === "pending" || r.deposit === "review").length}명 · 확정 {onsite.filter((r) => r.deposit === "paid").length}명
                   </p>
                   <label className="flex items-center gap-2 font-bold text-sky-ink"><SelectAll group="*" /> 현장 신청 전체 선택</label>
                   <div className="flex flex-wrap gap-2">
-                    <button name="op" value="confirm" className="btn !py-2 !text-sm">입금 확정</button>
-                    <button name="op" value="attended" className="btn !py-2 !text-sm">✓ 참석</button>
-                    <button name="op" value="refunded" className="btn !py-2 !text-sm">✓ 환급 완료</button>
+                    <button name="op" value="confirm" className="btn !py-2 !text-sm">선택 입금 확정</button>
+                    <button name="op" value="pending" className="btn-ghost !py-2 text-sm">입금 대기로 되돌리기</button>
                   </div>
-                  <details>
-                    <summary className="cursor-pointer text-xs text-slate-500">되돌리기</summary>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <button name="op" value="pending" className="btn-ghost !py-1.5 text-xs">입금 대기로</button>
-                      <button name="op" value="absent" className="btn-ghost !py-1.5 text-xs">참석 해제</button>
-                      <button name="op" value="unrefunded" className="btn-ghost !py-1.5 text-xs">환급 해제</button>
-                    </div>
-                  </details>
-                  <p className="text-xs text-slate-500">입금 문자가 오면 자동으로 확정돼요. 신청 후 {DEPOSIT_HOURS}시간 안에 입금이 없으면 자동 취소돼요. 특강 당일 온 학생은 [참석], 현장에서 보증금을 돌려준 학생은 [환급 완료]를 눌러 주세요.</p>
+                  <p className="text-xs text-slate-500">입금 문자가 오면 자동으로 확정돼요. 신청 후 {DEPOSIT_MINUTES}분 안에 입금이 없으면 자동 취소돼요. 보증금은 특강 당일 현장에서 돌려주세요.</p>
                 </CloseOnSubmitForm>
               )}
               <Roster title="불라방" items={online} />

@@ -99,8 +99,6 @@ export type SpecialRegistration = {
   name: string;
   deposit: DepositStatus | null; // 현장 신청 보증금 (불라방은 없음)
   deposit_paid_at: string | null;
-  attended: boolean; // 특강 당일 참석
-  deposit_refunded: boolean; // 보증금 현장 환급
   created_at: string;
 };
 
@@ -583,7 +581,7 @@ export async function getSpecialRegistrationsFor(application_ids: string[]): Pro
   return mem.specialRegistrations.filter((registration) => registration.application_id && ok.includes(registration.application_id));
 }
 
-type SpecialRegistrationPatch = Partial<Pick<SpecialRegistration, "deposit" | "deposit_paid_at" | "attended" | "deposit_refunded">>;
+type SpecialRegistrationPatch = Partial<Pick<SpecialRegistration, "deposit" | "deposit_paid_at">>;
 
 // 현장 신청 여러 건의 보증금·참석·환급 상태를 한 번에 바꿔요.
 export async function updateOnsiteRegistrations(ids: string[], patch: SpecialRegistrationPatch) {
@@ -597,9 +595,9 @@ export async function updateOnsiteRegistrations(ids: string[], patch: SpecialReg
   for (const r of mem.specialRegistrations) if (ok.includes(r.id) && r.mode === "onsite") Object.assign(r, patch);
 }
 
-// 신청 후 24시간 안에 입금이 없으면 자동 취소해요. (페이지를 열거나 입금 문자가 올 때마다 확인)
-export async function expireSpecialDeposits(hours: number) {
-  const cutoff = new Date(Date.now() - hours * 3600 * 1000).toISOString();
+// 신청 후 정해진 시간(분) 안에 입금이 없으면 자동 취소해요. (페이지를 열거나 입금 문자가 올 때마다 확인)
+export async function expireSpecialDeposits(minutes: number) {
+  const cutoff = new Date(Date.now() - minutes * 60 * 1000).toISOString();
   if (sb) {
     const { error } = await sb.from("special_lecture_registrations").update({ deposit: "cancelled" })
       .eq("mode", "onsite").eq("deposit", "pending").lt("created_at", cutoff);
@@ -666,7 +664,7 @@ export async function createSpecialRegistration(registration: Pick<SpecialRegist
     return data.id as string;
   }
   const id = crypto.randomUUID();
-  mem.specialRegistrations.push({ ...registration, id, deposit_paid_at: null, attended: false, deposit_refunded: false, created_at: new Date().toISOString() });
+  mem.specialRegistrations.push({ ...registration, id, deposit_paid_at: null, created_at: new Date().toISOString() });
   return id;
 }
 
