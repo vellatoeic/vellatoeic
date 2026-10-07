@@ -3,6 +3,9 @@ import { BOOKS, COURSES, PARTS, TIME_SLOTS, TRACKS, TRACK_PARTS, cohortLabel, to
 import { liveState } from "@/lib/live";
 import AddToHome from "@/components/AddToHome";
 import BookReceived from "@/components/BookReceived";
+import TestForm from "@/components/tests/TestForm";
+import { studentTests, takesTests } from "@/lib/dailyTests";
+import { TEST_LABEL } from "@/lib/tests";
 import { specialDay } from "@/lib/special";
 import { listAudios, listLectures, listMissions, listStamps, currentCohort, getSetting } from "@/lib/db";
 import { missionCount, missionFor } from "@/lib/mission";
@@ -70,6 +73,10 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
     }] as const;
   })));
 
+  // 문풀반·속성반 데일리 테스트 (이번 달 납부 완료 신청)
+  const testApp = paid.find((a) => a.cohort === cohort && takesTests(a));
+  const myTests = testApp ? await studentTests(testApp, today) : null;
+
   // 맨 위 탭 [☀️ 오전반 | 🌙 저녁반]: 본인 시간대가 먼저 선택되고, 교차 수강을 위해 다른 시간대로 바꿔 볼 수 있어요.
   const liveApp = paid.find((a) => a.cohort === cohort);
   const { t } = await searchParams;
@@ -115,6 +122,25 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
         </form>
       </div>
 
+
+      {testApp && myTests && (myTests.today.length > 0 || myTests.missed.length > 0) && (
+        <section className="space-y-2 rounded-3xl border-2 border-[#ffd23f] bg-[#fffbea] p-4">
+          {myTests.today.length > 0 && (
+            <>
+              <p className="font-jua text-xl text-sky-ink">📝 오늘의 테스트</p>
+              {myTests.today.map((t) => (
+                <TestForm key={t.spec.kind} appId={testApp.id} day={t.day} kind={t.spec.kind} label={`${TEST_LABEL[t.spec.kind]} ${t.spec.no}`} questions={t.spec.questions}
+                  existing={t.result ? { score: t.result.score, wrong: t.result.wrong, late: t.result.late } : null} />
+              ))}
+              <p className="text-xs text-slate-500">오늘 23:59까지 제출하고 고칠 수 있어요.</p>
+            </>
+          )}
+          <Link href="/class/tests" className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm font-bold text-sky-ink">
+            <span>{myTests.missed.length > 0 ? `⏰ 밀린 테스트 ${myTests.missed.length}개 · ` : ""}📈 내 점수 기록</span>
+            <span className="text-sky-main">›</span>
+          </Link>
+        </section>
+      )}
 
       {pending.map((a) => (
         <div key={a.id} className="rounded-3xl border-2 border-amber-300 bg-amber-50 p-5 text-center">

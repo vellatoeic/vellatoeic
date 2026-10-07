@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import type { TestKind, TestOverride } from "./tests";
 import { thisMonthKST, roundOf, type BookId, type CourseId, type Kind, type Part, type Pickup, type Status, type TimeSlot, type Track, type DepositStatus } from "./config";
 
 export type Application = {
@@ -35,6 +36,20 @@ export type Lecture = {
   title: string;
   youtube_id: string;
   created_at: string;
+};
+
+export type TestResult = {
+  id: string;
+  app_id: string;
+  cohort: string;
+  day: string;
+  kind: TestKind;
+  test_no: number;
+  questions: number;
+  score: number;
+  wrong: number[];
+  late: boolean;
+  submitted_at: string;
 };
 
 export type FaqItem = {
@@ -139,9 +154,11 @@ type Mem = {
   faq: FaqItem[];
   questions: StudentQuestion[];
   depositEvents: DepositEvent[];
+  testResults: TestResult[];
+  testOverrides: TestOverride[];
 };
 const g = globalThis as unknown as { __vellaMem?: Mem };
-const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [] });
+const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [], testResults: [], testOverrides: [] });
 mem.specialLectures ??= [];
 mem.specialRegistrations ??= [];
 mem.specialMaterials ??= [];
@@ -154,6 +171,8 @@ mem.audios ??= [];
 mem.faq ??= [];
 mem.questions ??= [];
 mem.depositEvents ??= [];
+mem.testResults ??= [];
+mem.testOverrides ??= [];
 
 const isUuid = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
 
@@ -303,6 +322,62 @@ export async function deleteLecture(id: string) {
     return;
   }
   mem.lectures = mem.lectures.filter((l) => l.id !== id);
+}
+
+// ── 문풀반 데일리 테스트 ───────────────────────
+export async function listTestOverrides(cohort: string): Promise<TestOverride[]> {
+  const from = `${cohort}-01`, to = `${cohort}-31`;
+  if (sb) {
+    const { data, error } = await sb.from("test_overrides").select("*").gte("day", from).lte("day", to);
+    if (error) throw error;
+    return data as TestOverride[];
+  }
+  return mem.testOverrides.filter((o) => o.day.startsWith(cohort));
+}
+
+export async function saveTestOverride(o: TestOverride) {
+  if (sb) {
+    const { error } = await sb.from("test_overrides").upsert(o, { onConflict: "day,kind" });
+    if (error) throw error;
+    return;
+  }
+  mem.testOverrides = [...mem.testOverrides.filter((x) => !(x.day === o.day && x.kind === o.kind)), o];
+}
+
+export async function deleteTestOverride(day: string, kind: TestKind) {
+  if (sb) {
+    const { error } = await sb.from("test_overrides").delete().eq("day", day).eq("kind", kind);
+    if (error) throw error;
+    return;
+  }
+  mem.testOverrides = mem.testOverrides.filter((x) => !(x.day === day && x.kind === kind));
+}
+
+export async function listTestResults(filter: { cohort?: string; day?: string; appIds?: string[] }): Promise<TestResult[]> {
+  const ids = filter.appIds?.filter(isUuid);
+  if (ids && ids.length === 0) return [];
+  if (sb) {
+    let q = sb.from("test_results").select("*").order("day").order("kind");
+    if (filter.cohort) q = q.eq("cohort", filter.cohort);
+    if (filter.day) q = q.eq("day", filter.day);
+    if (ids) q = q.in("app_id", ids);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data as TestResult[];
+  }
+  return mem.testResults.filter((r) => (!filter.cohort || r.cohort === filter.cohort) && (!filter.day || r.day === filter.day) && (!ids || ids.includes(r.app_id)));
+}
+
+export async function saveTestResult(r: Omit<TestResult, "id" | "submitted_at">) {
+  const row = { ...r, submitted_at: new Date().toISOString() };
+  if (sb) {
+    const { error } = await sb.from("test_results").upsert(row, { onConflict: "app_id,day,kind" });
+    if (error) throw error;
+    return;
+  }
+  const old = mem.testResults.find((x) => x.app_id === r.app_id && x.day === r.day && x.kind === r.kind);
+  if (old) Object.assign(old, row);
+  else mem.testResults.push({ ...row, id: crypto.randomUUID() });
 }
 
 // ── 자주 묻는 질문 · 질문함 ─────────────────────────

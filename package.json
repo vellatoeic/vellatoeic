@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "SUPABASE_URL= SUPABASE_SERVICE_ROLE_KEY= node --experimental-strip-types --no-warnings --import ./tests/register.mjs --test tests/access.test.ts tests/bank-sms.test.ts tests/deposits.test.ts"
+    "test": "SUPABASE_URL= SUPABASE_SERVICE_ROLE_KEY= node --experimental-strip-types --no-warnings --import ./tests/register.mjs --test tests/access.test.ts tests/bank-sms.test.ts tests/deposits.test.ts tests/daily-tests.test.ts"
   },
   "dependencies": {
     "@fontsource/gowun-dodum": "^5.3.0",

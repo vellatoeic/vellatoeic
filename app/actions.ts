@@ -8,10 +8,12 @@ import {
 } from "@/lib/config";
 import {
   createApplication, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  saveMission, type Mission, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
+  saveMission, type Mission, listTestResults, saveTestResult, saveTestOverride, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
 } from "@/lib/db";
 import { canWatch, isActive, loginApps } from "@/lib/access";
 import { parseBankSms } from "@/lib/bankSms";
+import { checkTestAnswer, testsForClassDay, type TestKind } from "@/lib/tests";
+import { classDaysOf, planFor, takesTests } from "@/lib/dailyTests";
 import { activeStudentApps } from "@/lib/student";
 import { SCHEDULE_CLASSES, holidayKey, homeworkAssignmentDays, parseHolidays, parseSchoolDays, previousMonth, scheduleKey, scheduleClassFor, schoolDaysFor, shiftSchoolDays, type ScheduleClass } from "@/lib/schedule";
 import { specialRegistrationOpen } from "@/lib/special";
@@ -336,6 +338,56 @@ export async function cleanupExpiredAudios() {
     if (end && end < today) await deleteAudios(all.filter((a) => a.cohort === cohort));
   }
   revalidatePath("/admin/audio");
+}
+
+// ── 문풀반 데일리 테스트 ───────────────────────
+// 학생: 결과 입력. 그날 23:59까지는 제출·수정, 같은 달 지난 테스트는 '밀린 테스트'로 한 번 제출(늦은 제출 표시).
+export async function submitTestResult(_: FormState, fd: FormData): Promise<FormState> {
+  const appId = clean(fd.get("app_id"));
+  const day = clean(fd.get("day"));
+  const kind = clean(fd.get("kind")) as TestKind;
+  const score = Number(clean(fd.get("score")));
+  const wrong = clean(fd.get("wrong")).split(",").filter(Boolean).map(Number).sort((a, b) => a - b);
+  const today = todayKST();
+  const { apps } = await activeStudentApps();
+  const app = apps.find((a) => a.id === appId);
+  if (!app || !takesTests(app)) return { error: "테스트를 볼 수 있는 수강 신청이 아니에요." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day > today) return { error: "아직 제출할 수 없는 테스트예요." };
+  if (day.slice(0, 7) !== today.slice(0, 7)) return { error: "지난달 테스트는 제출할 수 없어요." };
+  const { plan } = await planFor(app.cohort);
+  const spec = testsForClassDay(plan, await classDaysOf(app), day).find((t) => t.kind === kind);
+  if (!spec) return { error: "이 날짜에는 이 테스트가 없어요." };
+  if (clean(fd.get("score")) === "") return { error: "맞은 개수를 적어 주세요." };
+  const problem = checkTestAnswer(spec.questions, score, kind === "rc" ? wrong : []);
+  if (problem) return { error: problem };
+  const late = day < today;
+  if (late && (await listTestResults({ appIds: [app.id] })).some((r) => r.day === day && r.kind === kind)) {
+    return { error: "지난 테스트는 한 번만 제출할 수 있어요." };
+  }
+  await saveTestResult({ app_id: app.id, cohort: app.cohort, day, kind, test_no: spec.no, questions: spec.questions, score, wrong: kind === "rc" ? wrong : [], late });
+  revalidatePath("/class");
+  revalidatePath("/class/tests");
+  revalidatePath("/admin/tests");
+  return { ok: late ? "늦은 제출로 저장했어요." : "저장했어요! 오늘 23:59까지 고칠 수 있어요." };
+}
+
+// 관리자: 특정 날짜 테스트 번호·문항 수 직접 고치기 / 자동 계산으로 되돌리기
+export async function saveTestOverrideAction(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const day = clean(fd.get("day"));
+  const kind = clean(fd.get("kind"));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || (kind !== "word" && kind !== "rc")) return;
+  if (clean(fd.get("reset"))) {
+    await deleteTestOverride(day, kind);
+  } else {
+    const none = clean(fd.get("none")) === "1";
+    const no = Number(clean(fd.get("test_no")));
+    const q = Number(clean(fd.get("questions")));
+    if (!none && (!Number.isInteger(no) || no < 1 || no > 99 || !Number.isInteger(q) || q < 1 || q > 100)) return;
+    await saveTestOverride({ day, kind, test_no: none ? null : no, questions: none ? null : q });
+  }
+  revalidatePath("/admin/tests");
+  revalidatePath("/class");
 }
 
 // ── 자주 묻는 질문 · 질문함 ─────────────────────
