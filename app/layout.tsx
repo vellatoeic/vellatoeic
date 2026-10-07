@@ -27,9 +27,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </span>
             </Link>
             <div className="flex items-center gap-2">
-              <Link href="/special" className="rounded-full bg-white px-3 py-2 text-sm font-bold text-sky-ink">
-                특강 신청
-              </Link>
               <Link href="/class" className="rounded-full bg-sky-main px-3 py-2 text-sm font-bold text-sky-ink">
                 강의실
               </Link>
