@@ -126,14 +126,21 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
       {testApp && myTests && (myTests.today.length > 0 || myTests.missed.length > 0) && (
         <section className="space-y-2 rounded-3xl border-2 border-[#ffd23f] bg-[#fffbea] p-4">
           {myTests.today.length > 0 && (
-            <>
-              <p className="font-jua text-xl text-sky-ink">📝 오늘의 테스트</p>
-              {myTests.today.map((t) => (
-                <TestForm key={t.spec.kind} appId={testApp.id} day={t.day} kind={t.spec.kind} label={`${TEST_LABEL[t.spec.kind]} ${t.spec.no}`} questions={t.spec.questions}
-                  existing={t.result ? { score: t.result.score, wrong: t.result.wrong, late: t.result.late } : null} />
-              ))}
-              <p className="text-xs text-slate-500">오늘 23:59까지 제출하고 고칠 수 있어요.</p>
-            </>
+            // 눌러서 접고 펼 수 있어요. 아직 안 낸 테스트가 있으면 펼친 채로 시작해요.
+            <details open={myTests.today.some((t) => !t.result)} className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between font-jua text-xl text-sky-ink">
+                <span>📝 오늘의 테스트 <span className="text-sm text-slate-500">· 제출 {myTests.today.filter((t) => t.result).length}/{myTests.today.length}</span></span>
+                <span className="text-sm text-slate-400 group-open:hidden">펼치기 ▾</span>
+                <span className="hidden text-sm text-slate-400 group-open:inline">접기 ▴</span>
+              </summary>
+              <div className="mt-2 space-y-2">
+                {myTests.today.map((t) => (
+                  <TestForm key={t.spec.kind} appId={testApp.id} day={t.day} kind={t.spec.kind} label={`${TEST_LABEL[t.spec.kind]} ${t.spec.no}`} questions={t.spec.questions}
+                    existing={t.result ? { score: t.result.score, wrong: t.result.wrong, late: t.result.late } : null} />
+                ))}
+                <p className="text-xs text-slate-500">오늘 23:59까지 제출하고 고칠 수 있어요.</p>
+              </div>
+            </details>
           )}
           <Link href="/class/tests" className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm font-bold text-sky-ink">
             <span>{myTests.missed.length > 0 ? `⏰ 밀린 테스트 ${myTests.missed.length}개 · ` : ""}📈 내 점수 기록</span>
@@ -184,7 +191,6 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
       <p className="rounded-2xl bg-sky-soft px-4 py-3 text-sm text-sky-deep">강의 영상은 개강일 이후부터 열람할 수 있어요.</p>
 
-      <AddToHome />
 
       {paid.map((a) => {
         // 강의 목록은 고른 시간대(☀️/🌙) 강의만 보여요. 구분 없는 예전 강의는 둘 다에 보여요.
@@ -272,6 +278,8 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
           </section>
         );
       })}
+
+      <AddToHome />
     </div>
   );
 }

@@ -114,7 +114,6 @@ export default async function MyPage({ params, searchParams }: { params: Promise
       {deskWaiting && isMine && <BookReceived id={a.id} when={a.pickup_date ? `${specialDay(a.pickup_date)} ${a.pickup_time ?? ""}` : undefined} />}
 
       {a.kind === "online" && <HowToWatch days={classDaysLabel(a)} times={classTimes(a)} />}
-      <AddToHome />
 
       <section className="card">
         <h2 className="font-jua text-xl text-sky-ink">신청 내용</h2>
@@ -130,6 +129,8 @@ export default async function MyPage({ params, searchParams }: { params: Promise
           <dt className="text-slate-500">교재비</dt><dd className="font-bold">{won(a.amount)}</dd>
         </dl>
       </section>
+
+      <AddToHome />
     </div>
   );
 }
