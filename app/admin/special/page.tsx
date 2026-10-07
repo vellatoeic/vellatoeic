@@ -1,7 +1,7 @@
 import { isAdmin } from "@/lib/auth";
 import { listSpecialLectures, listSpecialMaterials, listSpecialRegistrations, isPreview, type SpecialLecture, type SpecialRegistration } from "@/lib/db";
 import { addSpecialLecture, bulkSpecialDeposit, removeSpecialLecture, removeSpecialMaterial, removeSpecialRegistration, saveSpecialLecture } from "@/app/actions";
-import { DEPOSIT_LABEL, SPECIAL_DEPOSIT, won } from "@/lib/config";
+import { SPECIAL_DEPOSIT, won } from "@/lib/config";
 import SelectAll from "../SelectAll";
 import { specialWhen } from "@/lib/special";
 import AdminTabs from "../AdminTabs";
@@ -27,11 +27,10 @@ function LectureFields({ event }: { event?: SpecialLecture }) {
   );
 }
 
-const DEPOSIT_TONE = { pending: "bg-amber-100 text-amber-700", paid: "bg-sky-main/50 text-sky-ink", refunded: "bg-emerald-100 text-emerald-700", forfeited: "bg-slate-100 text-slate-500" } as const;
 
 function Roster({ title, items, depositForm }: { title: string; items: SpecialRegistration[]; depositForm?: string }) {
-  const order = { pending: 0, paid: 1, refunded: 2, forfeited: 3 } as const;
-  const sorted = [...items].sort((a, b) => (depositForm ? order[a.deposit ?? "pending"] - order[b.deposit ?? "pending"] : 0) || a.name.localeCompare(b.name, "ko"));
+  const waiting = (r: SpecialRegistration) => !r.deposit || r.deposit === "pending";
+  const sorted = [...items].sort((a, b) => (depositForm ? Number(waiting(b)) - Number(waiting(a)) : 0) || a.name.localeCompare(b.name, "ko"));
   return (
     <div className="mt-3">
       <h4 className="font-jua text-sky-deep">{title} · {items.length}명</h4>
@@ -42,7 +41,7 @@ function Roster({ title, items, depositForm }: { title: string; items: SpecialRe
               <span className="flex items-center gap-2">
                 {depositForm && <input type="checkbox" name="ids" value={r.id} form={depositForm} aria-label={`${r.name} 선택`} className="h-4 w-4 accent-sky-deep" />}
                 <b className="text-sky-ink">{r.name}</b>
-                {depositForm && <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${DEPOSIT_TONE[r.deposit ?? "pending"]}`}>보증금 {DEPOSIT_LABEL[r.deposit ?? "pending"]}</span>}
+                {depositForm && <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${waiting(r) ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>보증금 {waiting(r) ? "입금 대기" : "입금 확인"}</span>}
               </span>
               <details className="text-sm">
                 <summary className="cursor-pointer text-red-400">삭제</summary>
@@ -143,16 +142,14 @@ export default async function SpecialAdminPage() {
               {onsite.length > 0 && (
                 <CloseOnSubmitForm id={`deposit-${event.id}`} action={bulkSpecialDeposit} className="mt-2 space-y-2 rounded-2xl bg-amber-50 p-3 text-sm">
                   <p className="text-slate-600">
-                    보증금 {won(SPECIAL_DEPOSIT)} · 입금 대기 {onsite.filter((r) => !r.deposit || r.deposit === "pending").length} · 입금 확인 {onsite.filter((r) => r.deposit === "paid").length} · 환급 완료 {onsite.filter((r) => r.deposit === "refunded").length} · 불참 {onsite.filter((r) => r.deposit === "forfeited").length}
+                    보증금 {won(SPECIAL_DEPOSIT)} · 입금 대기 {onsite.filter((r) => !r.deposit || r.deposit === "pending").length}명 · 입금 확인 {onsite.filter((r) => r.deposit && r.deposit !== "pending").length}명
                   </p>
                   <label className="flex items-center gap-2 font-bold text-sky-ink"><SelectAll group="*" /> 현장 신청 전체 선택</label>
                   <div className="flex flex-wrap gap-2">
                     <button name="deposit" value="paid" className="btn !py-2 !text-sm">선택 입금 확인</button>
-                    <button name="deposit" value="refunded" className="btn !py-2 !text-sm">선택 환급 완료 (현장에서 돌려줌)</button>
-                    <button name="deposit" value="forfeited" className="btn-ghost !py-2 text-sm">선택 불참 · 미환급</button>
                     <button name="deposit" value="pending" className="btn-ghost !py-2 text-sm">입금 대기로 되돌리기</button>
                   </div>
-                  <p className="text-xs text-slate-500">특강 당일 현장에서 보증금을 돌려준 학생은 [환급 완료]로, 오지 않은 학생은 [불참]으로 바꿔 주세요. 학생 화면 안내도 함께 바뀌어요.</p>
+                  <p className="text-xs text-slate-500">입금을 확인하면 학생 화면에 &apos;보증금 입금 확인 완료! 특강 당일 현장에서 환급해 드려요&apos;가 보여요. 환급은 현장에서 직접 해 주세요.</p>
                 </CloseOnSubmitForm>
               )}
               <Roster title="불라방" items={online} />

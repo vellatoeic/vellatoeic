@@ -556,12 +556,12 @@ export async function removeSpecialLecture(fd: FormData) {
   revalidatePath("/special");
 }
 
-// 현장 신청 보증금 상태를 체크한 학생들에게 한 번에 바꿔요. (입금 확인 → 참여 후 환급 완료 / 불참)
+// 현장 신청 보증금: 체크한 학생들의 입금 확인을 한 번에 해요.
 export async function bulkSpecialDeposit(fd: FormData) {
   if (!(await isAdmin())) return;
   const to = clean(fd.get("deposit"));
-  if (!["pending", "paid", "refunded", "forfeited"].includes(to)) return;
-  await updateSpecialDeposits(fd.getAll("ids").map(clean).filter(Boolean), to as "pending" | "paid" | "refunded" | "forfeited");
+  if (to !== "pending" && to !== "paid") return; // 보증금은 받는 것까지만 관리해요 (환급은 현장에서)
+  await updateSpecialDeposits(fd.getAll("ids").map(clean).filter(Boolean), to);
   revalidatePath("/admin/special");
   revalidatePath("/special");
 }
