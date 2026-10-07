@@ -16,11 +16,28 @@ const MAX_FAILED_AUTH = 10; // 토큰이 틀린 요청은 10분에 10번까지
 
 const digest = (s: string) => createHash("sha256").update(s).digest();
 
-// 길이와 상관없이 같은 시간에 비교해요 (타이밍 공격 방지)
-function tokenMatches(given: string) {
-  const expected = process.env.DEPOSIT_WEBHOOK_TOKEN ?? "";
-  if (expected.length < 16) return false; // 토큰이 없거나 너무 짧으면 꺼 둬요.
-  return timingSafeEqual(digest(given), digest(expected));
+const MIN_TOKEN_LENGTH = 16;
+
+// 토큰 확인. 실패하면 어디서 막혔는지 구분해서 알려줘요. (토큰 값은 응답·로그에 절대 넣지 않고, 글자 수만)
+// 앞뒤 공백·줄바꿈은 자동으로 지우고 비교해요.
+type AuthResult = { ok: true } | { ok: false; status: number; error: string; countsAsFailure: boolean; extra?: Record<string, number> };
+
+function checkAuth(req: NextRequest): AuthResult {
+  const expected = (process.env.DEPOSIT_WEBHOOK_TOKEN ?? "").trim();
+  if (!expected) return { ok: false, status: 503, error: "server_token_missing", countsAsFailure: false };
+  if (expected.length < MIN_TOKEN_LENGTH) {
+    return { ok: false, status: 503, error: "server_token_too_short", countsAsFailure: false, extra: { server_length: expected.length, min_length: MIN_TOKEN_LENGTH } };
+  }
+  const header = (req.headers.get("authorization") ?? "").trim();
+  if (!header) return { ok: false, status: 401, error: "no_auth_header", countsAsFailure: true };
+  const m = header.match(/^Bearer\s+(.+)$/i);
+  if (!m) return { ok: false, status: 401, error: "bad_format", countsAsFailure: true };
+  const given = m[1].trim();
+  // 길이와 상관없이 같은 시간에 비교해요 (타이밍 공격 방지)
+  if (!timingSafeEqual(digest(given), digest(expected))) {
+    return { ok: false, status: 401, error: "token_mismatch", countsAsFailure: true, extra: { received_length: given.length, server_length: expected.length } };
+  }
+  return { ok: true };
 }
 
 const reply = (status: number, body: Record<string, unknown>) => NextResponse.json(body, { status, headers: { "cache-control": "no-store" } });
@@ -29,10 +46,10 @@ export async function POST(req: NextRequest) {
   const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
   if (count(`fail:${ip}`, WINDOW) >= MAX_FAILED_AUTH) return reply(429, { ok: false, error: "too_many" });
 
-  const given = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!tokenMatches(given)) {
-    allow(`fail:${ip}`, Number.MAX_SAFE_INTEGER, WINDOW);
-    return reply(401, { ok: false, error: "unauthorized" });
+  const auth = checkAuth(req);
+  if (!auth.ok) {
+    if (auth.countsAsFailure) allow(`fail:${ip}`, Number.MAX_SAFE_INTEGER, WINDOW);
+    return reply(auth.status, { ok: false, error: auth.error, ...auth.extra });
   }
   if (!allow(`ok:${ip}`, MAX_REQUESTS, WINDOW) || !allow("ok:all", MAX_REQUESTS * 2, WINDOW)) return reply(429, { ok: false, error: "too_many" });
 
