@@ -11,7 +11,24 @@ export default async function FaqPage({ searchParams }: { searchParams: Promise<
   const { login } = await searchParams;
   if (login) return <StudentLogin next="/faq" note="로그인하면 질문을 남길 수 있어요." />;
 
-  const [items, { apps }] = await Promise.all([listFaq(), activeStudentApps()]);
+  let items: Awaited<ReturnType<typeof listFaq>>;
+  try {
+    items = await listFaq();
+  } catch (e) {
+    // 원인을 바로 알 수 있게 오류 내용을 작게 보여줘요.
+    const detail = e instanceof Error ? e.message : typeof e === "object" && e ? JSON.stringify(e) : String(e);
+    console.error("FAQ 불러오기 실패", detail);
+    return (
+      <div className="pt-12">
+        <div className="card mx-auto max-w-sm space-y-2 text-center">
+          <p className="font-jua text-2xl text-sky-ink">자주 묻는 질문을 불러오지 못했어요</p>
+          <p className="text-slate-600">잠시 후 다시 열어 주세요.</p>
+          <p className="break-all rounded-xl bg-slate-50 p-2 text-left text-xs text-slate-400">{detail}</p>
+        </div>
+      </div>
+    );
+  }
+  const { apps } = await activeStudentApps();
   const published = items.filter((f) => f.published);
   // 카테고리는 맨 앞 항목 순서대로 보여줘요.
   const categories = [...new Set(published.map((f) => f.category))];
