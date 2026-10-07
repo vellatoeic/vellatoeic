@@ -11,7 +11,7 @@ export async function GET() {
   if (!(await isAdmin())) return new NextResponse("관리자 로그인이 필요해요.", { status: 401 });
   const cohort = await currentCohort();
   const apps = (await listApplications())
-    .filter((a) => a.cohort === cohort && a.kind === "online" && a.pickup === "delivery")
+    .filter((a) => a.cohort === cohort && a.kind === "online" && a.pickup === "delivery" && a.status !== "refunded")
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
   return csvResponse(`택배명단_${cohort}.csv`, [
     ["이름", "수강반", "연락처", "주소", "교재", "상태"],

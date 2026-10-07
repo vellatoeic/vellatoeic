@@ -35,6 +35,26 @@ export type Lecture = {
   created_at: string;
 };
 
+export type FaqItem = {
+  id: string;
+  category: string;
+  question: string;
+  answer: string;
+  published: boolean;
+  sort_order: number;
+  created_at: string;
+};
+
+export type StudentQuestion = {
+  id: string;
+  app_id: string | null;
+  name: string;
+  kind: "question" | "suggestion";
+  content: string;
+  checked: boolean;
+  created_at: string;
+};
+
 export type LcAudio = {
   id: string;
   cohort: string;
@@ -112,9 +132,11 @@ type Mem = {
   specialMaterials: SpecialMaterial[];
   missions: Mission[];
   audios: LcAudio[];
+  faq: FaqItem[];
+  questions: StudentQuestion[];
 };
 const g = globalThis as unknown as { __vellaMem?: Mem };
-const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [] });
+const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [] });
 mem.specialLectures ??= [];
 mem.specialRegistrations ??= [];
 mem.specialMaterials ??= [];
@@ -124,6 +146,8 @@ mem.homework ??= [];
 mem.photos ??= {};
 mem.missions ??= [];
 mem.audios ??= [];
+mem.faq ??= [];
+mem.questions ??= [];
 
 const isUuid = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
 
@@ -273,6 +297,95 @@ export async function deleteLecture(id: string) {
     return;
   }
   mem.lectures = mem.lectures.filter((l) => l.id !== id);
+}
+
+// ── 자주 묻는 질문 · 질문함 ─────────────────────────
+export async function listFaq(): Promise<FaqItem[]> {
+  if (sb) {
+    const { data, error } = await sb.from("faq_items").select("*").order("sort_order").order("created_at");
+    if (error) throw error;
+    return data as FaqItem[];
+  }
+  return [...mem.faq].sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at));
+}
+
+export async function getFaq(id: string): Promise<FaqItem | null> {
+  if (!isUuid(id)) return null;
+  if (sb) {
+    const { data, error } = await sb.from("faq_items").select("*").eq("id", id).maybeSingle();
+    if (error) throw error;
+    return (data as FaqItem) ?? null;
+  }
+  return mem.faq.find((f) => f.id === id) ?? null;
+}
+
+export async function createFaq(item: Pick<FaqItem, "category" | "question" | "answer" | "published" | "sort_order">) {
+  if (sb) {
+    const { error } = await sb.from("faq_items").insert(item);
+    if (error) throw error;
+    return;
+  }
+  mem.faq.push({ ...item, id: crypto.randomUUID(), created_at: new Date().toISOString() });
+}
+
+export async function updateFaq(id: string, patch: Partial<Pick<FaqItem, "category" | "question" | "answer" | "published" | "sort_order">>) {
+  if (!isUuid(id)) return;
+  if (sb) {
+    const { error } = await sb.from("faq_items").update(patch).eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  const item = mem.faq.find((f) => f.id === id);
+  if (item) Object.assign(item, patch);
+}
+
+export async function deleteFaq(id: string) {
+  if (!isUuid(id)) return;
+  if (sb) {
+    const { error } = await sb.from("faq_items").delete().eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  mem.faq = mem.faq.filter((f) => f.id !== id);
+}
+
+export async function listQuestions(): Promise<StudentQuestion[]> {
+  if (sb) {
+    const { data, error } = await sb.from("student_questions").select("*").order("created_at", { ascending: false });
+    if (error) throw error;
+    return data as StudentQuestion[];
+  }
+  return [...mem.questions].sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+export async function createQuestion(q: Pick<StudentQuestion, "app_id" | "name" | "kind" | "content">) {
+  if (sb) {
+    const { error } = await sb.from("student_questions").insert(q);
+    if (error) throw error;
+    return;
+  }
+  mem.questions.push({ ...q, id: crypto.randomUUID(), checked: false, created_at: new Date().toISOString() });
+}
+
+export async function updateQuestion(id: string, patch: Partial<Pick<StudentQuestion, "checked">>) {
+  if (!isUuid(id)) return;
+  if (sb) {
+    const { error } = await sb.from("student_questions").update(patch).eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  const q = mem.questions.find((x) => x.id === id);
+  if (q) Object.assign(q, patch);
+}
+
+export async function getQuestion(id: string): Promise<StudentQuestion | null> {
+  if (!isUuid(id)) return null;
+  if (sb) {
+    const { data, error } = await sb.from("student_questions").select("*").eq("id", id).maybeSingle();
+    if (error) throw error;
+    return (data as StudentQuestion) ?? null;
+  }
+  return mem.questions.find((x) => x.id === id) ?? null;
 }
 
 // ── LC 음원 zip (파일은 비공개 보관함에 브라우저에서 바로 올려요) ──────

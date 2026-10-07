@@ -1,19 +1,19 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { COURSES, PARTS, cohortLabel } from "@/lib/config";
-import { getApplications, getLecture } from "@/lib/db";
-import { getStudentIds } from "@/lib/auth";
-import { covers } from "@/lib/access";
+import { getLecture } from "@/lib/db";
+import { activeStudentApps } from "@/lib/student";
+import { canOpenLecture } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "강의 · vella_toeic", robots: { index: false } };
 
 export default async function Watch({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [apps, lecture] = await Promise.all([getApplications(await getStudentIds()), getLecture(id)]);
+  const [{ apps }, lecture] = await Promise.all([activeStudentApps(), getLecture(id)]);
 
-  // 로그인 안 했거나, 이 강의를 볼 권한이 없으면 강의실로
-  if (!lecture || !apps.some((a) => covers(a, lecture))) redirect("/class");
+  // 로그인 안 했거나, 이 강의를 볼 권한이 없으면 강의실로 (주소를 직접 입력해도 같아요)
+  if (!lecture || !canOpenLecture(apps, lecture)) redirect("/class");
 
   return (
     <div className="space-y-5 pt-8">

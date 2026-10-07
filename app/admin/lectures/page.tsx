@@ -77,8 +77,8 @@ export default async function Lectures() {
                                   </select>
                                 </label>
                                 <label><span className="text-xs text-slate-500">오전/저녁</span>
-                                  <select name="slot" defaultValue={l.slot ?? ""} className="input !py-2">
-                                    <option value="">구분 없음</option>
+                                  <select name="slot" defaultValue={l.slot ?? ""} required className="input !py-2">
+                                    {!l.slot && <option value="" disabled>선택</option>}
                                     <option value="am">오전반</option>
                                     <option value="pm">저녁반</option>
                                   </select>

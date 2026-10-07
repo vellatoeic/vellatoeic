@@ -2,11 +2,12 @@ import Link from "next/link";
 import { BOOKS, COURSES, PARTS, TIME_SLOTS, TRACKS, TRACK_PARTS, cohortLabel, todayKST, won } from "@/lib/config";
 import { liveState } from "@/lib/live";
 import AddToHome from "@/components/AddToHome";
-import { getApplications, listAudios, listLectures, listMissions, listStamps, currentCohort, getSetting } from "@/lib/db";
+import { listAudios, listLectures, listMissions, listStamps, currentCohort, getSetting } from "@/lib/db";
 import { missionCount, missionFor } from "@/lib/mission";
 import { audioBooksFor, dayDiff, studentAudioWindow } from "@/lib/audio";
-import { getStudentIds } from "@/lib/auth";
-import { canWatch, covers } from "@/lib/access";
+import { activeStudentApps } from "@/lib/student";
+import { canWatch, covers, liveLinkFor } from "@/lib/access";
+import type { TimeSlot } from "@/lib/config";
 import { studentLogout } from "@/app/actions";
 import StudentLogin from "./StudentLogin";
 import StickerBoard from "./StickerBoard";
@@ -15,9 +16,21 @@ import { defaultHolidays, holidayKey, parseHolidays, schoolDaysFor, scheduleClas
 export const dynamic = "force-dynamic";
 export const metadata = { title: "강의실 · vella_toeic", robots: { index: false } };
 
-export default async function ClassRoom() {
-  const apps = await getApplications(await getStudentIds());
-  if (apps.length === 0) return <StudentLogin />;
+export default async function ClassRoom({ searchParams }: { searchParams: Promise<{ t?: string }> }) {
+  const { loggedIn, apps } = await activeStudentApps();
+  if (!loggedIn) return <StudentLogin />;
+  // 환불·삭제된 수강생은 아무것도 볼 수 없어요.
+  if (apps.length === 0) {
+    return (
+      <div className="pt-12">
+        <div className="card mx-auto max-w-sm space-y-3 text-center">
+          <p className="font-jua text-2xl text-sky-ink">수강 정보가 없어요</p>
+          <p className="text-slate-600">Vella쌤에게 문의해 주세요.</p>
+          <form action={studentLogout}><button className="btn-ghost w-full">처음으로</button></form>
+        </div>
+      </div>
+    );
+  }
 
   const name = apps[0].name;
   const paid = apps.filter(canWatch).sort((a, b) => b.cohort.localeCompare(a.cohort));
@@ -55,12 +68,17 @@ export default async function ClassRoom() {
     }] as const;
   })));
 
-  // 맨 위 "🔴 라이브 입장": 이번 달 납부 완료 반의 수업 30분 전 ~ 종료까지 빨간색, 그 외엔 다음 라이브 안내
+  // 맨 위 탭 [☀️ 오전반 | 🌙 저녁반]: 본인 시간대가 먼저 선택되고, 교차 수강을 위해 다른 시간대로 바꿔 볼 수 있어요.
   const liveApp = paid.find((a) => a.cohort === cohort);
+  const { t } = await searchParams;
+  const ownSlot: TimeSlot = liveApp?.slot ?? paid[0]?.slot ?? "am";
+  const tab: TimeSlot = t === "am" || t === "pm" ? t : ownSlot;
+
+  // 맨 위 "🔴 라이브 입장": 고른 시간대 수업 10분 전 ~ 종료까지 빨간색, 그 외엔 다음 라이브 안내
   const liveButton = (() => {
     if (!liveApp) return null;
     const schedule = schedulesByClass.get(`${liveApp.cohort}:${scheduleClassFor(liveApp.course, liveApp.track)}`);
-    const state = liveState(liveApp, schedule?.days ?? []);
+    const state = liveState({ ...liveApp, slot: tab }, schedule?.days ?? []);
     if (!state.open) {
       return (
         <div className="rounded-3xl bg-slate-200 px-5 py-4 text-center text-slate-500">
@@ -69,10 +87,7 @@ export default async function ClassRoom() {
         </div>
       );
     }
-    const slot = state.slot;
-    const link = lectures
-      .filter((l) => covers(liveApp, l) && (!l.slot || l.slot === slot))
-      .sort((x, y) => y.created_at.localeCompare(x.created_at))[0];
+    const link = liveLinkFor(liveApp, lectures, state.slot);
     return link ? (
       <a href={`https://youtu.be/${link.youtube_id}`} target="_blank" rel="noreferrer" className="block rounded-3xl bg-red-500 px-5 py-4 text-center text-white shadow-[0_5px_0_#b91c1c] active:translate-y-1 active:shadow-none">
         <p className="font-jua text-2xl">🔴 라이브 입장</p>
@@ -109,6 +124,19 @@ export default async function ClassRoom() {
         </div>
       ))}
 
+      {paid.length > 0 && (
+        <div>
+          <div className="grid grid-cols-2 gap-1 rounded-2xl bg-white p-1 shadow-[0_2px_0_#d5ecf9]">
+            {(["am", "pm"] as const).map((s) => (
+              <Link key={s} href={`/class?t=${s}`} scroll={false} className={`rounded-xl py-2.5 text-center font-jua text-lg ${tab === s ? "bg-sky-deep text-white" : "text-sky-ink"}`}>
+                {s === "am" ? "☀️ 오전반" : "🌙 저녁반"}
+              </Link>
+            ))}
+          </div>
+          {tab !== ownSlot && <p className="mt-1.5 text-center text-xs text-slate-500">내 수강 시간은 {TIME_SLOTS[ownSlot]}이에요. 같은 반 수업은 교차 수강할 수 있어요.</p>}
+        </div>
+      )}
+
       {liveButton}
 
       {latestMission < 4 && (
@@ -127,7 +155,8 @@ export default async function ClassRoom() {
       <AddToHome />
 
       {paid.map((a) => {
-        const mine = lectures.filter((l) => covers(a, l));
+        // 강의 목록은 고른 시간대(☀️/🌙) 강의만 보여요. 구분 없는 예전 강의는 둘 다에 보여요.
+        const mine = lectures.filter((l) => covers(a, l) && (!l.slot || l.slot === tab));
         return (
           <section key={a.id} className="card">
             <div className="flex flex-wrap items-center gap-2">

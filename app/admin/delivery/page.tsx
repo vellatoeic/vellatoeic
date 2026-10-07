@@ -15,7 +15,7 @@ export default async function DeliveryPage() {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
   const cohort = await currentCohort();
   const delivery = (await listApplications())
-    .filter((a) => a.cohort === cohort && a.kind === "online" && a.pickup === "delivery")
+    .filter((a) => a.cohort === cohort && a.kind === "online" && a.pickup === "delivery" && a.status !== "refunded")
     .sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status) || a.name.localeCompare(b.name, "ko"));
   const count = (status: string) => delivery.filter((a) => a.status === status).length;
 
@@ -32,7 +32,7 @@ export default async function DeliveryPage() {
       <section className="card !p-4 sm:!p-6">
         {delivery.length > 0 ? (
           <DeliveryList
-            rows={delivery.map((a) => ({ id: a.id, name: a.name, klass: klassLabel(a), phone: phoneLabel(a.phone), address: a.address ?? "", books: a.books.map((b) => BOOKS[b]).join(", "), status: a.status }))}
+            rows={delivery.map((a) => ({ id: a.id, name: a.name, klass: klassLabel(a), phone: phoneLabel(a.phone), address: a.address ?? "", books: a.books.map((b) => BOOKS[b]).join(", "), status: a.status as "pending" | "paid" | "shipped" }))}
           />
         ) : <p className="text-center text-slate-500">이번 기수 택배 신청자가 아직 없어요.</p>}
       </section>

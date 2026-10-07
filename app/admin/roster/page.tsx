@@ -49,7 +49,7 @@ function Table({ apps }: { apps: Application[] }) {
 export default async function Roster() {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
   const cohort = await currentCohort();
-  const apps = (await listApplications()).filter((a) => a.cohort === cohort);
+  const apps = (await listApplications()).filter((a) => a.cohort === cohort && a.status !== "refunded");
   const onsite = apps.filter((a) => a.kind === "onsite");
   const desk = apps.filter((a) => a.kind === "online" && a.pickup === "classroom");
   const delivery = apps.filter((a) => a.kind === "online" && a.pickup === "delivery");

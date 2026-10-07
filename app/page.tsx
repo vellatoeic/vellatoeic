@@ -60,6 +60,7 @@ export default async function Home() {
         <div className="mt-[18px] grid gap-2.5">
           <MenuItem href="/class" icon="☁️" bg="#e3f4fd" title="강의실" sub="출석 · 스티커판 · 강의 영상" />
           <MenuItem href="/mission" icon="✅" bg="#e8f8ef" title="첫 수업 미션" sub="첫 수업 시간에 다 같이 해요" />
+          <MenuItem href="/faq" icon="❓" bg="#f3efff" title="자주 묻는 질문" sub="교재비 · 강의실 · 라이브 · 출석 · 숙제" />
           {open.length > 0 && (
             <MenuItem href="/special" icon="🎤" bg="#fff5cc" title="특강 신청" sub={open.map((e) => specialDay(e.event_date)).join(" · ")} />
           )}

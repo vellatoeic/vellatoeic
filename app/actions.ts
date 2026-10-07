@@ -8,9 +8,10 @@ import {
 } from "@/lib/config";
 import {
   createApplication, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  saveMission, type Mission, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
+  saveMission, type Mission, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
 } from "@/lib/db";
-import { canWatch } from "@/lib/access";
+import { canWatch, isActive, loginApps } from "@/lib/access";
+import { activeStudentApps } from "@/lib/student";
 import { SCHEDULE_CLASSES, holidayKey, homeworkAssignmentDays, parseHolidays, parseSchoolDays, previousMonth, scheduleKey, scheduleClassFor, schoolDaysFor, shiftSchoolDays, type ScheduleClass } from "@/lib/schedule";
 import { specialRegistrationOpen } from "@/lib/special";
 import { MISSION_STEPS, studentMission, type MissionStep } from "@/lib/mission";
@@ -79,7 +80,7 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
 
   // 같은 달에 같은 이름 + 같은 비밀번호로 이미 낸 신청이 있으면 새로 만들지 않고 그 신청 화면으로 보내요.
   // 이름이 같아도 비밀번호가 다르면 동명이인으로 보고 새로 받아요.
-  const mine = (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash));
+  const mine = (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash) && isActive(a));
   const existing = mine.find((a) => a.cohort === cohort);
   if (existing) {
     await setStudent(mine.map((a) => a.id));
@@ -111,14 +112,15 @@ export async function studentLogin(_: FormState, fd: FormData): Promise<FormStat
   const name = clean(fd.get("name"));
   const pin = clean(fd.get("pin"));
   if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 비밀번호 4자리를 입력해 주세요." };
-  const mine = (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash));
-  if (mine.length === 0) {
+  // 환불·삭제된 수강생은 로그인할 수 없어요.
+  const result = loginApps(await findByName(name), (a) => checkPin(pin, a.pin_hash));
+  if (!result.apps) {
     await sleep(800);
-    return { error: "이름 또는 비밀번호가 맞지 않아요." };
+    return { error: result.error };
   }
-  await setStudent(mine.map((a) => a.id));
+  await setStudent(result.apps.map((a) => a.id));
   const next = clean(fd.get("next"));
-  redirect(next === "/check" || next.startsWith("/check?") || next === "/class" || next === "/mission" ? next : "/class");
+  redirect(next === "/check" || next.startsWith("/check?") || next === "/class" || next === "/mission" || next === "/faq" ? next : "/class");
 }
 
 export async function studentLogout() {
@@ -144,7 +146,7 @@ export async function logout() {
 export async function changeStatus(fd: FormData) {
   if (!(await isAdmin())) return;
   const status = clean(fd.get("status")) as Status;
-  if (!["pending", "paid", "shipped"].includes(status)) return;
+  if (!["pending", "paid", "shipped", "refunded"].includes(status)) return;
   await updateApplication(clean(fd.get("id")), { status });
   revalidatePath("/admin");
 }
@@ -249,8 +251,8 @@ export async function editLecture(fd: FormData) {
   const slot = clean(fd.get("slot"));
   const title = clean(fd.get("title"));
   const yt = youtubeId(clean(fd.get("url")));
-  if (!validCohort(cohort) || !LECTURE_COURSES.includes(course) || !Object.hasOwn(PARTS, part) || !title || !yt) return;
-  await updateLecture(clean(fd.get("id")), { cohort, course, part, slot: isTimeSlot(slot) ? slot : null, title, youtube_id: yt });
+  if (!validCohort(cohort) || !LECTURE_COURSES.includes(course) || !Object.hasOwn(PARTS, part) || !isTimeSlot(slot) || !title || !yt) return;
+  await updateLecture(clean(fd.get("id")), { cohort, course, part, slot, title, youtube_id: yt });
   revalidatePath("/admin/lectures");
   revalidatePath("/class");
 }
@@ -327,6 +329,94 @@ export async function cleanupExpiredAudios() {
   revalidatePath("/admin/audio");
 }
 
+// ── 자주 묻는 질문 · 질문함 ─────────────────────
+// 학생: FAQ 아래 '여기 없는 질문 남기기' (로그인한 수강생만, 실명 저장, 알림 없음)
+export async function submitQuestion(_: FormState, fd: FormData): Promise<FormState> {
+  const { apps } = await activeStudentApps();
+  if (apps.length === 0) return { error: "강의실에 로그인한 수강생만 남길 수 있어요." };
+  const kind = clean(fd.get("kind"));
+  const content = String(fd.get("content") ?? "").trim().slice(0, 1000);
+  if (kind !== "question" && kind !== "suggestion") return { error: "질문 또는 제안을 골라 주세요." };
+  if (content.length < 2) return { error: "내용을 적어 주세요." };
+  await createQuestion({ app_id: apps[0].id, name: apps[0].name, kind, content });
+  revalidatePath("/admin/faq");
+  return { ok: "잘 받았어요! Vella쌤이 확인할게요." };
+}
+
+function faqFields(fd: FormData) {
+  const category = clean(fd.get("category")) || clean(fd.get("new_category"));
+  const question = clean(fd.get("question"));
+  const answer = String(fd.get("answer") ?? "").trim().slice(0, 3000);
+  return category && question ? { category, question, answer } : null;
+}
+
+export async function addFaq(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const fields = faqFields(fd);
+  if (!fields) return;
+  const last = (await listFaq()).reduce((m, f) => Math.max(m, f.sort_order), 0);
+  await createFaq({ ...fields, published: !!fd.get("published"), sort_order: last + 10 });
+  revalidatePath("/admin/faq");
+  revalidatePath("/faq");
+}
+
+export async function saveFaq(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const fields = faqFields(fd);
+  if (!fields) return;
+  await updateFaq(clean(fd.get("id")), { ...fields, published: !!fd.get("published") });
+  revalidatePath("/admin/faq");
+  revalidatePath("/faq");
+}
+
+export async function toggleFaq(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const item = await getFaq(clean(fd.get("id")));
+  if (item) await updateFaq(item.id, { published: !item.published });
+  revalidatePath("/admin/faq");
+  revalidatePath("/faq");
+}
+
+// 같은 카테고리 안에서 한 칸 위/아래로 옮겨요.
+export async function moveFaq(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const item = await getFaq(clean(fd.get("id")));
+  if (!item) return;
+  const all = await listFaq();
+  const list = all.filter((f) => f.category === item.category);
+  const i = list.findIndex((f) => f.id === item.id);
+  const j = clean(fd.get("dir")) === "up" ? i - 1 : i + 1;
+  if (j < 0 || j >= list.length) return;
+  await Promise.all([updateFaq(list[i].id, { sort_order: list[j].sort_order }), updateFaq(list[j].id, { sort_order: list[i].sort_order })]);
+  revalidatePath("/admin/faq");
+  revalidatePath("/faq");
+}
+
+export async function removeFaq(fd: FormData) {
+  if (!(await isAdmin())) return;
+  await deleteFaq(clean(fd.get("id")));
+  revalidatePath("/admin/faq");
+  revalidatePath("/faq");
+}
+
+export async function toggleQuestionChecked(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const q = await getQuestion(clean(fd.get("id")));
+  if (q) await updateQuestion(q.id, { checked: !q.checked });
+  revalidatePath("/admin/faq");
+}
+
+// 질문함의 질문을 숨김 상태 FAQ로 올려요. 답을 채운 뒤 공개하면 돼요.
+export async function promoteQuestion(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const q = await getQuestion(clean(fd.get("id")));
+  if (!q) return;
+  const last = (await listFaq()).reduce((m, f) => Math.max(m, f.sort_order), 0);
+  await createFaq({ category: "💬 기타", question: q.content.slice(0, 200), answer: "", published: false, sort_order: last + 10 });
+  await updateQuestion(q.id, { checked: true });
+  revalidatePath("/admin/faq");
+}
+
 // ── 첫 수업 미션 ───────────────────────────────
 const EMPTY_MISSION = { prev_score: null, target_score: null, exam_month: null, affiliation: null, instagram: null, message: null, intro_at: null, cafe_at: null, blog_at: null, insta_at: null };
 // 기존 기록(지난달 기록 포함)을 이어받아 이번 신청에 저장할 바탕을 만들어요.
@@ -387,7 +477,7 @@ export async function registerSpecialLecture(_: FormState, fd: FormData): Promis
   if (mode !== "onsite" && mode !== "online") return { error: "현장 또는 불라방을 선택해 주세요." };
   if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 강의실 비밀번호 4자리를 입력해 주세요." };
 
-  const mine = (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash));
+  const mine = (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash) && isActive(a));
   const month = mine.filter((a) => a.cohort === event.event_date.slice(0, 7));
   if (month.length === 0) {
     await sleep(800);
@@ -414,12 +504,12 @@ export async function specialLogin(_: FormState, fd: FormData): Promise<FormStat
   const name = clean(fd.get("name"));
   const pin = clean(fd.get("pin"));
   if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 강의실 비밀번호 4자리를 입력해 주세요." };
-  const mine = (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash));
-  if (mine.length === 0) {
+  const result = loginApps(await findByName(name), (a) => checkPin(pin, a.pin_hash));
+  if (!result.apps) {
     await sleep(800);
-    return { error: "이름 또는 강의실 비밀번호가 맞지 않아요." };
+    return { error: result.error };
   }
-  await setStudent(mine.map((a) => a.id));
+  await setStudent(result.apps.map((a) => a.id));
   redirect("/special");
 }
 
@@ -494,11 +584,12 @@ export async function changeClass(fd: FormData) {
   revalidatePath("/admin");
 }
 
-// 수강 시간(오전반/저녁반) 바꾸기. 비우면 '시간 미정'이 돼요.
+// 수강 시간(오전반/저녁반) 바꾸기. 시간 미정으로 되돌릴 수는 없어요.
 export async function changeSlot(fd: FormData) {
   if (!(await isAdmin())) return;
   const slot = clean(fd.get("slot"));
-  await updateApplication(clean(fd.get("id")), { slot: isTimeSlot(slot) ? slot : null });
+  if (!isTimeSlot(slot)) return; // 오전반/저녁반 중 하나만 (시간 미정 없음)
+  await updateApplication(clean(fd.get("id")), { slot });
   revalidatePath("/admin");
   revalidatePath("/admin/roster");
 }
@@ -619,7 +710,8 @@ export async function bulkMarkBooksDone(fd: FormData) {
 export async function bulkChangeSlot(fd: FormData) {
   if (!(await isAdmin())) return;
   const slot = clean(fd.get("slot"));
-  await updateApplications(checkedIds(fd), { slot: isTimeSlot(slot) ? slot : null });
+  if (!isTimeSlot(slot)) return;
+  await updateApplications(checkedIds(fd), { slot });
   revalidatePath("/admin");
   revalidatePath("/admin/roster");
 }

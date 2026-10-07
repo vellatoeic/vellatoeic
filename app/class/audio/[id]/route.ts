@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { getStudentIds, isAdmin } from "@/lib/auth";
-import { audioDownloadUrl, getApplications, getAudio } from "@/lib/db";
-import { audioBooksFor, studentAudioWindow } from "@/lib/audio";
+import { isAdmin } from "@/lib/auth";
+import { activeStudentApps } from "@/lib/student";
+import { canDownloadAudio } from "@/lib/access";
+import { audioDownloadUrl, getAudio } from "@/lib/db";
+import { studentAudioWindow } from "@/lib/audio";
 import { todayKST } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
@@ -14,16 +16,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   let allowed = await isAdmin();
   if (!allowed) {
-    const today = todayKST();
-    const apps = (await getApplications(await getStudentIds()))
-      .filter((a) => a.cohort === audio.cohort && audioBooksFor(a).includes(audio.book));
-    for (const app of apps) {
-      const period = await studentAudioWindow(app);
-      if (period && today >= period.start && today <= period.end) {
-        allowed = true;
-        break;
-      }
-    }
+    const { apps } = await activeStudentApps();
+    const candidates = apps.filter((a) => a.cohort === audio.cohort);
+    const periods = new Map(await Promise.all(candidates.map(async (a) => [a.id, await studentAudioWindow(a)] as const)));
+    allowed = canDownloadAudio(candidates, audio, (a) => periods.get(a.id) ?? null, todayKST());
   }
   if (!allowed) return new NextResponse("다운로드 기간이 아니거나 받을 수 없는 음원이에요.", { status: 403 });
 

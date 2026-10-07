@@ -14,8 +14,9 @@ export const metadata = { robots: { index: false } };
 type Filters = { k: string; p: string; b: string; t: string; q: string; c: string };
 
 const KIND_FILTERS = [["all", "전체"], ["onsite", "현장"], ["online", "불라방"]] as const;
-const PAY_FILTERS = [["all", "전체"], ["pending", "미납"], ["paid", "납부 완료"]] as const;
-const TIME_FILTERS = [["all", "전체"], ["am", "오전반"], ["pm", "저녁반"], ["none", "시간 미정"]] as const;
+const PAY_FILTERS = [["all", "전체"], ["pending", "미납"], ["paid", "납부 완료"], ["refunded", "환불"]] as const;
+const TIME_FILTERS = [["all", "전체"], ["am", "오전반"], ["pm", "저녁반"]] as const;
+const isPaid = (a: Application) => a.status === "paid" || a.status === "shipped";
 const SLOT_ORDER: (TimeSlot | null)[] = ["am", "pm", null];
 const BOOK_FILTERS = [["all", "전체"], ["todo", "수령·발송 대기"], ["done", "수령·발송 완료"]] as const;
 
@@ -42,7 +43,7 @@ function Row({ a, group, mission }: { a: Application; group: string; mission?: M
             <b className="text-sky-ink">{a.name}</b>
             {a.depositor !== a.name && <span className="text-sm text-slate-500">(입금자 {a.depositor})</span>}
             <Badge tone={a.kind === "onsite" ? "slate" : "sky"}>{KINDS[a.kind].short}{a.kind === "online" ? ` · ${a.pickup === "delivery" ? "택배" : "1층 데스크"}` : ""}</Badge>
-            <Badge tone={a.status === "pending" ? "amber" : "green"}>{a.status === "pending" ? "미납" : "납부 완료"}</Badge>
+            <Badge tone={a.status === "pending" ? "amber" : a.status === "refunded" ? "slate" : "green"}>{a.status === "pending" ? "미납" : a.status === "refunded" ? "환불" : "납부 완료"}</Badge>
             {a.kind === "online" && <Badge tone={a.status === "shipped" ? "green" : a.status === "paid" ? "amber" : "slate"}>교재 {book}</Badge>}
             {a.continuing && <Badge tone="slate">이어듣기</Badge>}
             <Badge tone={missionCount(mission) === 4 ? "green" : "slate"}>미션 {missionCount(mission)}/4</Badge>
@@ -71,16 +72,26 @@ function Row({ a, group, mission }: { a: Application; group: string; mission?: M
               {a.status === "paid" && a.kind === "online" && (
                 <button name="status" value="shipped" className="btn !px-4 !py-1.5 !text-sm">{a.pickup === "delivery" ? "발송 완료" : "수령 완료"}</button>
               )}
-              {a.status !== "pending" && (
+              {isPaid(a) && (
                 <button name="status" value={a.status === "shipped" ? "paid" : "pending"} className="btn-ghost !py-1.5 text-sm">
                   {a.status === "shipped" ? "교재 상태 되돌리기" : "미납으로 되돌리기"}
                 </button>
               )}
+              {a.status === "refunded" && <button name="status" value="paid" className="btn-ghost !py-1.5 text-sm">환불 취소 (납부 완료로)</button>}
             </CloseOnSubmitForm>
+            {a.status !== "refunded" && (
+              <details className="text-sm">
+                <summary className="cursor-pointer text-amber-600">환불 처리</summary>
+                <CloseOnSubmitForm action={changeStatus} className="mt-1">
+                  <input type="hidden" name="id" value={a.id} />
+                  <button name="status" value="refunded" className="rounded-xl bg-amber-50 px-3 py-1.5 font-bold text-amber-700">환불로 바꾸기 (강의실 로그인이 막혀요 · 출석·납부 기록은 남아요)</button>
+                </CloseOnSubmitForm>
+              </details>
+            )}
             <CloseOnSubmitForm action={changeSlot} className="flex items-center gap-2">
               <input type="hidden" name="id" value={a.id} />
-              <select name="slot" defaultValue={a.slot ?? ""} className="input !w-32 !py-1.5 text-sm">
-                <option value="">시간 미정</option>
+              <select name="slot" defaultValue={a.slot ?? ""} required className="input !w-32 !py-1.5 text-sm">
+                {!a.slot && <option value="" disabled>시간 선택</option>}
                 <option value="am">오전반</option>
                 <option value="pm">저녁반</option>
               </select>
@@ -144,14 +155,17 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   const round = await roundFor(now);
   // 이번 모집 기수에서 아직 입금 확인이 안 된 학생 (수업 전에 확인해야 라이브·강의가 열려요)
   const waiting = everything.filter((a) => a.cohort === now && a.status === "pending").sort((a, b) => a.created_at.localeCompare(b.created_at));
+  // 수강 시간이 아직 비어 있는 학생 (예전 신청). 오전/저녁을 정해 주세요.
+  const unslotted = everything.filter((a) => a.cohort === now && !a.slot && a.status !== "refunded").sort((a, b) => a.name.localeCompare(b.name, "ko"));
   const cohorts = [...new Set([now, ...everything.map((a) => a.cohort)])].sort().reverse();
   const all = c === "all" ? everything : everything.filter((a) => a.cohort === c);
 
   const list = all.filter((a) => {
     if (k !== "all" && a.kind !== k) return false;
     if (p === "pending" && a.status !== "pending") return false;
-    if (p === "paid" && a.status === "pending") return false;
-    if (t === "none" ? a.slot : t !== "all" && a.slot !== t) return false;
+    if (p === "paid" && !isPaid(a)) return false;
+    if (p === "refunded" && a.status !== "refunded") return false;
+    if (t !== "all" && a.slot !== t) return false;
     if (b === "todo" && !bookTodo(a)) return false;
     if (b === "done" && !(a.kind === "online" && a.status === "shipped")) return false;
     if (q && !`${a.name} ${a.depositor} ${a.phone ?? ""}`.includes(q)) return false;
@@ -207,6 +221,29 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
         </CloseOnSubmitForm>
       )}
 
+      {unslotted.length > 0 && (
+        <CloseOnSubmitForm action={bulkChangeSlot} className="block rounded-3xl border-2 border-sky-main bg-white p-5">
+          <p className="font-jua text-xl text-sky-ink">🕒 수강 시간을 정해야 하는 학생 {unslotted.length}명</p>
+          <p className="mt-1 text-sm text-slate-600">예전에 신청해서 오전/저녁이 비어 있어요. 체크한 뒤 오전반 또는 저녁반을 눌러 주세요.</p>
+          <label className="mt-3 flex items-center gap-2 text-sm font-bold text-sky-ink"><SelectAll group="unslotted" /> {unslotted.length}명 전체 선택</label>
+          <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+            {unslotted.map((a) => (
+              <li key={a.id}>
+                <label className="flex items-center gap-2 rounded-xl bg-sky-soft px-3 py-2 text-sm">
+                  <input type="checkbox" name="ids" value={a.id} data-group="unslotted" className="h-4 w-4 accent-sky-deep" />
+                  <b className="text-sky-ink">{a.name}</b>
+                  <span className="text-slate-500">{KINDS[a.kind].short} · {COURSES[a.course].label} {TRACKS[a.track]}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button name="slot" value="am" className="btn !py-2.5 !text-base">☀️ 오전반으로</button>
+            <button name="slot" value="pm" className="btn !py-2.5 !text-base">🌙 저녁반으로</button>
+          </div>
+        </CloseOnSubmitForm>
+      )}
+
       <details className="card !p-4">
         <summary className="font-jua cursor-pointer text-lg text-sky-ink">⚙️ 기본 설정 (모집 기수 · 계좌 · 카페·블로그 주소)</summary>
         <div className="mt-4">
@@ -258,7 +295,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
         {[
           { label: "전체 신청", value: `${all.length}명`, sub: `현장 ${count((a) => a.kind === "onsite")} · 불라방 ${count((a) => a.kind === "online")}`, href: link({ k: "all", p: "all", b: "all" }) },
           { label: "미납", value: `${count((a) => a.status === "pending")}명`, sub: "눌러서 미납만 보기", href: link({ p: "pending", b: "all" }), warn: true },
-          { label: "납부 완료", value: `${count((a) => a.status !== "pending")}명`, sub: won(all.filter((a) => a.status !== "pending").reduce((s, a) => s + a.amount, 0)), href: link({ p: "paid" }) },
+          { label: "납부 완료", value: `${count(isPaid)}명`, sub: won(all.filter(isPaid).reduce((s, a) => s + a.amount, 0)), href: link({ p: "paid" }) },
           { label: "불라방 교재 대기", value: `${count(bookTodo)}명`, sub: `데스크 ${count((a) => bookTodo(a) && a.pickup === "classroom")} · 택배 ${count((a) => bookTodo(a) && a.pickup === "delivery")}`, href: link({ k: "online", p: "all", b: "todo" }) },
           { label: "불라방 교재 완료", value: `${count((a) => a.kind === "online" && a.status === "shipped")}명`, sub: "수령·발송 완료", href: link({ k: "online", p: "all", b: "done" }) },
         ].map((s) => (
@@ -323,7 +360,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
               <select name="slot" className="input !w-36 !py-2">
                 <option value="am">오전반</option>
                 <option value="pm">저녁반</option>
-                <option value="">시간 미정</option>
+                
               </select>
               <button formAction={bulkChangeSlot} className="btn-ghost whitespace-nowrap !py-2">변경</button>
             </div>

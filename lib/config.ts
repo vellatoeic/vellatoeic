@@ -12,7 +12,7 @@ export type CourseId = "start" | "solve" | "intensive";
 export type Track = "all" | "rc" | "lc" | "alt_mw" | "alt_tt" | "alt";
 export type Kind = "onsite" | "online";
 export type Pickup = "classroom" | "delivery";
-export type Status = "pending" | "paid" | "shipped";
+export type Status = "pending" | "paid" | "shipped" | "refunded";
 export type TimeSlot = "am" | "pm";
 
 // 매달 같은 책: 개념집, 시작반 RC / 달마다 번갈아 바뀌는 책: 문풀반 RC 1·2, LC 1·2
@@ -99,6 +99,7 @@ export function pickupLabel(kind: Kind, pickup: Pickup) {
 export function bookStatusLabel(a: { kind: Kind; pickup: Pickup; status: Status }) {
   if (a.kind === "onsite") return "첫날 지급";
   const delivery = a.pickup === "delivery";
+  if (a.status === "refunded") return "환불";
   if (a.status === "pending") return "납부 후 진행";
   if (a.status === "paid") return delivery ? "발송 대기" : "수령 대기";
   return delivery ? "발송 완료" : "수령 완료";
@@ -108,6 +109,7 @@ export const STATUS_LABEL: Record<Status, string> = {
   pending: "입금 확인 중",
   paid: "납부 완료",
   shipped: "교재 발송 완료",
+  refunded: "환불",
 };
 
 export const INSTAGRAM_URL = "https://www.instagram.com/vella_toeic/";
@@ -191,7 +193,7 @@ export function dayLabel(d: string) {
 export type Slot = { label: string; from: string; to: string; detail: string };
 
 const START_TIME: Slot[] = [
-  { label: "오전반", from: "10:00", to: "12:10", detail: "RC 10:00~11:00 · LC 11:00~12:10" },
+  { label: "오전반", from: "10:00", to: "12:10", detail: "RC 10:00~11:00 · LC 11:10~12:10" },
   { label: "저녁반", from: "19:10", to: "21:20", detail: "LC 19:10~20:10 · RC 20:20~21:20" },
 ];
 const SOLVE_TIME: Slot[] = [

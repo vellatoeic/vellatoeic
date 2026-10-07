@@ -13,6 +13,16 @@ export default async function MyPage({ params, searchParams }: { params: Promise
   const { again } = await searchParams;
   const a = await getApplication(id);
   if (!a) notFound();
+  if (a.status === "refunded") {
+    return (
+      <div className="pt-12">
+        <div className="card mx-auto max-w-sm space-y-2 text-center">
+          <p className="font-jua text-2xl text-sky-ink">환불 처리된 신청이에요</p>
+          <p className="text-slate-600">수강 정보가 없어요. Vella쌤에게 문의해 주세요.</p>
+        </div>
+      </div>
+    );
+  }
   const account = await getSetting("bank_account");
 
   const online = a.kind === "online";

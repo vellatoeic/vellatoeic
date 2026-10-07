@@ -1,6 +1,5 @@
 import "server-only";
 import { getSetting, type Application, type LcAudio } from "./db";
-import { canWatch } from "./access";
 import { SCHEDULE_CLASSES, scheduleClassFor, scheduleKey, schoolDaysFor, type ScheduleClass } from "./schedule";
 
 export const AUDIO_DAYS = 14; // 첫 수업일부터 다운로드할 수 있는 날 수
@@ -20,10 +19,7 @@ async function classWindow(cohort: string, klass: ScheduleClass) {
   return { start: days[0], end: addDays(days[0], AUDIO_DAYS - 1) };
 }
 
-// 신청 교재에 들어 있는 LC 교재 (RC 단과는 없어서 음원도 안 보여요)
-export function audioBooksFor(app: Application): LcAudio["book"][] {
-  return canWatch(app) ? app.books.filter(isAudioBook) : [];
-}
+export { audioBooksFor } from "./access";
 
 // 학생 본인 반의 다운로드 기간 (첫 수업일 ~ 14일째)
 export function studentAudioWindow(app: Application) {

@@ -12,7 +12,7 @@ import AdminTabs from "../AdminTabs";
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
 
-const SLOT_FILTERS = [["am", "오전반"], ["pm", "저녁반"], ["none", "시간 미정"], ["all", "전체"]] as const;
+const SLOT_FILTERS = [["am", "오전반"], ["pm", "저녁반"], ["all", "전체"]] as const;
 
 export default async function Stamps({ searchParams }: { searchParams: Promise<{ k?: string; t?: string }> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
@@ -24,7 +24,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
   const everyone = (await listApplications()).filter((a) => a.cohort === cohort && canWatch(a));
   // 일괄 붙이기 대상: 수강 시간으로 걸러서 반별로 묶어요.
   const bulkApps = everyone
-    .filter((a) => (t === "all" ? true : t === "none" ? !a.slot : a.slot === t))
+    .filter((a) => (t === "all" ? true : a.slot === t))
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
   const bulkGroups = (Object.keys(COURSES) as CourseId[]).flatMap((co) =>
     (Object.keys(TRACKS) as Track[]).map((tr) => ({ key: `${co}-${tr}`, title: `${COURSES[co].label} ${TRACKS[tr]}`, items: bulkApps.filter((a) => a.course === co && a.track === tr) })),

@@ -1,7 +1,7 @@
 import { KLASS_TIME, TIME_SLOTS, isAlt, klassOf, type CourseId, type TimeSlot, type Track } from "./config";
 import { specialDay } from "./special";
 
-export const LIVE_OPEN_BEFORE_MIN = 30; // 라이브 입장 버튼은 수업 30분 전부터 빨간색
+export const LIVE_OPEN_BEFORE_MIN = 10; // 라이브 입장 버튼은 수업 10분 전부터 빨간색
 
 const toMin = (hhmm: string) => {
   const [h, m] = hhmm.split(":").map(Number);

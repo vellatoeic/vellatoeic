@@ -1,4 +1,4 @@
-import { getStudentIds } from "@/lib/auth";
+import { activeStudentApps } from "@/lib/student";
 import { getSpecialRegistrationsFor, listSpecialLectures, listSpecialMaterials } from "@/lib/db";
 import { CLASSROOM } from "@/lib/config";
 import { specialLogout } from "@/app/actions";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "특강 신청 · vella_toeic", robots: { index: false } };
 
 export default async function SpecialPage() {
-  const [events, mine] = await Promise.all([listSpecialLectures(), getStudentIds().then(getSpecialRegistrationsFor)]);
+  const [events, mine] = await Promise.all([listSpecialLectures(), activeStudentApps().then(({ apps }) => getSpecialRegistrationsFor(apps.map((a) => a.id)))]);
   const open = events.filter((event) => specialRegistrationOpen(event.event_date, event.starts_at));
   const eventById = new Map(events.map((event) => [event.id, event]));
   const myRows = await Promise.all(

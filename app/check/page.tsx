@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { todayKST } from "@/lib/config";
-import { getApplications, addAttendance, currentCohort, listStamps } from "@/lib/db";
-import { getStudentIds } from "@/lib/auth";
+import { addAttendance, currentCohort, listStamps } from "@/lib/db";
+import { activeStudentApps } from "@/lib/student";
 import { canWatch } from "@/lib/access";
 import StudentLogin from "../class/StudentLogin";
 
@@ -23,7 +23,10 @@ function Box({ title, children }: { title: string; children: React.ReactNode }) 
 // 출석 QR은 하나예요. 반·시간 구분 없이, 찍으면 오늘 출석으로 남아요.
 // (예전에 인쇄한 반별 QR의 ?k=… 주소로 들어와도 똑같이 출석돼요.)
 export default async function Check() {
-  const apps = await getApplications(await getStudentIds());
+  const { loggedIn, apps } = await activeStudentApps();
+  if (loggedIn && apps.length === 0) {
+    return <Box title="수강 정보가 없어요"><p className="text-slate-600">Vella쌤에게 문의해 주세요.</p></Box>;
+  }
   if (apps.length === 0) {
     return <StudentLogin next="/check" note="출석하려면 먼저 로그인해 주세요. (처음 한 번만)" />;
   }
