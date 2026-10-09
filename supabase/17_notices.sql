@@ -48,13 +48,14 @@ select '📚 다음 수업부터 문풀반 스터디 시작!',
          {"icon":"💻","title":"현장 참여가 어려운 날","body":"숙제 후 1~30번 답 단서를 적고, 헷갈린 문제 번호를 숙제 게시글 댓글로 남겨 주세요","gray":true}
        ]'::jsonb,
        '✅ 인증하러 가기', '@study',
-       '[{"courses":["solve"],"tracks":["all","rc"],"kinds":["onsite"]}]'::jsonb,
+       -- 대상: 문풀반(종합·격일·RC 단과) 현장 + 속성반 저녁반 현장
+       '[{"courses":["solve"],"tracks":["all","rc"],"kinds":["onsite"]},{"courses":["intensive"],"kinds":["onsite"],"slots":["pm"]}]'::jsonb,
        current_date, (date_trunc('month', current_date) + interval '1 month - 1 day')::date, true, false, now()
 where not exists (select 1 from public.notices where title = '📚 다음 수업부터 문풀반 스터디 시작!');
 
 insert into public.notices (title, to_label, lead, sections, link_label, link_url, targets, starts_on, ends_on, popup, pinned, created_at)
 select '📚 다음 수업부터 스터디 시작! (온라인 참여)',
-       '실전속성반 · 불라방 수강생 안내',
+       '실전속성반 오전 · 불라방 수강생 안내',
        '수업 시간에 안내한 대로 **다음 수업부터 스터디를 진행해요.**' || chr(10) || '아래 방법으로 미리 준비해 주세요 :)',
        '[
          {"icon":"✏️","title":"스터디 방법","body":"숙제를 마친 뒤 PART 5 **1~30번의 답 단서**를 적어 주세요"},
@@ -62,7 +63,8 @@ select '📚 다음 수업부터 스터디 시작! (온라인 참여)',
          {"icon":"✅","title":"스터디 인증","body":"네이버 카페 **''문풀반 스터디 인증''** 게시판에 인증 글을 남기면 **스터디 완료!**"}
        ]'::jsonb,
        '✅ 인증하러 가기', '@study',
-       '[{"courses":["intensive"]},{"courses":["solve"],"tracks":["all","rc"],"kinds":["online"]}]'::jsonb,
+       -- 대상: 문풀반(종합·격일·RC 단과) 불라방 + 속성반 오전반 전체(현장·불라방) + 속성반 저녁반 불라방
+       '[{"courses":["solve"],"tracks":["all","rc"],"kinds":["online"]},{"courses":["intensive"],"slots":["am"]},{"courses":["intensive"],"kinds":["online"],"slots":["pm"]}]'::jsonb,
        current_date, (date_trunc('month', current_date) + interval '1 month - 1 day')::date, true, false, now() + interval '1 second'
 where not exists (select 1 from public.notices where title = '📚 다음 수업부터 스터디 시작! (온라인 참여)');
 
