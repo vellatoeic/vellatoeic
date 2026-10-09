@@ -1,5 +1,6 @@
 -- 공지 팝업 + 확인 기록 + 첫 공지 2개. 여러 번 실행해도 안전해요.
 -- 기존 데이터는 지우거나 바꾸지 않아요.
+-- 이미 다른 용도의 public.notices 표가 있어서, 이 사이트 공지는 site_notices / site_notice_reads 표를 따로 써요 (기존 표는 건드리지 않아요).
 
 begin;
 
@@ -7,7 +8,7 @@ begin;
 --    targets: 대상 조건 목록 (비어 있으면 전체). 예) [{"courses":["solve"],"tracks":["all","rc"],"kinds":["onsite"]}]
 --    sections: [{"icon":"🕘","title":"언제 · 어디서","body":"**수업 30분 전, 704호**로 입실해 주세요","gray":false}]
 --    link_url이 '@study'면 관리자 설정의 '스터디 인증 게시판 링크'로 열려요.
-create table if not exists public.notices (
+create table if not exists public.site_notices (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   to_label text not null default '',
@@ -24,19 +25,19 @@ create table if not exists public.notices (
 );
 
 -- 2) 공지 확인 기록 (수강 신청 1건마다)
-create table if not exists public.notice_reads (
-  notice_id uuid not null references public.notices(id) on delete cascade,
+create table if not exists public.site_notice_reads (
+  notice_id uuid not null references public.site_notices(id) on delete cascade,
   app_id uuid not null references public.applications(id) on delete cascade,
   read_at timestamptz not null default now(),
   primary key (notice_id, app_id)
 );
 
-alter table public.notices enable row level security;
-alter table public.notice_reads enable row level security;
-grant select, insert, update, delete on public.notices, public.notice_reads to service_role;
+alter table public.site_notices enable row level security;
+alter table public.site_notice_reads enable row level security;
+grant select, insert, update, delete on public.site_notices, public.site_notice_reads to service_role;
 
 -- 3) 첫 공지 2개 (게시 기간: 오늘 ~ 이번 달 말일, 같은 제목이 없을 때만)
-insert into public.notices (title, to_label, lead, sections, link_label, link_url, targets, starts_on, ends_on, popup, pinned, created_at)
+insert into public.site_notices (title, to_label, lead, sections, link_label, link_url, targets, starts_on, ends_on, popup, pinned, created_at)
 select '📚 다음 수업부터 문풀반 스터디 시작!',
        '문풀반 · 현장 수강생 안내',
        '수업 시간에 안내한 대로 **다음 수업부터 스터디를 진행해요.**' || chr(10) || '아래 내용 확인하고 미리 준비해 주세요 :)',
@@ -51,9 +52,9 @@ select '📚 다음 수업부터 문풀반 스터디 시작!',
        -- 대상: 문풀반(종합·격일·RC 단과) 현장 + 속성반 저녁반 현장
        '[{"courses":["solve"],"tracks":["all","rc"],"kinds":["onsite"]},{"courses":["intensive"],"kinds":["onsite"],"slots":["pm"]}]'::jsonb,
        current_date, (date_trunc('month', current_date) + interval '1 month - 1 day')::date, true, false, now()
-where not exists (select 1 from public.notices where title = '📚 다음 수업부터 문풀반 스터디 시작!');
+where not exists (select 1 from public.site_notices where title = '📚 다음 수업부터 문풀반 스터디 시작!');
 
-insert into public.notices (title, to_label, lead, sections, link_label, link_url, targets, starts_on, ends_on, popup, pinned, created_at)
+insert into public.site_notices (title, to_label, lead, sections, link_label, link_url, targets, starts_on, ends_on, popup, pinned, created_at)
 select '📚 다음 수업부터 스터디 시작! (온라인 참여)',
        '실전속성반 오전 · 불라방 수강생 안내',
        '수업 시간에 안내한 대로 **다음 수업부터 스터디를 진행해요.**' || chr(10) || '아래 방법으로 미리 준비해 주세요 :)',
@@ -66,7 +67,7 @@ select '📚 다음 수업부터 스터디 시작! (온라인 참여)',
        -- 대상: 문풀반(종합·격일·RC 단과) 불라방 + 속성반 오전반 전체(현장·불라방) + 속성반 저녁반 불라방
        '[{"courses":["solve"],"tracks":["all","rc"],"kinds":["online"]},{"courses":["intensive"],"slots":["am"]},{"courses":["intensive"],"kinds":["online"],"slots":["pm"]}]'::jsonb,
        current_date, (date_trunc('month', current_date) + interval '1 month - 1 day')::date, true, false, now() + interval '1 second'
-where not exists (select 1 from public.notices where title = '📚 다음 수업부터 스터디 시작! (온라인 참여)');
+where not exists (select 1 from public.site_notices where title = '📚 다음 수업부터 스터디 시작! (온라인 참여)');
 
 commit;
 

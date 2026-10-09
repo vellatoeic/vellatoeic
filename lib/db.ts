@@ -335,7 +335,7 @@ export type NoticeFields = Omit<Notice, "id" | "created_at">;
 
 export async function listNotices(): Promise<Notice[]> {
   if (sb) {
-    const { data, error } = await sb.from("notices").select("*").order("created_at", { ascending: false });
+    const { data, error } = await sb.from("site_notices").select("*").order("created_at", { ascending: false });
     if (error) throw error;
     return data as Notice[];
   }
@@ -344,7 +344,7 @@ export async function listNotices(): Promise<Notice[]> {
 
 export async function createNotice(n: NoticeFields) {
   if (sb) {
-    const { error } = await sb.from("notices").insert(n);
+    const { error } = await sb.from("site_notices").insert(n);
     if (error) throw error;
     return;
   }
@@ -354,7 +354,7 @@ export async function createNotice(n: NoticeFields) {
 export async function updateNotice(id: string, n: Partial<NoticeFields>) {
   if (!isUuid(id)) return;
   if (sb) {
-    const { error } = await sb.from("notices").update(n).eq("id", id);
+    const { error } = await sb.from("site_notices").update(n).eq("id", id);
     if (error) throw error;
     return;
   }
@@ -365,7 +365,7 @@ export async function updateNotice(id: string, n: Partial<NoticeFields>) {
 export async function deleteNotice(id: string) {
   if (!isUuid(id)) return;
   if (sb) {
-    const { error } = await sb.from("notices").delete().eq("id", id);
+    const { error } = await sb.from("site_notices").delete().eq("id", id);
     if (error) throw error;
     return;
   }
@@ -377,7 +377,7 @@ export async function listNoticeReads(filter: { appIds?: string[] } = {}): Promi
   const ids = filter.appIds?.filter(isUuid);
   if (ids && ids.length === 0) return [];
   if (sb) {
-    let q = sb.from("notice_reads").select("*");
+    let q = sb.from("site_notice_reads").select("*");
     if (ids) q = q.in("app_id", ids);
     const { data, error } = await q;
     if (error) throw error;
@@ -391,7 +391,7 @@ export async function markNoticeRead(noticeId: string, appIds: string[]) {
   if (!isUuid(noticeId) || ids.length === 0) return;
   const rows = ids.map((app_id) => ({ notice_id: noticeId, app_id }));
   if (sb) {
-    const { error } = await sb.from("notice_reads").upsert(rows, { onConflict: "notice_id,app_id", ignoreDuplicates: true });
+    const { error } = await sb.from("site_notice_reads").upsert(rows, { onConflict: "notice_id,app_id", ignoreDuplicates: true });
     if (error) throw error;
     return;
   }
