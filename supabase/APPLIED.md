@@ -20,6 +20,7 @@ Vella가 Supabase SQL Editor에서 실행했다고 확인한 SQL 파일만 기�
 | `14_special_deposit.sql` | 완료 | 특강 현장 신청 보증금 상태(deposit, deposit_paid_at) 추가, 입금 문자 기록 표(deposit_events) 생성 |
 | `15_book_auto_pickup.sql` | 완료 | 데스크 수령 희망 날짜·시간(pickup_date, pickup_time), 입금 기록 application_id 추가, FAQ 카테고리 '📦 수령 안내'·답 2곳 수정, 택배 FAQ 추가 |
 | `16_daily_tests.sql` | 완료 | 문풀반 데일리 테스트 결과 표(test_results)·날짜별 번호 수정 표(test_overrides) 생성 |
+| `17_notices.sql` | 완료 | 공지 표(site_notices)·공지 확인 기록 표(site_notice_reads) 생성, 첫 공지 2개(현장 스터디·온라인 참여) 입력. 기존 public.notices 표는 건드리지 않음 |
 
 ## 기록 갱신 규칙
 
