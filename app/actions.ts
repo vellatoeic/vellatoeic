@@ -8,12 +8,14 @@ import {
 } from "@/lib/config";
 import {
   createApplication, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  saveMission, type Mission, listTestResults, saveTestResult, saveTestOverride, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
+  saveMission, type Mission, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
 } from "@/lib/db";
 import { canWatch, isActive, loginApps } from "@/lib/access";
 import { parseBankSms } from "@/lib/bankSms";
 import { checkTestAnswer, testsForClassDay, type TestKind } from "@/lib/tests";
 import { classDaysOf, planFor, takesTests } from "@/lib/dailyTests";
+import { noticeIdentity } from "@/lib/noticeView";
+import type { NoticeSection, NoticeTarget } from "@/lib/notices";
 import { activeStudentApps } from "@/lib/student";
 import { SCHEDULE_CLASSES, holidayKey, homeworkAssignmentDays, parseHolidays, parseSchoolDays, previousMonth, scheduleKey, scheduleClassFor, schoolDaysFor, shiftSchoolDays, type ScheduleClass } from "@/lib/schedule";
 import { specialRegistrationOpen } from "@/lib/special";
@@ -191,7 +193,7 @@ export async function saveSettings(fd: FormData) {
     }
   }
   // 첫 수업 미션 링크 (비워두면 미션 화면에서 버튼이 숨겨져요)
-  for (const key of ["cafe_url", "blog_url"]) {
+  for (const key of ["cafe_url", "blog_url", "study_board_url"]) {
     const value = clean(fd.get(key));
     try {
       if (!value || new URL(value).protocol === "https:") await setSetting(key, value);
@@ -343,6 +345,64 @@ export async function cleanupExpiredAudios() {
     if (end && end < today) await deleteAudios(all.filter((a) => a.cohort === cohort));
   }
   revalidatePath("/admin/audio");
+}
+
+// ── 공지 ───────────────────────────────────────
+// 학생: [확인했어요] → 이번 기수 본인 신청 모두에 확인 기록 (다시 안 떠요)
+export async function readNotice(fd: FormData) {
+  const { apps } = await noticeIdentity();
+  await markNoticeRead(clean(fd.get("id")), apps.map((a) => a.id));
+  revalidatePath("/", "layout");
+}
+
+const COURSE_IDS = ["start", "solve", "intensive"] as const;
+const TRACK_GROUPS = ["all", "alt", "rc", "lc"] as const;
+
+// 관리자: 공지 저장 (새로 만들기 / 고치기). 섹션·대상은 편집 화면이 JSON으로 보내요.
+export async function saveNoticeAction(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const parse = <T,>(k: string): T[] => { try { const v = JSON.parse(String(fd.get(k) ?? "[]")); return Array.isArray(v) ? v : []; } catch { return []; } };
+  const text = (v: unknown, n: number) => String(v ?? "").trim().slice(0, n);
+  const sections: NoticeSection[] = parse<NoticeSection>("sections_json")
+    .map((x) => ({ icon: text(x.icon, 8) || "📌", title: text(x.title, 60), body: text(x.body, 1000), gray: !!x.gray }))
+    .filter((x) => x.title || x.body)
+    .slice(0, 12);
+  const pick = <T extends string>(arr: unknown, allowed: readonly T[]) => (Array.isArray(arr) ? arr.filter((v): v is T => allowed.includes(v as T)) : []);
+  const targets: NoticeTarget[] = parse<NoticeTarget>("targets_json").map((r) => ({
+    courses: pick(r.courses, COURSE_IDS),
+    tracks: pick(r.tracks, TRACK_GROUPS),
+    kinds: pick(r.kinds, ["onsite", "online"] as const),
+    slots: pick(r.slots, ["am", "pm"] as const),
+  })).slice(0, 10);
+  const title = clean(fd.get("title"));
+  const starts_on = clean(fd.get("starts_on"));
+  const ends_on = clean(fd.get("ends_on"));
+  if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(starts_on) || !/^\d{4}-\d{2}-\d{2}$/.test(ends_on) || ends_on < starts_on) return;
+  const useStudy = !!fd.get("link_study");
+  const linkUrl = clean(fd.get("link_url"));
+  const fields = {
+    title,
+    to_label: clean(fd.get("to_label")),
+    lead: String(fd.get("lead") ?? "").trim().slice(0, 600),
+    sections,
+    link_label: clean(fd.get("link_label")) || null,
+    link_url: useStudy ? "@study" : /^https:\/\//.test(linkUrl) ? linkUrl : null,
+    targets,
+    starts_on,
+    ends_on,
+    popup: !!fd.get("popup"),
+    pinned: !!fd.get("pinned"),
+  };
+  const id = clean(fd.get("id"));
+  if (id) await updateNotice(id, fields);
+  else await createNotice(fields);
+  revalidatePath("/", "layout");
+}
+
+export async function deleteNoticeAction(fd: FormData) {
+  if (!(await isAdmin())) return;
+  await deleteNotice(clean(fd.get("id")));
+  revalidatePath("/", "layout");
 }
 
 // ── 문풀반 데일리 테스트 ───────────────────────

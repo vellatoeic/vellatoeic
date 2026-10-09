@@ -147,11 +147,12 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   const now = await currentCohort();
   const { k = "all", p = "all", b = "all", t = "all", q = "", c = now } = await searchParams;
   const everything = await listApplications();
-  const [account, cafeHomeworkUrl, cafeUrl, blogUrl] = await Promise.all([
+  const [account, cafeHomeworkUrl, cafeUrl, blogUrl, studyBoardUrl] = await Promise.all([
     getSetting("bank_account"),
     getSetting("cafe_homework_url"),
     getSetting("cafe_url"),
     getSetting("blog_url"),
+    getSetting("study_board_url"),
   ]);
   const round = await roundFor(now);
   // 이번 모집 기수에서 아직 입금 확인이 안 된 학생 (수업 전에 확인해야 라이브·강의가 열려요)
@@ -298,6 +299,10 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
           <label className="sm:col-span-4">
             <span className="label">첫 수업 미션 · 블로그 주소 <span className="font-normal text-slate-400">(비우면 blog.naver.com/vella_toeic)</span></span>
             <input type="url" name="blog_url" defaultValue={blogUrl} className="input" placeholder="https://blog.naver.com/..." />
+          </label>
+          <label className="sm:col-span-4">
+            <span className="label">스터디 인증 게시판 링크 <span className="font-normal text-slate-400">(네이버 카페 &apos;문풀반 스터디 인증&apos; · 공지의 [인증하러 가기] 버튼)</span></span>
+            <input type="url" name="study_board_url" defaultValue={studyBoardUrl} className="input" placeholder="https://cafe.naver.com/..." />
           </label>
           <label className="sm:col-span-3">
             <span className="label">네이버 카페 숙제 게시판 주소</span>

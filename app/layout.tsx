@@ -5,6 +5,8 @@ import "@fontsource/jua";
 import "@fontsource/gowun-dodum";
 import "./globals.css";
 import { INSTAGRAM_URL } from "@/lib/config";
+import Bell from "@/components/notices/Bell";
+import { noticeSummary } from "@/lib/noticeView";
 
 export const metadata: Metadata = {
   title: "vella_toeic",
@@ -13,7 +15,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#9fd8f5" };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const notice = await noticeSummary();
   return (
     <html lang="ko">
       <body className="min-h-dvh">
@@ -27,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </span>
             </Link>
             <div className="flex items-center gap-2">
+              <Bell count={notice.unread} visitorIds={notice.visitorIds} />
               <Link href="/class" className="rounded-full bg-sky-main px-3 py-2 text-sm font-bold text-sky-ink">
                 강의실
               </Link>

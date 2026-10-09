@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { TestKind, TestOverride } from "./tests";
+import type { Notice } from "./notices";
 import { thisMonthKST, roundOf, type BookId, type CourseId, type Kind, type Part, type Pickup, type Status, type TimeSlot, type Track, type DepositStatus } from "./config";
 
 export type Application = {
@@ -156,9 +157,11 @@ type Mem = {
   depositEvents: DepositEvent[];
   testResults: TestResult[];
   testOverrides: TestOverride[];
+  notices: Notice[];
+  noticeReads: NoticeRead[];
 };
 const g = globalThis as unknown as { __vellaMem?: Mem };
-const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [], testResults: [], testOverrides: [] });
+const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [], testResults: [], testOverrides: [], notices: [], noticeReads: [] });
 mem.specialLectures ??= [];
 mem.specialRegistrations ??= [];
 mem.specialMaterials ??= [];
@@ -173,6 +176,8 @@ mem.questions ??= [];
 mem.depositEvents ??= [];
 mem.testResults ??= [];
 mem.testOverrides ??= [];
+mem.notices ??= [];
+mem.noticeReads ??= [];
 
 const isUuid = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
 
@@ -322,6 +327,75 @@ export async function deleteLecture(id: string) {
     return;
   }
   mem.lectures = mem.lectures.filter((l) => l.id !== id);
+}
+
+// ── 공지 ───────────────────────────────────────
+export type NoticeRead = { notice_id: string; app_id: string; read_at: string };
+export type NoticeFields = Omit<Notice, "id" | "created_at">;
+
+export async function listNotices(): Promise<Notice[]> {
+  if (sb) {
+    const { data, error } = await sb.from("notices").select("*").order("created_at", { ascending: false });
+    if (error) throw error;
+    return data as Notice[];
+  }
+  return [...mem.notices].sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+export async function createNotice(n: NoticeFields) {
+  if (sb) {
+    const { error } = await sb.from("notices").insert(n);
+    if (error) throw error;
+    return;
+  }
+  mem.notices.push({ ...n, id: crypto.randomUUID(), created_at: new Date().toISOString() });
+}
+
+export async function updateNotice(id: string, n: Partial<NoticeFields>) {
+  if (!isUuid(id)) return;
+  if (sb) {
+    const { error } = await sb.from("notices").update(n).eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  const x = mem.notices.find((m) => m.id === id);
+  if (x) Object.assign(x, n);
+}
+
+export async function deleteNotice(id: string) {
+  if (!isUuid(id)) return;
+  if (sb) {
+    const { error } = await sb.from("notices").delete().eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  mem.notices = mem.notices.filter((n) => n.id !== id);
+  mem.noticeReads = mem.noticeReads.filter((r) => r.notice_id !== id);
+}
+
+export async function listNoticeReads(filter: { appIds?: string[] } = {}): Promise<NoticeRead[]> {
+  const ids = filter.appIds?.filter(isUuid);
+  if (ids && ids.length === 0) return [];
+  if (sb) {
+    let q = sb.from("notice_reads").select("*");
+    if (ids) q = q.in("app_id", ids);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data as NoticeRead[];
+  }
+  return mem.noticeReads.filter((r) => !ids || ids.includes(r.app_id));
+}
+
+export async function markNoticeRead(noticeId: string, appIds: string[]) {
+  const ids = appIds.filter(isUuid);
+  if (!isUuid(noticeId) || ids.length === 0) return;
+  const rows = ids.map((app_id) => ({ notice_id: noticeId, app_id }));
+  if (sb) {
+    const { error } = await sb.from("notice_reads").upsert(rows, { onConflict: "notice_id,app_id", ignoreDuplicates: true });
+    if (error) throw error;
+    return;
+  }
+  for (const r of rows) if (!mem.noticeReads.some((x) => x.notice_id === r.notice_id && x.app_id === r.app_id)) mem.noticeReads.push({ ...r, read_at: new Date().toISOString() });
 }
 
 // ── 문풀반 데일리 테스트 ───────────────────────

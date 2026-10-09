@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BOOKS, COURSES, PARTS, TIME_SLOTS, TRACKS, TRACK_PARTS, cohortLabel, todayKST, won } from "@/lib/config";
 import { liveState } from "@/lib/live";
 import AddToHome from "@/components/AddToHome";
+import NoticePopupHost from "@/components/notices/NoticePopupHost";
 import BookReceived from "@/components/BookReceived";
 import TestForm from "@/components/tests/TestForm";
 import { studentTests, takesTests } from "@/lib/dailyTests";
@@ -287,6 +288,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
       })}
 
       <AddToHome />
+      <NoticePopupHost />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Cloud from "@/components/Cloud";
+import NoticePopupHost from "@/components/notices/NoticePopupHost";
 import { listSpecialLectures } from "@/lib/db";
 import { specialDay, specialRegistrationOpen } from "@/lib/special";
 
@@ -38,6 +39,8 @@ export default async function Home() {
 
   return (
     // 휴대폰·태블릿: 한 줄로 쌓아요(태블릿은 조금 넓게). 컴퓨터: 왼쪽에 인사·수강 형태, 오른쪽에 메뉴를 나란히 놓아요.
+    <>
+    <NoticePopupHost />
     <div className="relative -mx-4 overflow-hidden px-4 pb-6 lg:mx-[calc(50%-min(32rem,50vw-1rem))] lg:pb-12">
       {CLOUDS.map((c) => <Cloud key={c} className={`pointer-events-none absolute opacity-85 ${c}`} />)}
 
@@ -69,5 +72,6 @@ export default async function Home() {
         </div>
       </div>
     </div>
+    </>
   );
 }
