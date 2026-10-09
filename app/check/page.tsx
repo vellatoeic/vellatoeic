@@ -45,8 +45,11 @@ export default async function Check() {
   }
 
   let days: Set<string>;
+  let already = false;
   try {
-    await Promise.all(mine.map((a) => addAttendance(a.id, todayKST())));
+    // 출석은 하루 한 번이면 돼요. 이미 찍었으면 그대로 두고 안내만 해요.
+    already = (await listStamps(mine.map((a) => a.id))).attendance.some((x) => x.day === todayKST());
+    if (!already) await Promise.all(mine.map((a) => addAttendance(a.id, todayKST())));
     const { attendance } = await listStamps(mine.map((a) => a.id));
     days = new Set(attendance.map((a) => a.day));
   } catch (e) {
@@ -62,8 +65,8 @@ export default async function Check() {
   }
 
   return (
-    <Box title="출석 완료! ☁️">
-      <p className="text-slate-600">{mine[0].name}님, 오늘도 왔네요 :)</p>
+    <Box title={already ? "오늘은 이미 출석했어요 ☁️" : "출석 완료! ☁️"}>
+      <p className="text-slate-600">{already ? "출석은 하루에 한 번만 찍으면 돼요." : `${mine[0].name}님, 오늘도 왔네요 :)`}</p>
       <p className="font-jua text-5xl text-sky-deep">{days.size}</p>
       <p className="text-sm text-slate-500">이번 달 모은 출석 스티커</p>
     </Box>

@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { COURSES, KINDS, KLASSES, TIME_SLOTS, TRACKS, cohortLabel, dayLabel, klassOf, takesSharedLc, todayKST, type CourseId, type Klass, type Track } from "@/lib/config";
-import { listApplications, listStamps, currentCohort, isPreview } from "@/lib/db";
+import { COURSES, KINDS, TIME_SLOTS, TRACKS, cohortLabel, dayLabel, todayKST, type CourseId, type Track } from "@/lib/config";
+import { listApplications, listStamps, currentCohort, getSetting, isPreview } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { canWatch } from "@/lib/access";
-import { isHomeworkStickerEligible } from "@/lib/schedule";
+import { isHomeworkStickerEligible, scheduleClassFor, scheduleKey, schoolDaysFor } from "@/lib/schedule";
 import { bulkStamp, cancelHomeworkSticker, cleanupPhotos, markAttendanceManual } from "@/app/actions";
 import SelectAll from "../SelectAll";
 import LoginForm from "../LoginForm";
@@ -14,10 +14,9 @@ export const metadata = { robots: { index: false } };
 
 const SLOT_FILTERS = [["am", "오전반"], ["pm", "저녁반"], ["all", "전체"]] as const;
 
-export default async function Stamps({ searchParams }: { searchParams: Promise<{ k?: string; t?: string }> }) {
+export default async function Stamps({ searchParams }: { searchParams: Promise<{ b?: string; s?: string; t?: string }> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
-  const { k = "start-daily", t = "am" } = await searchParams;
-  const klass = (Object.hasOwn(KLASSES, k) ? k : "start-daily") as Klass;
+  const { b = "", s = "all", t = "am" } = await searchParams;
   const cohort = await currentCohort();
   const today = todayKST();
 
@@ -30,11 +29,19 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
     (Object.keys(TRACKS) as Track[]).map((tr) => ({ key: `${co}-${tr}`, title: `${COURSES[co].label} ${TRACKS[tr]}`, items: bulkApps.filter((a) => a.course === co && a.track === tr) })),
   ).filter((g) => g.items.length > 0);
 
+  // 출석 현황은 신청한 반(시작반 종합, 문풀반 RC 단과 …) 기준으로 봐요. 출석은 하루 한 번 QR이면 끝이에요.
+  const classTabs = (Object.keys(COURSES) as CourseId[]).flatMap((co) =>
+    (Object.keys(TRACKS) as Track[]).map((tr) => ({ key: `${co}-${tr}`, title: `${COURSES[co].label} ${TRACKS[tr]}`, course: co, track: tr })),
+  ).filter((c) => everyone.some((a) => a.course === c.course && a.track === c.track));
+  const current = classTabs.find((c) => c.key === b) ?? classTabs[0];
   const apps = everyone
-    .filter((a) => (klass === "lc-common" ? takesSharedLc(a) : klassOf(a) === klass))
+    .filter((a) => current && a.course === current.course && a.track === current.track && (s === "all" || a.slot === s))
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
   const { attendance, homework } = await listStamps(apps.map((a) => a.id));
-  const days = [...new Set([...attendance.map((x) => x.day), ...homework.map((x) => x.day)])].sort();
+  const schedClass = current ? scheduleClassFor(current.course, current.track) : null;
+  const classDays = schedClass ? schoolDaysFor(await getSetting(scheduleKey(cohort, schedClass)), cohort, schedClass) : [];
+  // 날짜 칸 = 그 반 수업일 (수업일이 아닌 날 기록이 있으면 그 날도 보여줘요)
+  const days = [...new Set([...classDays, ...attendance.map((x) => x.day), ...homework.map((x) => x.day)])].sort();
   const has = (list: { app_id: string; day: string }[], id: string, d: string) => list.find((x) => x.app_id === id && x.day === d);
 
   return (
@@ -57,7 +64,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="font-bold text-slate-500">수강 시간</span>
           {SLOT_FILTERS.map(([v, label]) => (
-            <a key={v} href={`/admin/stamps?k=${klass}&t=${v}`} className={`rounded-full px-3 py-1.5 font-bold ${t === v ? "bg-sky-deep text-white" : "bg-sky-soft text-sky-ink"}`}>{label}</a>
+            <a key={v} href={`/admin/stamps?b=${current?.key ?? ""}&s=${s}&t=${v}`} className={`rounded-full px-3 py-1.5 font-bold ${t === v ? "bg-sky-deep text-white" : "bg-sky-soft text-sky-ink"}`}>{label}</a>
           ))}
         </div>
         {bulkGroups.length === 0 ? <p className="text-sm text-slate-500">해당하는 납부 완료 학생이 없어요.</p> : (
@@ -87,17 +94,24 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
         )}
       </form>
 
-      <div className="flex flex-wrap gap-2">
-        {(Object.keys(KLASSES) as Klass[]).map((x) => (
-          <a key={x} href={`/admin/stamps?k=${x}&t=${t}`} className={`rounded-full px-4 py-2 text-sm font-bold ${x === klass ? "bg-sky-deep text-white" : "bg-white text-sky-ink"}`}>
-            {KLASSES[x]}
-          </a>
-        ))}
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-2">
+          {classTabs.map((c) => (
+            <a key={c.key} href={`/admin/stamps?b=${c.key}&s=${s}&t=${t}`} className={`rounded-full px-4 py-2 text-sm font-bold ${c.key === current?.key ? "bg-sky-deep text-white" : "bg-white text-sky-ink"}`}>
+              {c.title}
+            </a>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {([["all", "전체"], ["am", "☀️ 오전반"], ["pm", "🌙 저녁반"]] as const).map(([v, label]) => (
+            <a key={v} href={`/admin/stamps?b=${current?.key ?? ""}&s=${v}&t=${t}`} className={`rounded-full px-3 py-1.5 text-sm font-bold ${s === v ? "bg-sky-ink text-white" : "bg-white text-sky-ink"}`}>{label}</a>
+          ))}
+        </div>
       </div>
 
       <section className="card overflow-x-auto">
         <h2 className="font-jua text-2xl text-sky-ink">
-          {cohortLabel(cohort)} {KLASSES[klass]} <span className="text-base text-slate-400">· {apps.length}명 · 수업 {days.length}회</span>
+          {cohortLabel(cohort)} {current?.title ?? ""}{s !== "all" ? ` · ${TIME_SLOTS[s as "am" | "pm"]}` : ""} <span className="text-base text-slate-400">· {apps.length}명 · 수업 {classDays.length}회</span>
         </h2>
         <p className="mt-1 text-xs text-slate-500">☁️ 출석(빈 구름을 누르면 직접 처리) · ⭐ 숙제(누르면 사진) · 빨간 이름 = 결석 3회 이상</p>
         {apps.length === 0 ? (
@@ -121,9 +135,9 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
                 }).length;
                 return (
                   <tr key={a.id} className="border-b border-sky-soft">
-                    <td className={`sticky left-0 bg-white py-2 pr-3 text-left ${days.length - att >= 3 ? "font-bold text-red-500" : ""}`}>
+                    <td className={`sticky left-0 bg-white py-2 pr-3 text-left ${classDays.filter((d) => d < today).length - att >= 3 ? "font-bold text-red-500" : ""}`}>
                       {a.name}
-                      <span className="ml-1 text-[11px] text-slate-400">{KINDS[a.kind].short}{a.track === "rc" || a.track === "lc" ? ` ${TRACKS[a.track]}` : ""}</span>
+                      <span className="ml-1 text-[11px] text-slate-400">{KINDS[a.kind].short}{a.slot ? ` · ${TIME_SLOTS[a.slot]}` : ""}</span>
                     </td>
                     {days.map((d) => {
                       const h = has(homework, a.id, d) as { photo_path?: string | null; created_at?: string } | undefined;

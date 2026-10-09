@@ -236,21 +236,26 @@ export async function copyPreviousSchedule(fd: FormData) {
 export async function uploadLecture(_: FormState, fd: FormData): Promise<FormState> {
   if (!(await isAdmin())) return { error: "관리자 로그인이 필요해요." };
   const cohort = clean(fd.get("cohort"));
-  const course = clean(fd.get("course")) as CourseId;
-  const part = clean(fd.get("part")) as Part;
-  const slot = clean(fd.get("slot"));
+  // 반·RC/LC·시간대는 여러 개 고를 수 있어요. 고른 조합마다 강의를 하나씩 등록해요.
+  const courses = [...new Set(fd.getAll("course").map(clean))].filter((c): c is CourseId => LECTURE_COURSES.includes(c as CourseId));
+  const parts = [...new Set(fd.getAll("part").map(clean))].filter((p): p is Part => Object.hasOwn(PARTS, p));
+  const slots = [...new Set(fd.getAll("slot").map(clean))].filter(isTimeSlot);
   const title = clean(fd.get("title"));
   const yt = youtubeId(clean(fd.get("url")));
   if (!/^\d{4}-\d{2}$/.test(cohort)) return { error: "기수를 선택해 주세요." };
-  if (!LECTURE_COURSES.includes(course)) return { error: "반을 선택해 주세요." };
-  if (!Object.hasOwn(PARTS, part)) return { error: "RC/LC를 선택해 주세요." };
-  if (!isTimeSlot(slot)) return { error: "오전반/저녁반을 선택해 주세요." };
+  if (courses.length === 0) return { error: "반을 선택해 주세요." };
+  if (parts.length === 0) return { error: "RC/LC를 선택해 주세요." };
+  if (slots.length === 0) return { error: "오전반/저녁반을 선택해 주세요." };
   if (!title) return { error: "강의 제목을 입력해 주세요." };
   if (!yt) return { error: "유튜브 링크를 확인해 주세요." };
-  await addLecture({ cohort, course, part, slot, title, youtube_id: yt });
+  let count = 0;
+  for (const course of courses) for (const part of parts) for (const slot of slots) {
+    await addLecture({ cohort, course, part, slot, title, youtube_id: yt });
+    count++;
+  }
   revalidatePath("/class");
   revalidatePath("/admin/lectures");
-  return { ok: `'${title}' 강의를 올렸어요.` };
+  return { ok: count > 1 ? `'${title}' 강의를 ${count}곳에 올렸어요.` : `'${title}' 강의를 올렸어요.` };
 }
 
 // 올린 강의의 제목·링크·기수·반·RC/LC 고치기 (잘못된 값이면 그대로 둬요)

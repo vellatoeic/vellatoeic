@@ -34,16 +34,18 @@ function wrongRank(results: TestResult[], top = 10) {
   return [...count.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0]).slice(0, top).map(([n, c]) => ({ label: `${n}번`, value: c }));
 }
 
-export default async function TestsAdmin({ searchParams }: { searchParams: Promise<{ d?: string; g?: string; t?: string; tv?: string; view?: string }> }) {
+export default async function TestsAdmin({ searchParams }: { searchParams: Promise<{ d?: string; g?: string; t?: string; tv?: string; view?: string; sort?: string }> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
   const today = todayKST();
   const sp = await searchParams;
   const d = /^\d{4}-\d{2}-\d{2}$/.test(sp.d ?? "") ? sp.d! : today;
   const g = GROUPS.some(([k]) => k === sp.g) ? sp.g! : "all";
   const t = SLOTS.some(([k]) => k === sp.t) ? sp.t! : "all";
-  const tv = sp.tv === "1";
+  // 수업용 보기: tv=am(오전반) / tv=pm(저녁반) / tv=1(전체)
+  const tv = sp.tv === "am" || sp.tv === "pm" || sp.tv === "1" ? sp.tv : "";
+  const sort = sp.sort === "rank" ? "rank" : "time"; // 학생 점수: 제출 순서(기본) / 점수 순위
   const cohort = d.slice(0, 7);
-  const link = (patch: Record<string, string>) => `/admin/tests?${new URLSearchParams({ d, g, t, ...(tv ? { tv: "1" } : {}), ...patch })}`;
+  const link = (patch: Record<string, string>) => `/admin/tests?${new URLSearchParams(Object.entries({ d, g, t, tv, sort, ...patch }).filter(([, v]) => v))}`;
 
   const [{ stats, plan, classDays }, { solveAllDays, overrides }] = await Promise.all([cohortTestStats(cohort, today), planFor(cohort)]);
   const autoPlan = testPlan(cohort, solveAllDays);
@@ -86,48 +88,60 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
     );
   }
 
-  // ── 그날 테스트 ──
+  // ── 그날 테스트: 오전반 / 저녁반을 나란히 ──
   const specs: TestSpec[] = plan.get(d) ?? [];
-  const sections = specs.map((spec) => {
-    // 그날 이 테스트를 보는 학생 = 본인 반 수업일에 그 날짜가 있는 학생
-    const expected = group.filter((s) => (classDays.get(s.klass) ?? []).includes(d));
-    const results = expected.map((s) => ({ s, r: s.results.find((r) => r.day === d && r.kind === spec.kind) })).filter((x): x is { s: StudentTestStat; r: TestResult } => !!x.r);
+  const dayNo = dayNumber(solveAllDays, d);
+  const byClass = stats.filter((s) => g === "all" || s.klass === g); // 나란히 보기는 반만 거르고 시간대는 칸으로 나눠요
+  const slotsShown: ("am" | "pm" | null)[] = ["am", "pm"];
+  if (byClass.some((s) => !s.app.slot)) slotsShown.push(null); // 예전 신청 중 시간 미정이 남아 있으면 따로
+  const slotName = (sl: "am" | "pm" | null) => (sl ? (sl === "am" ? "☀️ 오전반" : "🌙 저녁반") : "시간 미정");
+  const view = (spec: TestSpec, sl: "am" | "pm" | null) => {
+    const expected = byClass.filter((s) => (s.app.slot ?? null) === sl && (classDays.get(s.klass) ?? []).includes(d));
+    const results = expected
+      .map((s) => ({ s, r: s.results.find((r) => r.day === d && r.kind === spec.kind) }))
+      .filter((x): x is { s: StudentTestStat; r: TestResult } => !!x.r)
+      .sort((a, b) => (sort === "rank" ? b.r.score - a.r.score : 0) || a.r.submitted_at.localeCompare(b.r.submitted_at));
     const missing = expected.filter((s) => !results.some((x) => x.s.app.id === s.app.id));
     const avg = results.length ? results.reduce((sum, x) => sum + x.r.score, 0) / results.length : 0;
-    return { spec, expected, results, missing, avg };
-  });
-
-  const dayNo = dayNumber(solveAllDays, d);
+    return { expected, results, missing, avg };
+  };
 
   if (tv) {
+    const tvSlots = tv === "1" ? slotsShown : [tv as "am" | "pm"];
     return (
       <div className="space-y-8 pt-6">
         <AutoRefresh />
         <div className="flex items-center justify-between">
-          <p className="font-jua text-4xl text-sky-ink">📝 {specialDay(d)} 오늘의 테스트</p>
+          <p className="font-jua text-4xl text-sky-ink">📝 {specialDay(d)} 오늘의 테스트{tv !== "1" ? ` · ${slotName(tv as "am" | "pm")}` : ""}</p>
           <Link href={link({ tv: "" })} className="text-sm text-slate-400 underline">관리 화면으로</Link>
         </div>
-        {sections.length === 0 && <p className="font-jua text-3xl text-slate-400">오늘은 테스트가 없어요</p>}
+        {specs.length === 0 && <p className="font-jua text-3xl text-slate-400">오늘은 테스트가 없어요</p>}
         <div className="grid gap-6 lg:grid-cols-2">
-          {sections.map(({ spec, expected, results, avg }) => (
-            <section key={spec.kind} className="card space-y-5 !p-8">
-              <p className="font-jua text-4xl text-sky-ink">{TEST_LABEL[spec.kind]} {spec.no}</p>
-              <div className="grid grid-cols-2 gap-4 text-center">
-                <div><p className="text-xl text-slate-500">제출</p><p className="font-jua text-6xl text-sky-deep">{results.length}<span className="text-3xl text-slate-400">/{expected.length}</span></p></div>
-                <div><p className="text-xl text-slate-500">평균</p><p className="font-jua text-6xl text-sky-deep">{results.length ? avg.toFixed(1) : "-"}<span className="text-3xl text-slate-400">/{spec.questions}</span></p></div>
-              </div>
-              {spec.kind === "rc" && (
-                <div>
-                  <p className="mb-3 font-jua text-2xl text-sky-ink">많이 틀린 번호</p>
-                  {wrongRank(results.map((x) => x.r), 5).length ? <Bars rows={wrongRank(results.map((x) => x.r), 5)} big /> : <p className="text-xl text-slate-400">아직 없어요</p>}
+          {specs.flatMap((spec) => tvSlots.map((sl) => {
+            const { expected, results, avg } = view(spec, sl);
+            const rank = wrongRank(results.map((x) => x.r), 5);
+            return (
+              <section key={`${spec.kind}-${sl}`} className="card space-y-5 !p-8">
+                <p className="font-jua text-4xl text-sky-ink">{TEST_LABEL[spec.kind]} {spec.no}{tv === "1" ? <span className="text-2xl text-slate-500"> · {slotName(sl)}</span> : null}</p>
+                <div className="grid grid-cols-2 gap-4 text-center">
+                  <div><p className="text-xl text-slate-500">제출</p><p className="font-jua text-6xl text-sky-deep">{results.length}<span className="text-3xl text-slate-400">/{expected.length}</span></p></div>
+                  <div><p className="text-xl text-slate-500">평균</p><p className="font-jua text-6xl text-sky-deep">{results.length ? avg.toFixed(1) : "-"}<span className="text-3xl text-slate-400">/{spec.questions}</span></p></div>
                 </div>
-              )}
-            </section>
-          ))}
+                {spec.kind === "rc" && (
+                  <div>
+                    <p className="mb-3 font-jua text-2xl text-sky-ink">많이 틀린 번호</p>
+                    {rank.length ? <Bars rows={rank} big /> : <p className="text-xl text-slate-400">아직 없어요</p>}
+                  </div>
+                )}
+              </section>
+            );
+          }))}
         </div>
       </div>
     );
   }
+
+  const chip = (on: boolean) => `rounded-full px-3 py-1.5 text-sm font-bold ${on ? "bg-sky-ink text-white" : "bg-white text-sky-ink"}`;
 
   return (
     <div className="space-y-5 pt-8">
@@ -139,44 +153,65 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
           <h2 className="font-jua text-2xl text-sky-ink">📝 {specialDay(d)} 오늘의 테스트</h2>
         </div>
         <div className="flex flex-wrap gap-2">
-          <form className="flex gap-1"><input type="date" name="d" defaultValue={d} className="input !w-auto !py-2" /><input type="hidden" name="g" value={g} /><input type="hidden" name="t" value={t} /><button className="btn-ghost !py-2 text-sm">날짜 보기</button></form>
-          <Link href={link({ tv: "1" })} className="btn !py-2 !text-sm">📺 수업용 보기</Link>
+          <form className="flex gap-1"><input type="date" name="d" defaultValue={d} className="input !w-auto !py-2" /><input type="hidden" name="g" value={g} /><input type="hidden" name="sort" value={sort} /><button className="btn-ghost !py-2 text-sm">날짜 보기</button></form>
+          <Link href={link({ tv: "am" })} className="btn !py-2 !text-sm">📺 오전반 수업용</Link>
+          <Link href={link({ tv: "pm" })} className="btn !py-2 !text-sm">📺 저녁반 수업용</Link>
           <Link href={link({ view: "students" })} className="btn-ghost !py-2 text-sm">학생별 기록</Link>
         </div>
       </div>
-      <Filters link={link} g={g} t={t} />
-
-      {sections.length === 0 && <p className="card text-center text-slate-500">이 날짜에는 테스트가 없어요. (DAY 1이거나 문풀반 종합 수업일이 아니에요)</p>}
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        {sections.map(({ spec, expected, results, missing, avg }) => (
-          <section key={spec.kind} className="card space-y-4">
-            <div className="flex items-baseline justify-between">
-              <p className="font-jua text-2xl text-sky-ink">{TEST_LABEL[spec.kind]} {spec.no} <span className="text-base text-slate-400">· {spec.questions}문항</span></p>
-              <p className="text-sm text-slate-500">제출 <b className="text-sky-ink">{results.length}</b>/{expected.length}명 · 평균 <b className="text-sky-ink">{results.length ? avg.toFixed(1) : "-"}</b>점</p>
-            </div>
-            <div>
-              <p className="mb-1.5 text-sm font-bold text-slate-500">점수 분포</p>
-              <Bars rows={distribution(results.map((x) => x.r), spec.questions)} />
-            </div>
-            {spec.kind === "rc" && (
-              <div>
-                <p className="mb-1.5 text-sm font-bold text-slate-500">많이 틀린 번호</p>
-                {wrongRank(results.map((x) => x.r)).length ? <Bars rows={wrongRank(results.map((x) => x.r))} /> : <p className="text-sm text-slate-400">틀린 번호를 고른 학생이 아직 없어요.</p>}
-              </div>
-            )}
-            <div>
-              <p className="mb-1.5 text-sm font-bold text-slate-500">학생별 점수</p>
-              <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
-                {[...results].sort((a, b) => b.r.score - a.r.score).map(({ s, r }) => (
-                  <li key={s.app.id} className="flex justify-between gap-2"><span>{s.app.name}</span><b className="text-sky-ink">{r.score}</b></li>
-                ))}
-              </ul>
-              {missing.length > 0 && <p className="mt-2 rounded-xl bg-amber-50 p-2 text-sm text-amber-700">미제출 {missing.length}명: {missing.map((s) => s.app.name).join(", ")}</p>}
-            </div>
-          </section>
-        ))}
+      <div className="flex flex-wrap gap-2">{GROUPS.map(([k, l]) => <Link key={k} href={link({ g: k })} className={`rounded-full px-3 py-1.5 text-sm font-bold ${g === k ? "bg-sky-deep text-white" : "bg-white text-sky-ink"}`}>{l}</Link>)}</div>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-bold text-slate-500">학생 점수 순서</span>
+        <Link href={link({ sort: "time" })} className={chip(sort === "time")}>제출한 순서</Link>
+        <Link href={link({ sort: "rank" })} className={chip(sort === "rank")}>점수 순위</Link>
       </div>
+
+      {specs.length === 0 && <p className="card text-center text-slate-500">이 날짜에는 테스트가 없어요. (DAY 1이거나 문풀반 종합 수업일이 아니에요)</p>}
+
+      {specs.map((spec) => (
+        <section key={spec.kind} className="card space-y-4">
+          <p className="font-jua text-2xl text-sky-ink">{TEST_LABEL[spec.kind]} {spec.no} <span className="text-base text-slate-400">· {spec.questions}문항</span></p>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {slotsShown.map((sl) => {
+              const { expected, results, missing, avg } = view(spec, sl);
+              const rank = wrongRank(results.map((x) => x.r));
+              return (
+                <div key={String(sl)} className="space-y-4 rounded-2xl bg-sky-soft/60 p-4">
+                  <div className="flex items-baseline justify-between">
+                    <p className="font-jua text-xl text-sky-ink">{slotName(sl)}</p>
+                    <p className="text-sm text-slate-500">제출 <b className="text-sky-ink">{results.length}</b>/{expected.length}명 · 평균 <b className="text-sky-ink">{results.length ? avg.toFixed(1) : "-"}</b>점</p>
+                  </div>
+                  <div>
+                    <p className="mb-1.5 text-sm font-bold text-slate-500">점수 분포</p>
+                    <Bars rows={distribution(results.map((x) => x.r), spec.questions)} />
+                  </div>
+                  {spec.kind === "rc" && (
+                    <div>
+                      <p className="mb-1.5 text-sm font-bold text-slate-500">많이 틀린 번호</p>
+                      {rank.length ? <Bars rows={rank} /> : <p className="text-sm text-slate-400">틀린 번호를 고른 학생이 아직 없어요.</p>}
+                    </div>
+                  )}
+                  <div>
+                    <p className="mb-1.5 text-sm font-bold text-slate-500">학생별 점수 ({sort === "rank" ? "점수 순위" : "제출한 순서"})</p>
+                    <ol className="space-y-1 text-sm">
+                      {results.map(({ s, r }, i) => (
+                        <li key={s.app.id} className="flex items-center gap-2 rounded-lg bg-white px-2.5 py-1.5">
+                          <span className="w-5 text-right text-xs text-slate-400">{i + 1}</span>
+                          <span className="flex-1">{s.app.name}</span>
+                          <span className="text-xs text-slate-400">{new Date(r.submitted_at).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" })}</span>
+                          <b className="w-10 text-right text-sky-ink">{r.score}</b>
+                        </li>
+                      ))}
+                    </ol>
+                    {results.length === 0 && <p className="text-sm text-slate-400">아직 제출한 학생이 없어요.</p>}
+                    {missing.length > 0 && <p className="mt-2 rounded-xl bg-amber-50 p-2 text-sm text-amber-700">미제출 {missing.length}명: {missing.map((s) => s.app.name).join(", ")}</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ))}
 
       <details className="card">
         <summary className="font-jua cursor-pointer text-lg text-sky-ink">✏️ 이 날짜 테스트 번호·문항 수 직접 고치기 (예외용)</summary>
