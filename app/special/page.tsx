@@ -2,7 +2,8 @@ import { activeStudentApps } from "@/lib/student";
 import { expireSpecialDeposits, getSetting, getSpecialRegistrationsFor, listSpecialLectures, listSpecialMaterials } from "@/lib/db";
 import { CLASSROOM, DEPOSIT_MINUTES, SPECIAL_DEPOSIT, won } from "@/lib/config";
 import { specialLogout } from "@/app/actions";
-import { specialRegistrationOpen, specialWhen } from "@/lib/special";
+import { deadlineBadge, specialRegistrationOpen, specialWhen } from "@/lib/special";
+import { todayKST } from "@/lib/config";
 import SpecialForm from "./SpecialForm";
 import SpecialLogin from "./SpecialLogin";
 
@@ -13,7 +14,9 @@ export default async function SpecialPage() {
   await expireSpecialDeposits(DEPOSIT_MINUTES);
   const [events, mine] = await Promise.all([listSpecialLectures(), activeStudentApps().then(({ apps }) => getSpecialRegistrationsFor(apps.map((a) => a.id)))]);
   const account = await getSetting("bank_account");
-  const open = events.filter((event) => specialRegistrationOpen(event.event_date, event.starts_at));
+  // 아직 열리지 않은(오늘 이후) 특강은 모두 보여주고, 마감된 것은 '신청이 마감됐어요'로 막아요.
+  const upcoming = events.filter((event) => event.event_date >= todayKST());
+  const open = upcoming.filter((event) => specialRegistrationOpen(event));
   const eventById = new Map(events.map((event) => [event.id, event]));
   const myRows = await Promise.all(
     mine
@@ -34,8 +37,8 @@ export default async function SpecialPage() {
         <p className="mt-2 text-slate-600">현장 또는 불라방으로 신청할 수 있어요.</p>
       </div>
 
-      {open.length > 0
-        ? <SpecialForm events={open.map((event) => ({ id: event.id, title: event.title, when: specialWhen(event) }))} />
+      {upcoming.length > 0
+        ? <SpecialForm events={upcoming.map((event) => ({ id: event.id, title: event.title, when: specialWhen(event), closed: !open.includes(event), badge: deadlineBadge(event) }))} />
         : <p className="card text-center text-slate-500">지금 신청할 수 있는 특강이 없어요.</p>}
 
       {myRows.length > 0 ? (

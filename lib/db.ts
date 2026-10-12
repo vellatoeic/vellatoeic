@@ -106,6 +106,7 @@ export type SpecialLecture = {
   starts_at: string;
   ends_at: string | null;
   youtube_id: string | null;
+  registration_deadline: string | null; // 비어 있으면 특강 전날 17:00
   created_at: string;
 };
 
@@ -137,7 +138,7 @@ const sb: SupabaseClient | null =
 export const isPreview = !sb;
 
 export type Stamp = { app_id: string; day: string };
-export type Attendance = Stamp;
+export type Attendance = Stamp & { late?: boolean };
 export type Homework = Stamp & { photo_path: string | null; created_at: string };
 
 type Mem = {
@@ -652,7 +653,7 @@ export async function saveMission(mission: Omit<Mission, "updated_at">) {
 
 // ── 특강 ────────────────────────────────────────
 const SPECIAL_BUCKET = "special-lecture-materials";
-type SpecialLectureFields = Pick<SpecialLecture, "event_date" | "title" | "starts_at" | "ends_at">;
+type SpecialLectureFields = Pick<SpecialLecture, "event_date" | "title" | "starts_at" | "ends_at" | "registration_deadline">;
 
 export async function listSpecialLectures(): Promise<SpecialLecture[]> {
   if (sb) {
@@ -928,6 +929,23 @@ export async function addAttendance(app_id: string, day: string) {
 }
 
 // createdAt을 주면 그 시각에 제출한 것으로 기록해요. (관리자가 지난 수업일에 붙여도 별이 보이게)
+// 관리자 출결 수정: 출석(present) · 지각(late) · 결석(absent = 기록 지우기)
+export async function setAttendanceState(app_id: string, day: string, state: "present" | "late" | "absent") {
+  if (!isUuid(app_id) || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+  if (sb) {
+    if (state === "absent") {
+      const { error } = await sb.from("attendance").delete().eq("app_id", app_id).eq("day", day);
+      if (error) throw error;
+      return;
+    }
+    const { error } = await sb.from("attendance").upsert({ app_id, day, late: state === "late" }, { onConflict: "app_id,day" });
+    if (error) throw error;
+    return;
+  }
+  mem.attendance = mem.attendance.filter((x) => !(x.app_id === app_id && x.day === day));
+  if (state !== "absent") mem.attendance.push({ app_id, day, late: state === "late" } as Attendance);
+}
+
 export async function addHomeworkSticker(app_id: string, day: string, createdAt?: string) {
   if (sb) {
     const row: Record<string, string | null> = { app_id, day, photo_path: null };
@@ -961,7 +979,7 @@ export async function listStamps(appIds: string[]): Promise<{ attendance: Attend
   if (ok.length === 0) return { attendance: [], homework: [] };
   if (sb) {
     const [a, h] = await Promise.all([
-      sb.from("attendance").select("app_id, day").in("app_id", ok),
+      sb.from("attendance").select("app_id, day, late").in("app_id", ok),
       sb.from("homework").select("app_id, day, photo_path, created_at").in("app_id", ok),
     ]);
     if (a.error) throw a.error;

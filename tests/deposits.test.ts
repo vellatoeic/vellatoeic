@@ -5,7 +5,7 @@ import { handleBankSms } from "@/lib/deposits";
 import { createSpecialLecture, createSpecialRegistration, expireSpecialDeposits, isPreview, listDepositEvents, listSpecialLectures, listSpecialRegistrations } from "@/lib/db";
 
 async function setup() {
-  await createSpecialLecture({ event_date: "2026-10-17", title: "테스트 특강", starts_at: "10:00", ends_at: null });
+  await createSpecialLecture({ event_date: "2026-10-17", title: "테스트 특강", starts_at: "10:00", ends_at: null, registration_deadline: null });
   const event = (await listSpecialLectures()).at(-1)!;
   const add = (name: string, mode: "onsite" | "online" = "onsite") =>
     createSpecialRegistration({ special_lecture_id: event.id, application_id: null, mode, name, deposit: mode === "onsite" ? "pending" : null });

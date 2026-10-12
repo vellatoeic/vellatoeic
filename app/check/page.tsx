@@ -2,6 +2,9 @@ import Link from "next/link";
 import { todayKST } from "@/lib/config";
 import { addAttendance, currentCohort, listStamps } from "@/lib/db";
 import { activeStudentApps } from "@/lib/student";
+import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
+import { isClassDay, nextClassDay } from "@/lib/attendanceDays";
+import { specialDay } from "@/lib/special";
 import { canWatch } from "@/lib/access";
 import StudentLogin from "../class/StudentLogin";
 
@@ -44,13 +47,26 @@ export default async function Check() {
     );
   }
 
+  // 수업이 있는 날만 출석이 돼요: 학생 반의 수업일이면서 공휴일이 아닌 날 (같은 반 오전↔저녁 교차 수강은 그대로 인정)
+  const today = todayKST();
+  const calendars = await Promise.all(mine.map(async (a) => ({ a, days: await classDaysOf(a), holidays: await holidaysOf(a.cohort) })));
+  const classToday = calendars.filter((c) => isClassDay(c.days, c.holidays, today)).map((c) => c.a);
+  if (classToday.length === 0) {
+    const next = calendars.map((c) => nextClassDay(c.days, c.holidays, today)).filter((d): d is string => !!d).sort()[0];
+    return (
+      <Box title="오늘은 수업이 없는 날이에요 ☁️">
+        <p className="text-slate-600">{next ? <>다음 수업: <b>{specialDay(next)}</b></> : "이번 달 수업이 모두 끝났어요."}</p>
+      </Box>
+    );
+  }
+
   let days: Set<string>;
   let already = false;
   try {
     // 출석은 하루 한 번이면 돼요. 이미 찍었으면 그대로 두고 안내만 해요.
-    already = (await listStamps(mine.map((a) => a.id))).attendance.some((x) => x.day === todayKST());
-    if (!already) await Promise.all(mine.map((a) => addAttendance(a.id, todayKST())));
-    const { attendance } = await listStamps(mine.map((a) => a.id));
+    already = (await listStamps(classToday.map((a) => a.id))).attendance.some((x) => x.day === today);
+    if (!already) await Promise.all(classToday.map((a) => addAttendance(a.id, today)));
+    const { attendance } = await listStamps(classToday.map((a) => a.id));
     days = new Set(attendance.map((a) => a.day));
   } catch (e) {
     // 원인을 바로 알 수 있게 오류 내용을 작게 보여줘요. (학생이 캡처해서 Vella에게 보내면 돼요)

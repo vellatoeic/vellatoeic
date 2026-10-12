@@ -1,48 +1,62 @@
 import Link from "next/link";
 import { COURSES, KINDS, TIME_SLOTS, TRACKS, cohortLabel, dayLabel, todayKST, type CourseId, type Track } from "@/lib/config";
-import { listApplications, listStamps, currentCohort, getSetting, isPreview } from "@/lib/db";
+import { listApplications, listStamps, currentCohort, isPreview, type Application, type Attendance } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { canWatch } from "@/lib/access";
-import { isHomeworkStickerEligible, scheduleClassFor, scheduleKey, schoolDaysFor } from "@/lib/schedule";
-import { bulkStamp, cancelHomeworkSticker, cleanupPhotos, markAttendanceManual } from "@/app/actions";
+import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
+import { isClassDay } from "@/lib/attendanceDays";
+import { specialDay } from "@/lib/special";
+import { bulkStamp, cleanupPhotos, cycleAttendance, deleteOffDayAttendance } from "@/app/actions";
 import SelectAll from "../SelectAll";
 import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
+import CloseOnSubmitForm from "../CloseOnSubmitForm";
 
 export const dynamic = "force-dynamic";
-export const metadata = { robots: { index: false } };
+export const metadata = { title: "출결 · vella_toeic", robots: { index: false } };
 
 const SLOT_FILTERS = [["am", "오전반"], ["pm", "저녁반"], ["all", "전체"]] as const;
+type SlotKey = "am" | "pm" | null;
+const SLOT_NAME = (s: SlotKey) => (s === "am" ? "☀️ 오전반" : s === "pm" ? "🌙 저녁반" : "시간 미정");
 
-export default async function Stamps({ searchParams }: { searchParams: Promise<{ b?: string; s?: string; t?: string }> }) {
+// 칸 표시: ● 출석 / ◐ 지각 / · 결석 / 빈칸 = 아직 안 온 날(오늘 이후, 오늘 아직 기록 없음)
+function mark(rec: Attendance | undefined, day: string, today: string) {
+  if (rec) return rec.late ? { t: "◐", cls: "text-amber-500", label: "지각" } : { t: "●", cls: "text-sky-deep", label: "출석" };
+  if (day >= today) return { t: "", cls: "", label: "아직" };
+  return { t: "·", cls: "text-red-400", label: "결석" };
+}
+
+export default async function Stamps({ searchParams }: { searchParams: Promise<{ b?: string; d?: string; t?: string }> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
-  const { b = "", s = "all", t = "am" } = await searchParams;
+  const sp = await searchParams;
   const cohort = await currentCohort();
   const today = todayKST();
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(sp.d ?? "") ? sp.d! : today;
+  const t = sp.t ?? "am";
 
   const everyone = (await listApplications()).filter((a) => a.cohort === cohort && canWatch(a));
-  // 일괄 붙이기 대상: 수강 시간으로 걸러서 반별로 묶어요.
-  const bulkApps = everyone
-    .filter((a) => (t === "all" ? true : a.slot === t))
-    .sort((a, b) => a.name.localeCompare(b.name, "ko"));
-  const bulkGroups = (Object.keys(COURSES) as CourseId[]).flatMap((co) =>
-    (Object.keys(TRACKS) as Track[]).map((tr) => ({ key: `${co}-${tr}`, title: `${COURSES[co].label} ${TRACKS[tr]}`, items: bulkApps.filter((a) => a.course === co && a.track === tr) })),
-  ).filter((g) => g.items.length > 0);
+  const holidays = await holidaysOf(cohort);
+  const { attendance } = await listStamps(everyone.map((a) => a.id));
+  const rec = (id: string, day: string) => attendance.find((x) => x.app_id === id && x.day === day);
 
-  // 출석 현황은 신청한 반(시작반 종합, 문풀반 RC 단과 …) 기준으로 봐요. 출석은 하루 한 번 QR이면 끝이에요.
-  const classTabs = (Object.keys(COURSES) as CourseId[]).flatMap((co) =>
+  // 반(신청한 반) 목록과 반별 수업일 (공휴일 제외)
+  const classTabs = await Promise.all((Object.keys(COURSES) as CourseId[]).flatMap((co) =>
     (Object.keys(TRACKS) as Track[]).map((tr) => ({ key: `${co}-${tr}`, title: `${COURSES[co].label} ${TRACKS[tr]}`, course: co, track: tr })),
-  ).filter((c) => everyone.some((a) => a.course === c.course && a.track === c.track));
-  const current = classTabs.find((c) => c.key === b) ?? classTabs[0];
-  const apps = everyone
-    .filter((a) => current && a.course === current.course && a.track === current.track && (s === "all" || a.slot === s))
-    .sort((a, b) => a.name.localeCompare(b.name, "ko"));
-  const { attendance, homework } = await listStamps(apps.map((a) => a.id));
-  const schedClass = current ? scheduleClassFor(current.course, current.track) : null;
-  const classDays = schedClass ? schoolDaysFor(await getSetting(scheduleKey(cohort, schedClass)), cohort, schedClass) : [];
-  // 날짜 칸 = 그 반 수업일 (수업일이 아닌 날 기록이 있으면 그 날도 보여줘요)
-  const days = [...new Set([...classDays, ...attendance.map((x) => x.day), ...homework.map((x) => x.day)])].sort();
-  const has = (list: { app_id: string; day: string }[], id: string, d: string) => list.find((x) => x.app_id === id && x.day === d);
+  ).filter((c) => everyone.some((a) => a.course === c.course && a.track === c.track)).map(async (c) => {
+    const days = (await classDaysOf({ cohort, course: c.course, track: c.track })).filter((x) => !holidays[x]);
+    const students = everyone.filter((a) => a.course === c.course && a.track === c.track).sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    return { ...c, days, students };
+  }));
+  const current = classTabs.find((c) => c.key === sp.b) ?? classTabs[0];
+  const slotsOf = (students: Application[]): SlotKey[] => [...(["am", "pm"] as const), ...(students.some((a) => !a.slot) ? [null] : [])];
+
+  // 수업 없는 날에 찍힌 출석 기록
+  const offDay = classTabs.flatMap((c) => c.students.flatMap((a) =>
+    attendance.filter((x) => x.app_id === a.id && !isClassDay(c.days, holidays, x.day)).map((x) => ({ a, day: x.day }))));
+
+  // 일괄 붙이기 (기존 기능)
+  const bulkApps = everyone.filter((a) => (t === "all" ? true : a.slot === t)).sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  const bulkGroups = classTabs.map((c) => ({ key: c.key, title: c.title, items: bulkApps.filter((a) => a.course === c.course && a.track === c.track) })).filter((g) => g.items.length > 0);
 
   return (
     <div className="space-y-6 pt-8">
@@ -51,10 +65,117 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
       <div className="card flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="font-jua text-xl text-sky-ink">출석 QR</p>
-          <p className="text-sm text-slate-500">QR 하나를 강의실에 붙이고 라이브에 띄워 주세요.<br />찍으면 그날 출석으로 남아요.</p>
+          <p className="text-sm text-slate-500">QR 하나를 강의실에 붙이고 라이브에 띄워 주세요.<br />수업이 있는 날 찍으면 그날 출석으로 남아요(하루 한 번).</p>
         </div>
         <Link href="/admin/qr" target="_blank" className="btn !py-3">출석 QR 인쇄하기</Link>
       </div>
+
+      {/* ── 날짜별 요약 ── */}
+      <section className="card space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <h2 className="font-jua text-2xl text-sky-ink">📋 {specialDay(d)} 출결 요약</h2>
+          <form className="flex gap-1">
+            <input type="hidden" name="b" value={current?.key ?? ""} />
+            <input type="date" name="d" defaultValue={d} className="input !w-auto !py-2" />
+            <button className="btn-ghost !py-2 text-sm">날짜 보기</button>
+          </form>
+        </div>
+        <div className="grid gap-2 lg:grid-cols-2">
+          {classTabs.flatMap((c) => slotsOf(c.students).map((sl) => {
+            const group = c.students.filter((a) => (a.slot ?? null) === sl);
+            if (group.length === 0) return null;
+            if (!isClassDay(c.days, holidays, d)) return <p key={c.key + sl} className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-400">{c.title} · {SLOT_NAME(sl)} — 수업 없는 날</p>;
+            const came = group.filter((a) => rec(a.id, d));
+            const late = came.filter((a) => rec(a.id, d)?.late);
+            const absent = group.filter((a) => !rec(a.id, d));
+            return (
+              <div key={c.key + sl} className="rounded-xl bg-sky-soft px-3 py-2 text-sm">
+                <p><b className="text-sky-ink">{c.title} · {SLOT_NAME(sl)}</b> — 출석 <b>{came.length}</b> / {group.length} · 지각 <b className="text-amber-600">{late.length}</b></p>
+                {absent.length > 0 && <p className="mt-0.5 text-red-500">{d > today ? "아직 안 온 학생" : "결석"} {absent.length}: {absent.map((a) => a.name).join(", ")}</p>}
+              </div>
+            );
+          }))}
+        </div>
+      </section>
+
+      {/* ── 반별 출결표 (오전·저녁 나란히) ── */}
+      <div className="flex flex-wrap gap-2">
+        {classTabs.map((c) => (
+          <a key={c.key} href={`/admin/stamps?b=${c.key}&d=${d}&t=${t}`} className={`rounded-full px-4 py-2 text-sm font-bold ${c.key === current?.key ? "bg-sky-deep text-white" : "bg-white text-sky-ink"}`}>{c.title}</a>
+        ))}
+      </div>
+      {!current ? <p className="card text-center text-slate-500">납부 완료된 수강생이 아직 없어요.</p> : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {slotsOf(current.students).map((sl) => {
+            const group = current.students.filter((a) => (a.slot ?? null) === sl);
+            return (
+              <section key={String(sl)} className="card overflow-x-auto !p-4">
+                <h3 className="font-jua text-xl text-sky-ink">{cohortLabel(cohort)} {current.title} · {SLOT_NAME(sl)} <span className="text-sm text-slate-400">· {group.length}명 · 수업 {current.days.length}회</span></h3>
+                <p className="mt-1 text-xs text-slate-500">● 출석 · ◐ 지각 · <span className="text-red-400">·</span> 결석 · 빈칸 = 아직 안 온 날 · 칸을 누르면 출석 → 지각 → 결석 순서로 바뀌어요 · 이름을 누르면 학생별 기록</p>
+                {group.length === 0 ? <p className="mt-3 text-sm text-slate-400">학생이 없어요.</p> : (
+                  <table className="mt-3 min-w-full text-center text-sm">
+                    <thead>
+                      <tr className="border-b border-sky-main text-slate-500">
+                        <th className="sticky left-0 bg-white py-1.5 pr-2 text-left">이름</th>
+                        {current.days.map((day) => <th key={day} className={`px-0.5 py-1.5 text-[11px] font-normal ${day === d ? "rounded bg-sky-main/50 text-sky-ink" : ""}`}>{dayLabel(day)}</th>)}
+                        <th className="px-1 py-1.5 text-xs">출석</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.map((a) => {
+                        const cnt = current.days.filter((day) => rec(a.id, day)).length;
+                        const absentCnt = current.days.filter((day) => day < today && !rec(a.id, day)).length;
+                        return (
+                          <tr key={a.id} className="border-b border-sky-soft">
+                            <td className={`sticky left-0 whitespace-nowrap bg-white py-1 pr-2 text-left ${absentCnt >= 3 ? "font-bold text-red-500" : ""}`}>
+                              <Link href={`/admin/stamps/${a.id}`} className="underline decoration-sky-main underline-offset-2">{a.name}</Link>
+                              <span className="ml-1 text-[11px] text-slate-400">{KINDS[a.kind].short}</span>
+                            </td>
+                            {current.days.map((day) => {
+                              const m = mark(rec(a.id, day), day, today);
+                              return (
+                                <td key={day} className={`px-0.5 ${day === d ? "bg-sky-soft" : ""}`}>
+                                  {day > today ? <span className="inline-block h-7 w-6" /> : (
+                                    <form action={cycleAttendance}>
+                                      <input type="hidden" name="id" value={a.id} />
+                                      <input type="hidden" name="day" value={day} />
+                                      <button title={`${a.name} ${dayLabel(day)} ${m.label} — 누르면 바뀌어요`} className={`h-7 w-6 rounded font-bold hover:bg-sky-soft ${m.t ? m.cls : "text-slate-200"}`}>{m.t || "○"}</button>
+                                    </form>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td className="px-1 font-bold text-sky-deep">{cnt}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      )}
+
+      {offDay.length > 0 && (
+        <CloseOnSubmitForm action={deleteOffDayAttendance} className="block rounded-3xl border-2 border-amber-200 bg-amber-50 p-5">
+          <p className="font-jua text-xl text-amber-700">⚠️ 수업 없는 날에 찍힌 출석 {offDay.length}건</p>
+          <p className="mt-1 text-sm text-slate-600">그 학생 반의 수업일이 아니거나 공휴일에 남은 기록이에요. 체크한 뒤 지우면 스티커판에서도 빠져요.</p>
+          <label className="mt-3 flex items-center gap-2 text-sm font-bold text-sky-ink"><SelectAll group="offday" /> 전체 선택</label>
+          <ul className="mt-2 grid gap-1 text-sm sm:grid-cols-2">
+            {offDay.map(({ a, day }) => (
+              <li key={a.id + day}>
+                <label className="flex items-center gap-2 rounded-lg bg-white px-3 py-1.5">
+                  <input type="checkbox" name="rec" value={`${a.id}|${day}`} data-group="offday" className="h-4 w-4 accent-sky-deep" />
+                  {specialDay(day)}{holidays[day] ? ` (${holidays[day]})` : ""} · <b>{a.name}</b> <span className="text-slate-400">{COURSES[a.course].label} {TRACKS[a.track]}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <button className="mt-3 rounded-xl bg-red-50 px-4 py-2 font-bold text-red-600">체크한 기록 삭제</button>
+        </CloseOnSubmitForm>
+      )}
 
       <form action={bulkStamp} className="card space-y-3">
         <div>
@@ -64,7 +185,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="font-bold text-slate-500">수강 시간</span>
           {SLOT_FILTERS.map(([v, label]) => (
-            <a key={v} href={`/admin/stamps?b=${current?.key ?? ""}&s=${s}&t=${v}`} className={`rounded-full px-3 py-1.5 font-bold ${t === v ? "bg-sky-deep text-white" : "bg-sky-soft text-sky-ink"}`}>{label}</a>
+            <a key={v} href={`/admin/stamps?b=${current?.key ?? ""}&d=${d}&t=${v}`} className={`rounded-full px-3 py-1.5 font-bold ${t === v ? "bg-sky-deep text-white" : "bg-sky-soft text-sky-ink"}`}>{label}</a>
           ))}
         </div>
         {bulkGroups.length === 0 ? <p className="text-sm text-slate-500">해당하는 납부 완료 학생이 없어요.</p> : (
@@ -92,106 +213,6 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
             </div>
           </>
         )}
-      </form>
-
-      <div className="space-y-2">
-        <div className="flex flex-wrap gap-2">
-          {classTabs.map((c) => (
-            <a key={c.key} href={`/admin/stamps?b=${c.key}&s=${s}&t=${t}`} className={`rounded-full px-4 py-2 text-sm font-bold ${c.key === current?.key ? "bg-sky-deep text-white" : "bg-white text-sky-ink"}`}>
-              {c.title}
-            </a>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {([["all", "전체"], ["am", "☀️ 오전반"], ["pm", "🌙 저녁반"]] as const).map(([v, label]) => (
-            <a key={v} href={`/admin/stamps?b=${current?.key ?? ""}&s=${v}&t=${t}`} className={`rounded-full px-3 py-1.5 text-sm font-bold ${s === v ? "bg-sky-ink text-white" : "bg-white text-sky-ink"}`}>{label}</a>
-          ))}
-        </div>
-      </div>
-
-      <section className="card overflow-x-auto">
-        <h2 className="font-jua text-2xl text-sky-ink">
-          {cohortLabel(cohort)} {current?.title ?? ""}{s !== "all" ? ` · ${TIME_SLOTS[s as "am" | "pm"]}` : ""} <span className="text-base text-slate-400">· {apps.length}명 · 수업 {classDays.length}회</span>
-        </h2>
-        <p className="mt-1 text-xs text-slate-500">☁️ 출석(빈 구름을 누르면 직접 처리) · ⭐ 숙제(누르면 사진) · 빨간 이름 = 결석 3회 이상</p>
-        {apps.length === 0 ? (
-          <p className="mt-4 text-slate-500">납부 완료된 수강생이 아직 없어요.</p>
-        ) : (
-          <table className="mt-4 min-w-full text-center text-sm">
-            <thead>
-              <tr className="border-b border-sky-main text-slate-500">
-                <th className="sticky left-0 bg-white py-2 pr-3 text-left">이름</th>
-                {days.map((d) => <th key={d} className="px-1 py-2 font-normal">{dayLabel(d)}</th>)}
-                <th className="px-2 py-2">출석</th>
-                <th className="px-2 py-2">숙제</th>
-              </tr>
-            </thead>
-            <tbody>
-              {apps.map((a) => {
-                const att = days.filter((d) => has(attendance, a.id, d)).length;
-                const hw = days.filter((d) => {
-                  const stamp = has(homework, a.id, d) as { created_at?: string } | undefined;
-                  return !!stamp && isHomeworkStickerEligible(d, stamp.created_at);
-                }).length;
-                return (
-                  <tr key={a.id} className="border-b border-sky-soft">
-                    <td className={`sticky left-0 bg-white py-2 pr-3 text-left ${classDays.filter((d) => d < today).length - att >= 3 ? "font-bold text-red-500" : ""}`}>
-                      {a.name}
-                      <span className="ml-1 text-[11px] text-slate-400">{KINDS[a.kind].short}{a.slot ? ` · ${TIME_SLOTS[a.slot]}` : ""}</span>
-                    </td>
-                    {days.map((d) => {
-                      const h = has(homework, a.id, d) as { photo_path?: string | null; created_at?: string } | undefined;
-                      const hasStar = !!h && isHomeworkStickerEligible(d, h.created_at);
-                      return (
-                        <td key={d} className="px-1 py-2 whitespace-nowrap">
-                          {has(attendance, a.id, d) ? (
-                            <span title="출석">☁️</span>
-                          ) : (
-                            <form action={markAttendanceManual} className="inline">
-                              <input type="hidden" name="id" value={a.id} />
-                              <input type="hidden" name="day" value={d} />
-                              <button className="opacity-25 hover:opacity-100" aria-label={`${a.name} ${dayLabel(d)} 출석 처리`}>☁️</button>
-                            </form>
-                          )}
-                          {h ? (
-                            <form action={cancelHomeworkSticker} className="inline">
-                              <input type="hidden" name="id" value={a.id} />
-                              <input type="hidden" name="day" value={d} />
-                              <button className={hasStar ? "" : "opacity-35"} aria-label={`${a.name} ${dayLabel(d)} 숙제 제출 기록 취소`} title={hasStar ? "별 스티커가 있어요. 누르면 기록을 취소해요." : "제출 기록은 있지만 제출이 늦어 별은 없어요. 누르면 기록을 취소해요."}>{hasStar ? "⭐" : "✓"}</button>
-                              {h.photo_path && <a className="ml-1 text-xs" href={`/admin/photo?p=${encodeURIComponent(h.photo_path)}`} target="_blank" rel="noreferrer" aria-label="기존 숙제 사진 보기">📷</a>}
-                            </form>
-                          ) : (
-                            <span className="opacity-20">⭐</span>
-                          )}
-                        </td>
-                      );
-                    })}
-                    <td className="px-2 py-2 font-bold text-sky-deep">{att}</td>
-                    <td className="px-2 py-2 font-bold text-amber-500">{hw}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </section>
-
-      <form action={markAttendanceManual} className="card flex flex-wrap items-end gap-3">
-        <div className="w-full">
-          <p className="font-jua text-lg text-sky-ink">표에 없는 날짜 출석 보정</p>
-          <p className="text-sm text-slate-500">그날 출석한 학생이 아무도 없어 표에 날짜가 없을 때 사용해요.</p>
-        </div>
-        <label className="min-w-48 flex-1">
-          <span className="label">수강생</span>
-          <select name="id" required className="input">
-            {apps.map((a) => <option key={a.id} value={a.id}>{a.name} · {KINDS[a.kind].short}</option>)}
-          </select>
-        </label>
-        <label>
-          <span className="label">수업 날짜</span>
-          <input type="date" name="day" required className="input" />
-        </label>
-        <button className="btn !py-3" disabled={apps.length === 0}>출석 처리</button>
       </form>
 
       <form action={cleanupPhotos} className="card flex flex-wrap items-center justify-between gap-3 text-sm">

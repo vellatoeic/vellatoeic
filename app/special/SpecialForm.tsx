@@ -4,7 +4,7 @@ import { keep } from "@/lib/keep";
 import { useActionState } from "react";
 import { registerSpecialLecture, type FormState } from "@/app/actions";
 
-type Option = { id: string; title: string; when: string };
+type Option = { id: string; title: string; when: string; closed: boolean; badge: string | null };
 
 export default function SpecialForm({ events }: { events: Option[] }) {
   const [state, action, pending] = useActionState<FormState, FormData>(registerSpecialLecture, {});
@@ -25,9 +25,15 @@ export default function SpecialForm({ events }: { events: Option[] }) {
         <p className="label">1. 특강 선택</p>
         <div className="space-y-2">
           {events.map((event) => (
-            <label key={event.id} className="flex items-start gap-3 rounded-xl bg-sky-soft p-3">
-              <input type="radio" name="event_id" value={event.id} required className="mt-1 accent-sky-deep" />
-              <span><b className="block text-sky-ink">{event.title}</b><span className="text-sm text-slate-600">{event.when}</span></span>
+            <label key={event.id} className={`flex items-start gap-3 rounded-xl p-3 ${event.closed ? "bg-slate-100 opacity-70" : "bg-sky-soft"}`}>
+              <input type="radio" name="event_id" value={event.id} required disabled={event.closed} className="mt-1 accent-sky-deep" />
+              <span>
+                <b className="block text-sky-ink">{event.title}</b>
+                <span className="text-sm text-slate-600">{event.when}</span>
+                {event.closed
+                  ? <span className="mt-1 block text-sm font-bold text-slate-500">신청이 마감됐어요</span>
+                  : event.badge && <span className="mt-1 inline-block rounded-full bg-red-500 px-2 py-0.5 font-jua text-xs text-white">{event.badge}</span>}
+              </span>
             </label>
           ))}
         </div>
@@ -55,7 +61,7 @@ export default function SpecialForm({ events }: { events: Option[] }) {
       </div>
 
       {state.error && <p className="text-sm font-bold text-red-600">{state.error}</p>}
-      <button className="btn w-full" disabled={pending}>{pending ? "신청 중…" : "특강 신청하기"}</button>
+      <button className="btn w-full" disabled={pending || events.every((e) => e.closed)}>{pending ? "신청 중…" : events.every((e) => e.closed) ? "신청이 마감됐어요" : "특강 신청하기"}</button>
     </form>
   );
 }

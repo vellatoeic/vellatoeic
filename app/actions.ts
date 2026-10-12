@@ -8,7 +8,7 @@ import {
 } from "@/lib/config";
 import {
   createApplication, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  saveMission, type Mission, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
+  saveMission, type Mission, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
 } from "@/lib/db";
 import { canWatch, isActive, loginApps } from "@/lib/access";
 import { parseBankSms } from "@/lib/bankSms";
@@ -610,7 +610,7 @@ export async function registerSpecialLecture(_: FormState, fd: FormData): Promis
   const pin = clean(fd.get("pin"));
   const event = await getSpecialLecture(eventId);
   if (!event) return { error: "신청할 특강을 선택해 주세요." };
-  if (!specialRegistrationOpen(event.event_date, event.starts_at)) return { error: "신청 기간이 끝난 특강이에요." };
+  if (!specialRegistrationOpen(event)) return { error: "신청이 마감됐어요." };
   if (mode !== "onsite" && mode !== "online") return { error: "현장 또는 불라방을 선택해 주세요." };
   if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 강의실 비밀번호 4자리를 입력해 주세요." };
 
@@ -665,9 +665,12 @@ function specialFields(fd: FormData) {
   const title = clean(fd.get("title"));
   const starts_at = clean(fd.get("starts_at"));
   const ends_at = clean(fd.get("ends_at"));
+  // 신청 마감 (한국 시간, 비우면 특강 전날 17:00)
+  const deadline = clean(fd.get("registration_deadline"));
   if (!validDate(event_date) || !title || !validTime(starts_at)) return null;
   if (ends_at && (!validTime(ends_at) || ends_at <= starts_at)) return null;
-  return { event_date, title, starts_at, ends_at: ends_at || null };
+  if (deadline && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(deadline)) return null;
+  return { event_date, title, starts_at, ends_at: ends_at || null, registration_deadline: deadline ? new Date(`${deadline}:00+09:00`).toISOString() : null };
 }
 
 export async function addSpecialLecture(fd: FormData) {
@@ -865,6 +868,29 @@ export async function markAttendanceManual(fd: FormData) {
   if (!app || !canWatch(app) || app.cohort !== (await currentCohort())) return;
   await addAttendance(app.id, day);
   revalidatePath("/admin/stamps");
+}
+
+// 관리자 출결표: 칸을 누를 때마다 출석 → 지각 → 결석 → 출석 순서로 바꿔요.
+export async function cycleAttendance(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const id = clean(fd.get("id"));
+  const day = clean(fd.get("day"));
+  const rec = (await listStamps([id])).attendance.find((x) => x.day === day);
+  const next = !rec ? "present" : rec.late ? "absent" : "late";
+  await setAttendanceState(id, day, next);
+  revalidatePath("/admin/stamps");
+  revalidatePath("/class");
+}
+
+// 수업 없는 날에 찍힌 출석 기록을 한 번에 지워요. (값: 신청id|날짜)
+export async function deleteOffDayAttendance(fd: FormData) {
+  if (!(await isAdmin())) return;
+  for (const v of fd.getAll("rec").map(clean)) {
+    const [id, day] = v.split("|");
+    await setAttendanceState(id, day, "absent");
+  }
+  revalidatePath("/admin/stamps");
+  revalidatePath("/class");
 }
 
 // ── 명단에서 체크한 여러 건 한 번에 ───────────────

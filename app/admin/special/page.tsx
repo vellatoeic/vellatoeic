@@ -4,7 +4,7 @@ import { addSpecialLecture, bulkSpecialOnsite, removeSpecialLecture, removeSpeci
 import { DEPOSIT_MINUTES, DEPOSIT_LABEL, SPECIAL_DEPOSIT, won, type DepositStatus } from "@/lib/config";
 import SmsTest from "./SmsTest";
 import SelectAll from "../SelectAll";
-import { specialWhen } from "@/lib/special";
+import { deadlineOf, kstLabel, specialRegistrationOpen, specialWhen } from "@/lib/special";
 import AdminTabs from "../AdminTabs";
 import LoginForm from "../LoginForm";
 import CloseOnSubmitForm from "../CloseOnSubmitForm";
@@ -24,6 +24,10 @@ function LectureFields({ event }: { event?: SpecialLecture }) {
         <label><span className="label">시작 시각</span><input type="time" name="starts_at" defaultValue={event?.starts_at.slice(0, 5) ?? "10:00"} required className="input" /></label>
         <label><span className="label">종료 시각 (모르면 비워두기)</span><input type="time" name="ends_at" defaultValue={event?.ends_at?.slice(0, 5) ?? ""} className="input" /></label>
       </div>
+      <label>
+        <span className="label">신청 마감 일시 <span className="font-normal text-slate-400">(비우면 특강 전날 17:00)</span></span>
+        <input type="datetime-local" name="registration_deadline" defaultValue={event?.registration_deadline ? new Date(Date.parse(event.registration_deadline) + 9 * 3600 * 1000).toISOString().slice(0, 16) : ""} className="input" />
+      </label>
     </>
   );
 }
@@ -183,6 +187,10 @@ export default async function SpecialAdminPage() {
           <section key={event.id} className="card space-y-5">
             <div>
               <p className="text-sm text-slate-500">{specialWhen(event)}</p>
+              <p className="mt-0.5 text-sm">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${specialRegistrationOpen(event) ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>{specialRegistrationOpen(event) ? "모집 중" : "마감"}</span>
+                <span className="ml-2 text-slate-500">신청 마감 {kstLabel(deadlineOf(event))}{event.registration_deadline ? "" : " (자동: 전날 17:00)"}</span>
+              </p>
               <h2 className="font-jua text-2xl text-sky-ink">{event.title}</h2>
               <p className="text-sm text-slate-600">현장 {onsite.length}명 · 불라방 {online.length}명</p>
             </div>
