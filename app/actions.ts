@@ -882,17 +882,6 @@ export async function cycleAttendance(fd: FormData) {
   revalidatePath("/class");
 }
 
-// 수업 없는 날에 찍힌 출석 기록을 한 번에 지워요. (값: 신청id|날짜)
-export async function deleteOffDayAttendance(fd: FormData) {
-  if (!(await isAdmin())) return;
-  for (const v of fd.getAll("rec").map(clean)) {
-    const [id, day] = v.split("|");
-    await setAttendanceState(id, day, "absent");
-  }
-  revalidatePath("/admin/stamps");
-  revalidatePath("/class");
-}
-
 // ── 명단에서 체크한 여러 건 한 번에 ───────────────
 const checkedIds = (fd: FormData) => fd.getAll("ids").map(clean).filter(Boolean);
 

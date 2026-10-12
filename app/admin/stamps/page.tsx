@@ -4,13 +4,11 @@ import { listApplications, listStamps, currentCohort, isPreview, type Applicatio
 import { isAdmin } from "@/lib/auth";
 import { canWatch } from "@/lib/access";
 import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
-import { isClassDay } from "@/lib/attendanceDays";
 import { specialDay } from "@/lib/special";
-import { bulkStamp, cleanupPhotos, cycleAttendance, deleteOffDayAttendance } from "@/app/actions";
+import { bulkStamp, cleanupPhotos, cycleAttendance } from "@/app/actions";
 import SelectAll from "../SelectAll";
 import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
-import CloseOnSubmitForm from "../CloseOnSubmitForm";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "출결 · vella_toeic", robots: { index: false } };
@@ -31,13 +29,13 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
   const sp = await searchParams;
   const cohort = await currentCohort();
   const today = todayKST();
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(sp.d ?? "") ? sp.d! : today;
   const t = sp.t ?? "am";
 
   const everyone = (await listApplications()).filter((a) => a.cohort === cohort && canWatch(a));
   const holidays = await holidaysOf(cohort);
-  const { attendance } = await listStamps(everyone.map((a) => a.id));
+  const { attendance, homework } = await listStamps(everyone.map((a) => a.id));
   const rec = (id: string, day: string) => attendance.find((x) => x.app_id === id && x.day === day);
+  const hw = (id: string, day: string) => homework.find((x) => x.app_id === id && x.day === day);
 
   // 반(신청한 반) 목록과 반별 수업일 (공휴일 제외)
   const classTabs = await Promise.all((Object.keys(COURSES) as CourseId[]).flatMap((co) =>
@@ -48,11 +46,12 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
     return { ...c, days, students };
   }));
   const current = classTabs.find((c) => c.key === sp.b) ?? classTabs[0];
+  // 날짜는 수업이 있는 날만 골라요 (어느 반이든 수업이 있는 날). 기본: 오늘, 오늘 수업이 없으면 가장 최근 수업일
+  const allDays = [...new Set(classTabs.flatMap((c) => c.days))].sort();
+  const d = allDays.includes(sp.d ?? "") ? sp.d! : allDays.filter((x) => x <= today).at(-1) ?? allDays[0] ?? today;
+  const prev = allDays.filter((x) => x < d).at(-1);
+  const next = allDays.filter((x) => x > d && x <= today).at(0);
   const slotsOf = (students: Application[]): SlotKey[] => [...(["am", "pm"] as const), ...(students.some((a) => !a.slot) ? [null] : [])];
-
-  // 수업 없는 날에 찍힌 출석 기록
-  const offDay = classTabs.flatMap((c) => c.students.flatMap((a) =>
-    attendance.filter((x) => x.app_id === a.id && !isClassDay(c.days, holidays, x.day)).map((x) => ({ a, day: x.day }))));
 
   // 일괄 붙이기 (기존 기능)
   const bulkApps = everyone.filter((a) => (t === "all" ? true : a.slot === t)).sort((a, b) => a.name.localeCompare(b.name, "ko"));
@@ -70,40 +69,78 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
         <Link href="/admin/qr" target="_blank" className="btn !py-3">출석 QR 인쇄하기</Link>
       </div>
 
-      {/* ── 날짜별 요약 ── */}
-      <section className="card space-y-3">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <h2 className="font-jua text-2xl text-sky-ink">📋 {specialDay(d)} 출결 요약</h2>
-          <form className="flex gap-1">
-            <input type="hidden" name="b" value={current?.key ?? ""} />
-            <input type="date" name="d" defaultValue={d} className="input !w-auto !py-2" />
-            <button className="btn-ghost !py-2 text-sm">날짜 보기</button>
-          </form>
+      {/* ── 그날 수업 보드: 반·시간대마다 누가 왔고 누가 숙제를 냈는지 ── */}
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            {prev ? <a href={`/admin/stamps?d=${prev}&b=${current?.key ?? ""}`} className="btn-ghost !px-3 !py-2 text-sm">◀ {dayLabel(prev)}</a> : <span className="w-16" />}
+            <h2 className="font-jua text-2xl text-sky-ink">{specialDay(d)} 수업 {d === today && <span className="text-base text-sky-deep">· 오늘</span>}</h2>
+            {next ? <a href={`/admin/stamps?d=${next}&b=${current?.key ?? ""}`} className="btn-ghost !px-3 !py-2 text-sm">{dayLabel(next)} ▶</a> : null}
+          </div>
+          {d !== allDays.filter((x) => x <= today).at(-1) && <a href="/admin/stamps" className="text-sm text-sky-deep underline">최근 수업일로</a>}
         </div>
-        <div className="grid gap-2 lg:grid-cols-2">
-          {classTabs.flatMap((c) => slotsOf(c.students).map((sl) => {
+        <p className="text-xs text-slate-500">이름을 누르면 출석 처리돼요 (한 번 더 누르면 ◐ 지각, 또 누르면 결석으로 돌아가요).</p>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {classTabs.filter((c) => c.days.includes(d)).flatMap((c) => slotsOf(c.students).map((sl) => {
             const group = c.students.filter((a) => (a.slot ?? null) === sl);
             if (group.length === 0) return null;
-            if (!isClassDay(c.days, holidays, d)) return <p key={c.key + sl} className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-400">{c.title} · {SLOT_NAME(sl)} — 수업 없는 날</p>;
             const came = group.filter((a) => rec(a.id, d));
-            const late = came.filter((a) => rec(a.id, d)?.late);
-            const absent = group.filter((a) => !rec(a.id, d));
+            const notYet = group.filter((a) => !rec(a.id, d));
+            const did = group.filter((a) => hw(a.id, d));
+            const notDid = group.filter((a) => !hw(a.id, d));
+            const chip = (a: Application, kind: "in" | "out") => {
+              const r = rec(a.id, d);
+              return (
+                <form key={a.id} action={cycleAttendance} className="inline">
+                  <input type="hidden" name="id" value={a.id} />
+                  <input type="hidden" name="day" value={d} />
+                  <button title={kind === "in" ? "누르면 지각/결석으로 바꿔요" : "누르면 출석 처리돼요"}
+                    className={`rounded-full px-3 py-1.5 text-sm font-bold ${kind === "out" ? "bg-white text-slate-500 ring-1 ring-slate-200" : r?.late ? "bg-amber-100 text-amber-700" : "bg-sky-deep text-white"}`}>
+                    {kind === "in" && (r?.late ? "◐ " : "● ")}{a.name}<span className="ml-1 text-[10px] font-normal opacity-70">{KINDS[a.kind].short}</span>
+                  </button>
+                </form>
+              );
+            };
             return (
-              <div key={c.key + sl} className="rounded-xl bg-sky-soft px-3 py-2 text-sm">
-                <p><b className="text-sky-ink">{c.title} · {SLOT_NAME(sl)}</b> — 출석 <b>{came.length}</b> / {group.length} · 지각 <b className="text-amber-600">{late.length}</b></p>
-                {absent.length > 0 && <p className="mt-0.5 text-red-500">{d > today ? "아직 안 온 학생" : "결석"} {absent.length}: {absent.map((a) => a.name).join(", ")}</p>}
-              </div>
+              <article key={c.key + sl} className="card space-y-3 !p-4">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="font-jua text-lg text-sky-ink">{c.title} · {SLOT_NAME(sl)}</p>
+                  <p className="shrink-0 text-sm text-slate-500">{group.length}명</p>
+                </div>
+                <div>
+                  <p className="mb-1.5 text-sm font-bold text-sky-ink">☁️ 출석 {came.length} / {group.length}{came.some((a) => rec(a.id, d)?.late) ? ` · 지각 ${came.filter((a) => rec(a.id, d)?.late).length}` : ""}</p>
+                  <div className="flex flex-wrap gap-1.5">{came.map((a) => chip(a, "in"))}</div>
+                  {notYet.length > 0 && (
+                    <>
+                      <p className="mb-1.5 mt-2 text-sm font-bold text-red-500">{d < today ? "결석" : "아직 안 옴"} {notYet.length}</p>
+                      <div className="flex flex-wrap gap-1.5">{notYet.map((a) => chip(a, "out"))}</div>
+                    </>
+                  )}
+                </div>
+                <div className="border-t border-sky-soft pt-2">
+                  <p className="mb-1.5 text-sm font-bold text-amber-600">⭐ 숙제 {did.length} / {group.length}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {did.map((a) => <span key={a.id} className="rounded-full bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-700">{a.name}</span>)}
+                  </div>
+                  {notDid.length > 0 && <p className="mt-2 text-sm text-slate-500">미제출 {notDid.length}: {notDid.map((a) => a.name).join(", ")}</p>}
+                </div>
+              </article>
             );
           }))}
         </div>
+        {classTabs.every((c) => !c.days.includes(d)) && <p className="card text-center text-slate-500">이 날은 수업이 없어요.</p>}
       </section>
 
-      {/* ── 반별 출결표 (오전·저녁 나란히) ── */}
-      <div className="flex flex-wrap gap-2">
-        {classTabs.map((c) => (
-          <a key={c.key} href={`/admin/stamps?b=${c.key}&d=${d}&t=${t}`} className={`rounded-full px-4 py-2 text-sm font-bold ${c.key === current?.key ? "bg-sky-deep text-white" : "bg-white text-sky-ink"}`}>{c.title}</a>
-        ))}
-      </div>
+      {/* ── 월간 출결표 (필요할 때만 펼쳐요) ── */}
+      <details className="card !p-4">
+        <summary className="font-jua cursor-pointer text-lg text-sky-ink">📅 반별 월간 출결표 · 학생별 기록</summary>
+        <div className="mt-3 space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {classTabs.map((c) => (
+              <a key={c.key} href={`/admin/stamps?b=${c.key}&d=${d}&t=${t}#month`} className={`rounded-full px-4 py-2 text-sm font-bold ${c.key === current?.key ? "bg-sky-deep text-white" : "bg-sky-soft text-sky-ink"}`}>{c.title}</a>
+            ))}
+          </div>
+          <div id="month">
       {!current ? <p className="card text-center text-slate-500">납부 완료된 수강생이 아직 없어요.</p> : (
         <div className="grid gap-4 lg:grid-cols-2">
           {slotsOf(current.students).map((sl) => {
@@ -158,26 +195,13 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
         </div>
       )}
 
-      {offDay.length > 0 && (
-        <CloseOnSubmitForm action={deleteOffDayAttendance} className="block rounded-3xl border-2 border-amber-200 bg-amber-50 p-5">
-          <p className="font-jua text-xl text-amber-700">⚠️ 수업 없는 날에 찍힌 출석 {offDay.length}건</p>
-          <p className="mt-1 text-sm text-slate-600">그 학생 반의 수업일이 아니거나 공휴일에 남은 기록이에요. 체크한 뒤 지우면 스티커판에서도 빠져요.</p>
-          <label className="mt-3 flex items-center gap-2 text-sm font-bold text-sky-ink"><SelectAll group="offday" /> 전체 선택</label>
-          <ul className="mt-2 grid gap-1 text-sm sm:grid-cols-2">
-            {offDay.map(({ a, day }) => (
-              <li key={a.id + day}>
-                <label className="flex items-center gap-2 rounded-lg bg-white px-3 py-1.5">
-                  <input type="checkbox" name="rec" value={`${a.id}|${day}`} data-group="offday" className="h-4 w-4 accent-sky-deep" />
-                  {specialDay(day)}{holidays[day] ? ` (${holidays[day]})` : ""} · <b>{a.name}</b> <span className="text-slate-400">{COURSES[a.course].label} {TRACKS[a.track]}</span>
-                </label>
-              </li>
-            ))}
-          </ul>
-          <button className="mt-3 rounded-xl bg-red-50 px-4 py-2 font-bold text-red-600">체크한 기록 삭제</button>
-        </CloseOnSubmitForm>
-      )}
+          </div>
+        </div>
+      </details>
 
-      <form action={bulkStamp} className="card space-y-3">
+      <details className="card !p-4">
+        <summary className="font-jua cursor-pointer text-lg text-sky-ink">🧷 스티커 일괄 붙이기 (QR이 안 됐던 날)</summary>
+      <form action={bulkStamp} className="mt-3 space-y-3">
         <div>
           <p className="font-jua text-xl text-sky-ink">스티커 일괄 붙이기</p>
           <p className="text-sm text-slate-500">QR이 안 됐던 날처럼 여러 학생에게 한 번에 출석(+숙제) 스티커를 붙여요. 이미 붙은 스티커는 그대로예요.</p>
@@ -214,6 +238,8 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
           </>
         )}
       </form>
+
+      </details>
 
       <form action={cleanupPhotos} className="card flex flex-wrap items-center justify-between gap-3 text-sm">
         <p className="text-slate-600">예전 기수 숙제 사진 정리 (새 숙제 인증은 카페 링크를 사용해요)</p>
