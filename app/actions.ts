@@ -3,12 +3,12 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
-  COURSES, PARTS, LECTURE_COURSES, DEPOSIT_MINUTES, booksFor, isAlt, isTimeSlot, calcAmount, youtubeId, todayKST,
+  COURSES, PARTS, LECTURE_COURSES, DEPOSIT_MINUTES, YBM_ORDER_AMOUNT, booksFor, isAlt, isTimeSlot, calcAmount, youtubeId, todayKST,
   type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
 } from "@/lib/config";
 import {
   createApplication, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  saveMission, type Mission, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
+  saveMission, type Mission, createYbmOrder, listYbmOrders, updateYbmOrders, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
 } from "@/lib/db";
 import { canWatch, isActive, loginApps } from "@/lib/access";
 import { parseBankSms } from "@/lib/bankSms";
@@ -345,6 +345,36 @@ export async function cleanupExpiredAudios() {
     if (end && end < today) await deleteAudios(all.filter((a) => a.cohort === cohort));
   }
   revalidatePath("/admin/audio");
+}
+
+// ── YBM 인강생 교재 주문 (개념 zip, 택배만) ─────────
+export async function createYbmOrderAction(_: FormState, fd: FormData): Promise<FormState> {
+  const name = normName(clean(fd.get("name")));
+  const phone = clean(fd.get("phone")).replace(/[^0-9]/g, "");
+  const address = clean(fd.get("address"));
+  const depositor = normName(clean(fd.get("depositor"))) || name;
+  const proof = fd.get("proof");
+  if (!/^[가-힣a-zA-Z ]{2,20}$/.test(name)) return { error: "이름을 한글 또는 영문으로 정확히 입력해 주세요." };
+  if (!/^01[0-9]{8,9}$/.test(phone)) return { error: "연락처를 정확히 입력해 주세요. (예: 010-1234-5678)" };
+  if (address.length < 10) return { error: "택배 받을 주소를 정확히 입력해 주세요." };
+  if (!(proof instanceof File) || proof.size === 0) return { error: "인강 수강증 캡처 사진을 올려 주세요." };
+  if (!["image/jpeg", "image/png", "image/webp"].includes(proof.type)) return { error: "수강증은 사진(JPG·PNG) 파일로 올려 주세요." };
+  if (proof.size > 4 * 1024 * 1024) return { error: "사진이 너무 커요. 다시 골라 주세요." };
+  // 같은 이름·연락처로 아직 발송 전 주문이 있으면 새로 만들지 않고 그 주문으로 보내요.
+  const existing = (await listYbmOrders()).find((o) => o.status !== "shipped" && o.name === name && o.phone === phone);
+  if (existing) redirect(`/ybm/${existing.id}?again=1`);
+  const id = await createYbmOrder({ name, phone, address, depositor, amount: YBM_ORDER_AMOUNT }, { data: Buffer.from(await proof.arrayBuffer()), type: proof.type });
+  revalidatePath("/admin/delivery");
+  redirect(`/ybm/${id}`);
+}
+
+// 관리자: 인강 주문 입금 확인 (입금 문자 자동 확인이 안 됐을 때)
+export async function confirmYbmPayments(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const ids = fd.getAll("ids").map(clean).filter((v) => v.startsWith("ybm:")).map((v) => v.slice(4));
+  const pending = (await listYbmOrders()).filter((o) => ids.includes(o.id) && o.status === "pending").map((o) => o.id);
+  await updateYbmOrders(pending, { status: "paid", paid_at: new Date().toISOString() });
+  revalidatePath("/admin/delivery");
 }
 
 // ── 공지 ───────────────────────────────────────
@@ -735,7 +765,14 @@ export async function resolveBookDepositEvent(fd: FormData) {
   if (!(await isAdmin())) return;
   const eventId = clean(fd.get("event_id"));
   const applicationId = clean(fd.get("application_id"));
-  if (applicationId) {
+  if (applicationId.startsWith("ybm:")) {
+    const id = applicationId.slice(4);
+    const order = (await listYbmOrders()).find((o) => o.id === id);
+    if (!order) return;
+    if (order.status === "pending") await updateYbmOrders([id], { status: "paid", paid_at: new Date().toISOString() });
+    await updateDepositEvent(eventId, { result: "resolved", ybm_order_id: id });
+    revalidatePath("/admin/delivery");
+  } else if (applicationId) {
     const [app] = await getApplications([applicationId]);
     if (app?.status === "pending") await updateApplications([app.id], { status: "paid" });
     await updateDepositEvent(eventId, { result: "resolved", application_id: applicationId });
@@ -919,11 +956,20 @@ export async function bulkConfirmPayment(fd: FormData) {
 // 불라방 교재: 체크한 학생 중 납부 완료 상태만 수령·발송 완료로 바꿔요.
 export async function bulkMarkBooksDone(fd: FormData) {
   if (!(await isAdmin())) return;
-  const ids = checkedIds(fd);
-  if (ids.length === 0) return;
-  const apps = await getApplications(ids);
-  const ready = apps.filter((app) => app.status === "paid" && app.kind === "online").map((app) => app.id);
-  await updateApplications(ready, { status: "shipped" });
+  const all = checkedIds(fd);
+  if (all.length === 0) return;
+  // "ybm:"로 시작하면 YBM 인강 주문, 나머지는 학원 불라방 신청이에요.
+  const ybmIds = all.filter((v) => v.startsWith("ybm:")).map((v) => v.slice(4));
+  const ids = all.filter((v) => !v.startsWith("ybm:"));
+  if (ids.length > 0) {
+    const apps = await getApplications(ids);
+    const ready = apps.filter((app) => app.status === "paid" && app.kind === "online").map((app) => app.id);
+    await updateApplications(ready, { status: "shipped" });
+  }
+  if (ybmIds.length > 0) {
+    const ready = (await listYbmOrders()).filter((o) => ybmIds.includes(o.id) && o.status === "paid").map((o) => o.id);
+    await updateYbmOrders(ready, { status: "shipped", shipped_at: new Date().toISOString() });
+  }
   revalidatePath("/admin/delivery");
   revalidatePath("/admin");
 }

@@ -1,5 +1,5 @@
 import { BOOKS, COURSES, KINDS, TRACKS, TIME_SLOTS, bookStatusLabel, cohortLabel, won, type CourseId, type TimeSlot, type Track } from "@/lib/config";
-import { listApplications, listDepositEvents, listMissions, getSetting, currentCohort, roundFor, isPreview, type Application, type Mission } from "@/lib/db";
+import { listApplications, listDepositEvents, listYbmOrders, listMissions, getSetting, currentCohort, roundFor, isPreview, type Application, type Mission } from "@/lib/db";
 import { missionCount } from "@/lib/mission";
 import { isAdmin } from "@/lib/auth";
 import { changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove, resolveBookDepositEvent } from "@/app/actions";
@@ -158,6 +158,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   // 이번 모집 기수에서 아직 입금 확인이 안 된 학생 (수업 전에 확인해야 라이브·강의가 열려요)
   const waiting = everything.filter((a) => a.cohort === now && a.status === "pending").sort((a, b) => a.created_at.localeCompare(b.created_at));
   // 자동으로 확정하지 못한 교재비 입금 문자 (같은 입금자명이 여러 명이거나 금액이 다를 때)
+  const ybmPending = (await listYbmOrders()).filter((o) => o.status === "pending");
   const bookChecks = (await listDepositEvents(50)).filter((e) => e.target === "book" && (e.result === "review" || e.result === "unmatched"));
   const pendingAll = everything.filter((a) => a.status === "pending");
   // 수강 시간이 아직 비어 있는 학생 (예전 신청). 오전/저녁을 정해 주세요.
@@ -241,6 +242,9 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
                     {[...pendingAll]
                       .sort((x, y) => Number(y.depositor === e.name) - Number(x.depositor === e.name))
                       .map((a) => <option key={a.id} value={a.id}>{a.depositor}{a.depositor !== a.name ? ` (${a.name})` : ""} · {won(a.amount)} · {COURSES[a.course].label} {TRACKS[a.track]}</option>)}
+                    {[...ybmPending]
+                      .sort((x, y) => Number(y.depositor === e.name) - Number(x.depositor === e.name))
+                      .map((o) => <option key={o.id} value={`ybm:${o.id}`}>{o.depositor}{o.depositor !== o.name ? ` (${o.name})` : ""} · {won(o.amount)} · YBM 인강 교재</option>)}
                   </select>
                   <button className="btn !py-2 !text-sm">처리</button>
                 </CloseOnSubmitForm>

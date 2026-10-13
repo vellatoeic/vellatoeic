@@ -81,7 +81,7 @@ test("웹훅은 30분 지난 대기 신청을 확정하지 않고, 취소 등 �
 
 test("문자 원문은 저장하지 않고 이름·금액·시각·결과만 남겨요", async () => {
   const e = (await listDepositEvents(1))[0];
-  assert.deepEqual(Object.keys(e).sort(), ["amount", "application_id", "id", "name", "received_at", "registration_id", "result", "target"]);
+  assert.deepEqual(Object.keys(e).sort(), ["amount", "application_id", "id", "name", "received_at", "registration_id", "result", "target", "ybm_order_id"]);
 });
 
 // ── 교재비 입금 자동 확인 ──
@@ -133,4 +133,31 @@ test("이미 납부 확인된 신청은 다시 바꾸지 않아요", async () =>
   assert.equal((await handleBankSms("[신한은행] 입금 10,000원 이미납부")).result, "matched");
   assert.equal((await handleBankSms("[신한은행] 입금 10,000원 이미납부")).result, "unmatched");
   assert.equal((await getApplication(id))?.status, "paid");
+});
+
+import { createYbmOrder, getYbmOrder } from "@/lib/db";
+
+const newYbm = (name: string, depositor = name) =>
+  createYbmOrder({ name, phone: "01011112222", address: "[48000] 부산 테스트로 1, 101호", depositor, amount: 14000 }, { data: Buffer.from("x"), type: "image/jpeg" });
+
+test("YBM 인강: 입금자명·14,000원이 맞으면 자동 입금 확인 → 발송 대기", async () => {
+  const id = await newYbm("인강생", "인강엄마");
+  assert.equal((await handleBankSms("[농협] 입금 14,000원 인강엄마")).result, "matched");
+  assert.equal((await getYbmOrder(id))?.status, "paid");
+  const ev = (await listDepositEvents(1000)).find((e) => e.ybm_order_id === id);
+  assert.equal(ev?.application_id ?? null, null);
+});
+
+test("YBM 인강 주문과 학원 택배 신청(14,000원)이 같은 이름으로 겹치면 '확인 필요'", async () => {
+  const order = await newYbm("겹친인강");
+  const app = await newApp("겹친인강", 14000);
+  assert.equal((await handleBankSms("[농협] 입금 14,000원 겹친인강")).result, "review");
+  assert.equal((await getYbmOrder(order))?.status, "pending");
+  assert.equal((await getApplication(app))?.status, "pending");
+});
+
+test("YBM 인강: 금액이 다르면 확정하지 않고 '확인 필요' 기록", async () => {
+  const id = await newYbm("만원만");
+  assert.equal((await handleBankSms("[농협] 입금 10,000원 만원만")).result, "unmatched");
+  assert.equal((await getYbmOrder(id))?.status, "pending");
 });

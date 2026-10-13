@@ -53,6 +53,20 @@ export type TestResult = {
   submitted_at: string;
 };
 
+export type YbmOrder = {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  depositor: string;
+  amount: number;
+  status: "pending" | "paid" | "shipped";
+  proof_path: string | null;
+  paid_at: string | null;
+  shipped_at: string | null;
+  created_at: string;
+};
+
 export type FaqItem = {
   id: string;
   category: string;
@@ -160,9 +174,10 @@ type Mem = {
   testOverrides: TestOverride[];
   notices: Notice[];
   noticeReads: NoticeRead[];
+  ybmOrders: YbmOrder[];
 };
 const g = globalThis as unknown as { __vellaMem?: Mem };
-const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [], testResults: [], testOverrides: [], notices: [], noticeReads: [] });
+const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [], testResults: [], testOverrides: [], notices: [], noticeReads: [], ybmOrders: [] });
 mem.specialLectures ??= [];
 mem.specialRegistrations ??= [];
 mem.specialMaterials ??= [];
@@ -179,6 +194,7 @@ mem.testResults ??= [];
 mem.testOverrides ??= [];
 mem.notices ??= [];
 mem.noticeReads ??= [];
+mem.ybmOrders ??= [];
 
 const isUuid = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
 
@@ -328,6 +344,76 @@ export async function deleteLecture(id: string) {
     return;
   }
   mem.lectures = mem.lectures.filter((l) => l.id !== id);
+}
+
+// ── YBM 인강 교재 주문 ─────────────────────────
+const YBM_BUCKET = "ybm-proofs";
+
+export async function createYbmOrder(o: Pick<YbmOrder, "name" | "phone" | "address" | "depositor" | "amount">, proof: { data: Buffer; type: string }): Promise<string> {
+  const id = crypto.randomUUID();
+  const path = `${id}.${proof.type === "image/png" ? "png" : proof.type === "image/webp" ? "webp" : "jpg"}`;
+  if (sb) {
+    const up = await sb.storage.from(YBM_BUCKET).upload(path, proof.data, { contentType: proof.type, upsert: false });
+    if (up.error) throw up.error;
+    const { error } = await sb.from("ybm_orders").insert({ ...o, id, proof_path: path });
+    if (error) {
+      await sb.storage.from(YBM_BUCKET).remove([path]);
+      throw error;
+    }
+    return id;
+  }
+  mem.photos[path] = `data:${proof.type};base64,${proof.data.toString("base64")}`;
+  mem.ybmOrders.push({ ...o, id, status: "pending", proof_path: path, paid_at: null, shipped_at: null, created_at: new Date().toISOString() });
+  return id;
+}
+
+export async function listYbmOrders(): Promise<YbmOrder[]> {
+  if (sb) {
+    const { data, error } = await sb.from("ybm_orders").select("*").order("created_at", { ascending: false });
+    if (error) throw error;
+    return data as YbmOrder[];
+  }
+  return [...mem.ybmOrders].sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+export async function getYbmOrder(id: string): Promise<YbmOrder | null> {
+  if (!isUuid(id)) return null;
+  if (sb) {
+    const { data, error } = await sb.from("ybm_orders").select("*").eq("id", id).maybeSingle();
+    if (error) throw error;
+    return (data as YbmOrder) ?? null;
+  }
+  return mem.ybmOrders.find((o) => o.id === id) ?? null;
+}
+
+export async function updateYbmOrders(ids: string[], patch: Partial<Pick<YbmOrder, "status" | "paid_at" | "shipped_at" | "proof_path">>) {
+  const ok = ids.filter(isUuid);
+  if (ok.length === 0) return;
+  if (sb) {
+    const { error } = await sb.from("ybm_orders").update(patch).in("id", ok);
+    if (error) throw error;
+    return;
+  }
+  for (const o of mem.ybmOrders) if (ok.includes(o.id)) Object.assign(o, patch);
+}
+
+export async function ybmProofUrl(path: string): Promise<string | null> {
+  if (sb) {
+    const { data, error } = await sb.storage.from(YBM_BUCKET).createSignedUrl(path, 60 * 10);
+    if (error) throw error;
+    return data?.signedUrl ?? null;
+  }
+  return mem.photos[path] ?? null;
+}
+
+// 개인정보 보호: 발송 완료 후 30일이 지난 주문의 수강증 사진을 지워요.
+export async function cleanupYbmProofs(days = 30) {
+  const cutoff = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
+  const old = (await listYbmOrders()).filter((o) => o.status === "shipped" && o.proof_path && o.shipped_at && o.shipped_at < cutoff);
+  if (old.length === 0) return;
+  if (sb) await sb.storage.from(YBM_BUCKET).remove(old.map((o) => o.proof_path!));
+  else for (const o of old) delete mem.photos[o.proof_path!];
+  await updateYbmOrders(old.map((o) => o.id), { proof_path: null });
 }
 
 // ── 공지 ───────────────────────────────────────
@@ -779,9 +865,10 @@ export type DepositEvent = {
   result: "matched" | "review" | "unmatched" | "resolved" | "dismissed";
   registration_id: string | null; // 특강 보증금이면 특강 신청
   application_id: string | null; // 교재비면 수강 신청
+  ybm_order_id?: string | null; // YBM 인강 교재 주문
 };
 
-export async function createDepositEvent(e: Pick<DepositEvent, "target" | "name" | "amount" | "result" | "registration_id" | "application_id">) {
+export async function createDepositEvent(e: Pick<DepositEvent, "target" | "name" | "amount" | "result" | "registration_id" | "application_id" | "ybm_order_id">) {
   if (sb) {
     const { error } = await sb.from("deposit_events").insert(e);
     if (error) throw error;
@@ -799,7 +886,7 @@ export async function listDepositEvents(limit = 50): Promise<DepositEvent[]> {
   return [...mem.depositEvents].sort((a, b) => b.received_at.localeCompare(a.received_at)).slice(0, limit);
 }
 
-export async function updateDepositEvent(id: string, patch: Partial<Pick<DepositEvent, "result" | "registration_id" | "application_id">>) {
+export async function updateDepositEvent(id: string, patch: Partial<Pick<DepositEvent, "result" | "registration_id" | "application_id" | "ybm_order_id">>) {
   if (!isUuid(id)) return;
   if (sb) {
     const { error } = await sb.from("deposit_events").update(patch).eq("id", id);
