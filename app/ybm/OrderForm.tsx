@@ -26,7 +26,7 @@ async function shrink(file: File): Promise<File> {
   }
 }
 
-export default function OrderForm({ amountLabel, bank }: { amountLabel: string; bank: string }) {
+export default function OrderForm({ amountLabel }: { amountLabel: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(createYbmOrderAction, {});
   const [phone, setPhone] = useState("");
   const [zip, setZip] = useState("");
@@ -69,6 +69,7 @@ export default function OrderForm({ amountLabel, bank }: { amountLabel: string; 
     else if (!get("address_detail")) err = "동·호수 등 상세 주소를 입력해 주세요. (단독주택이면 '단독주택'이라고 적어 주세요)";
     else if (manual && get("address_manual").length < 10) err = "택배 받을 주소를 정확히 입력해 주세요.";
     else if (!proof) err = "인강 수강증 캡처 사진을 올려 주세요.";
+    else if (!fd.get("agree")) err = "개인정보 수집·이용에 동의해 주세요.";
     setError(err);
     if (err) return;
     fd.set("phone", phone);
@@ -78,36 +79,51 @@ export default function OrderForm({ amountLabel, bank }: { amountLabel: string; 
   }
 
   return (
-    <form onSubmit={review} className="card space-y-4">
-      <label className="block"><span className="label">이름</span><input name="name" className="input" placeholder="홍길동" autoComplete="name" /></label>
-      <label className="block"><span className="label">연락처</span><input value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} className="input" placeholder="010-1234-5678" inputMode="numeric" autoComplete="tel" /></label>
-      <div className="space-y-2">
-        <span className="label">택배 받을 주소</span>
-        {manual ? <input name="address_manual" className="input" placeholder="도로명 주소" /> : (
-          <div className="flex gap-2">
-            <input readOnly value={zip ? `[${zip}] ${base}` : ""} placeholder="주소 검색을 눌러 주세요" onClick={searchAddress} className="input flex-1 bg-slate-50" />
-            <button type="button" onClick={searchAddress} className="btn-ghost shrink-0 !py-2">주소 검색</button>
-          </div>
-        )}
-        <input ref={detailRef} name="address_detail" className="input" placeholder="상세 주소 (예: 101동 1001호)" />
-        <span className="block text-sm font-bold text-red-600">* 교재를 받을 수 있도록 동·호수까지 정확한 주소를 입력해 주세요.</span>
-      </div>
-      <label className="block"><span className="label">입금자명 <span className="font-normal text-slate-400">(이름과 같으면 비워두세요)</span></span><input name="depositor" className="input" placeholder="예: 홍길동(엄마)" /></label>
-      <div className="space-y-2">
-        <span className="label">YBM 인강 수강증 캡처</span>
-        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-sky-main bg-sky-soft p-4 text-sm font-bold text-sky-ink">
-          📷 {proof ? "다른 사진으로 바꾸기" : "사진 올리기"}
-          <input type="file" accept="image/*" hidden onChange={(e) => pickProof(e.target.files?.[0])} />
+    <form onSubmit={review} className="space-y-3">
+      <section className="card space-y-3">
+        <p className="flex items-center gap-2 font-jua text-lg text-sky-ink"><span className="grid h-7 w-7 place-items-center rounded-full bg-sky-deep text-sm text-white">1</span>신청 교재</p>
+        <div className="rounded-2xl bg-sky-soft p-3 text-[15px]">
+          <p className="flex justify-between py-1"><span>📘 벨라토익 &apos;개념 zip&apos;</span><span>10,000원</span></p>
+          <p className="flex justify-between py-1"><span>🚚 택배비</span><span>4,000원</span></p>
+          <p className="mt-1.5 flex justify-between border-t-2 border-dashed border-sky-main pt-2 font-jua text-xl text-sky-ink"><span>총 금액</span><span>{amountLabel}</span></p>
+        </div>
+        <p className="text-sm text-slate-500">📦 인강 수강생은 <b>택배로만</b> 받아요. 입금 확인 후 순서대로 보내 드려요.</p>
+      </section>
+
+      <section className="card space-y-4">
+        <p className="flex items-center gap-2 font-jua text-lg text-sky-ink"><span className="grid h-7 w-7 place-items-center rounded-full bg-sky-deep text-sm text-white">2</span>받는 분 정보</p>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block"><span className="label">이름</span><input name="name" className="input" placeholder="홍길동" autoComplete="name" /></label>
+          <label className="block"><span className="label">연락처</span><input value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} className="input" placeholder="010-1234-5678" inputMode="numeric" autoComplete="tel" /></label>
+        </div>
+        <div className="space-y-2">
+          <span className="label">택배 받을 주소</span>
+          {manual ? <input name="address_manual" className="input" placeholder="도로명 주소" /> : (
+            <div className="flex gap-2">
+              <input readOnly value={zip ? `[${zip}] ${base}` : ""} placeholder="주소 검색을 눌러 주세요" onClick={searchAddress} className="input flex-1 bg-slate-50" />
+              <button type="button" onClick={searchAddress} className="btn-ghost shrink-0 !py-2">주소 검색</button>
+            </div>
+          )}
+          <input ref={detailRef} name="address_detail" className="input" placeholder="상세 주소 (예: 101동 1001호)" />
+          <span className="block text-sm font-bold text-red-600">* 교재를 받을 수 있도록 동·호수까지 정확한 주소를 입력해 주세요.</span>
+        </div>
+        <label className="block"><span className="label">입금자명 <span className="font-normal text-slate-400">(이름과 다르면 입력)</span></span><input name="depositor" className="input" placeholder="예: 홍길동(엄마)" /></label>
+        <div className="space-y-2">
+          <span className="label">YBM 인강 수강증 캡처</span>
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-sky-main bg-sky-soft p-4 text-sm font-bold text-sky-ink">
+            📷 {proof ? "다른 사진으로 바꾸기" : "사진 올리기"}
+            <input type="file" accept="image/*" hidden onChange={(e) => pickProof(e.target.files?.[0])} />
+          </label>
+          {preview && <img src={preview} alt="수강증 미리보기" className="max-h-56 rounded-xl border border-sky-main" />}
+          <span className="block text-xs text-slate-500">수강 중인 강의가 보이는 화면을 캡처해 주세요. 사진은 확인에만 쓰고 발송 30일 뒤 지워져요.</span>
+        </div>
+        <label className="flex items-start gap-2 text-sm leading-relaxed">
+          <input type="checkbox" name="agree" className="mt-0.5 h-5 w-5 shrink-0 accent-sky-deep" />
+          <span><b>개인정보 수집·이용 동의 (필수)</b><br /><span className="text-slate-500">교재 발송을 위해 이름·연락처·주소를 받아요. 발송 3개월 뒤 자동 삭제돼요.</span></span>
         </label>
-        {preview && <img src={preview} alt="수강증 미리보기" className="max-h-56 rounded-xl border border-sky-main" />}
-        <span className="block text-xs text-slate-500">수강 중인 강의가 보이는 화면을 캡처해 주세요. 사진은 발송 확인에만 쓰고 발송 30일 뒤 지워져요.</span>
-      </div>
-      <div className="rounded-2xl border-2 border-dashed border-sky-main p-4 text-center">
-        <p className="font-jua text-2xl text-sky-ink">{amountLabel}</p>
-        <p className="mt-1 text-xs text-slate-500">벨라토익 &apos;개념 zip&apos; 교재비 1만원 + 배송비 4천원</p>
-      </div>
-      {(error || state.error) && <p className="rounded-xl bg-red-50 p-3 text-center font-bold text-red-600">{error || state.error}</p>}
-      <button className="btn w-full" disabled={pending}>{pending ? "주문 중…" : "입력 내용 확인하기"}</button>
+        {(error || state.error) && <p className="rounded-xl bg-red-50 p-3 text-center font-bold text-red-600">{error || state.error}</p>}
+        <button className="btn w-full" disabled={pending}>{pending ? "신청 중…" : "교재 신청하기"}</button>
+      </section>
 
       {confirm && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center" role="dialog" aria-modal="true">
@@ -120,10 +136,9 @@ export default function OrderForm({ amountLabel, bank }: { amountLabel: string; 
               <dt className="text-slate-500">입금자명</dt><dd>{String(confirm.get("depositor") ?? "").trim() || String(confirm.get("name"))}</dd>
               <dt className="text-slate-500">금액</dt><dd className="font-jua text-xl text-sky-ink">{amountLabel}</dd>
             </dl>
-            <p className="rounded-xl bg-sky-soft p-3 text-center text-sm text-sky-ink">입금 계좌: <b>{bank}</b></p>
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => setConfirm(null)} className="btn-ghost">수정하기</button>
-              <button type="button" onClick={() => { const fd = confirm; setConfirm(null); startTransition(() => action(fd)); }} className="btn">맞아요, 주문</button>
+              <button type="button" onClick={() => { const fd = confirm; setConfirm(null); startTransition(() => action(fd)); }} className="btn">맞아요, 신청</button>
             </div>
           </div>
         </div>

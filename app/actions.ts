@@ -358,6 +358,7 @@ export async function createYbmOrderAction(_: FormState, fd: FormData): Promise<
   if (!/^01[0-9]{8,9}$/.test(phone)) return { error: "연락처를 정확히 입력해 주세요. (예: 010-1234-5678)" };
   if (address.length < 10) return { error: "택배 받을 주소를 정확히 입력해 주세요." };
   if (!(proof instanceof File) || proof.size === 0) return { error: "인강 수강증 캡처 사진을 올려 주세요." };
+  if (!fd.get("agree")) return { error: "개인정보 수집·이용에 동의해 주세요." };
   if (!["image/jpeg", "image/png", "image/webp"].includes(proof.type)) return { error: "수강증은 사진(JPG·PNG) 파일로 올려 주세요." };
   if (proof.size > 4 * 1024 * 1024) return { error: "사진이 너무 커요. 다시 골라 주세요." };
   // 같은 이름·연락처로 아직 발송 전 주문이 있으면 새로 만들지 않고 그 주문으로 보내요.

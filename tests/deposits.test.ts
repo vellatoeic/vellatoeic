@@ -161,3 +161,16 @@ test("YBM 인강: 금액이 다르면 확정하지 않고 '확인 필요' 기록
   assert.equal((await handleBankSms("[농협] 입금 10,000원 만원만")).result, "unmatched");
   assert.equal((await getYbmOrder(id))?.status, "pending");
 });
+
+import { cleanupYbmOrders, updateYbmOrders } from "@/lib/db";
+
+test("YBM 인강: 발송 3개월 지난 주문은 개인정보째 지우고, 그 전 주문은 남겨요", async () => {
+  const old = await newYbm("오래된주문");
+  const recent = await newYbm("최근주문");
+  const day = 24 * 3600 * 1000;
+  await updateYbmOrders([old], { status: "shipped", shipped_at: new Date(Date.now() - 91 * day).toISOString() });
+  await updateYbmOrders([recent], { status: "shipped", shipped_at: new Date(Date.now() - 10 * day).toISOString() });
+  await cleanupYbmOrders();
+  assert.equal(await getYbmOrder(old), null);
+  assert.equal((await getYbmOrder(recent))?.name, "최근주문");
+});

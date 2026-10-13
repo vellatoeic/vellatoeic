@@ -1,5 +1,5 @@
 import { BOOKS, cohortLabel, klassLabel } from "@/lib/config";
-import { listApplications, listYbmOrders, cleanupYbmProofs, currentCohort, isPreview } from "@/lib/db";
+import { listApplications, listYbmOrders, cleanupYbmProofs, cleanupYbmOrders, currentCohort, isPreview } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { phoneLabel } from "@/lib/csv";
 import LoginForm from "../LoginForm";
@@ -20,6 +20,7 @@ export default async function DeliveryPage({ searchParams }: { searchParams: Pro
   const from: Source = raw === "academy" || raw === "ybm" ? raw : "all";
   const cohort = await currentCohort();
   await cleanupYbmProofs().catch(() => {});
+  await cleanupYbmOrders().catch(() => {});
   const academy: Row[] = (await listApplications())
     .filter((a) => a.cohort === cohort && a.kind === "online" && a.pickup === "delivery" && a.status !== "refunded")
     .map((a) => ({ id: a.id, name: a.name, klass: klassLabel(a), phone: phoneLabel(a.phone), address: a.address ?? "", books: a.books.map((b) => BOOKS[b]).join(", "), status: a.status as Row["status"] }));

@@ -416,6 +416,22 @@ export async function cleanupYbmProofs(days = 30) {
   await updateYbmOrders(old.map((o) => o.id), { proof_path: null });
 }
 
+// 개인정보 보호: 발송 완료 후 3개월(90일)이 지난 주문은 이름·연락처·주소째로 지워요.
+export async function cleanupYbmOrders(days = 90) {
+  const cutoff = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
+  const old = (await listYbmOrders()).filter((o) => o.status === "shipped" && o.shipped_at && o.shipped_at < cutoff);
+  if (old.length === 0) return;
+  const photos = old.flatMap((o) => (o.proof_path ? [o.proof_path] : []));
+  if (sb) {
+    if (photos.length) await sb.storage.from(YBM_BUCKET).remove(photos);
+    const { error } = await sb.from("ybm_orders").delete().in("id", old.map((o) => o.id));
+    if (error) throw error;
+    return;
+  }
+  for (const p of photos) delete mem.photos[p];
+  mem.ybmOrders = mem.ybmOrders.filter((o) => !old.some((x) => x.id === o.id));
+}
+
 // ── 공지 ───────────────────────────────────────
 export type NoticeRead = { notice_id: string; app_id: string; read_at: string };
 export type NoticeFields = Omit<Notice, "id" | "created_at">;
