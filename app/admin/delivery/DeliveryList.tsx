@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { bulkMarkBooksDone, confirmYbmPayments } from "@/app/actions";
 
-export type Row = { id: string; name: string; klass: string; phone: string; address: string; books: string; status: "pending" | "paid" | "shipped"; proof?: string; ybm?: boolean };
+export type Row = { id: string; name: string; klass: string; phone: string; address: string; books: string; status: "pending" | "paid" | "shipped"; proof?: string; ybm?: boolean; at: string };
 
 const STATUS = { pending: "미납", paid: "발송 대기", shipped: "발송 완료" };
 const line = (r: Row) => `${r.name}\t${r.klass}\t${r.phone}\t${r.address}`;
@@ -65,7 +65,7 @@ export default function DeliveryList({ rows, csv }: { rows: Row[]; csv: string }
                 <input type="checkbox" name="ids" value={r.id} data-paid={r.status === "paid" ? "" : undefined} aria-label={`${r.name} 선택`} className="h-5 w-5 accent-sky-deep" />
               )}
             </span>
-            <b className="text-lg text-sky-ink">{r.name}</b>
+            <b className="text-lg text-sky-ink">{r.name}<span className="ml-1.5 text-xs font-normal text-slate-400">{new Date(r.at).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" })}</span></b>
             <span className={`text-right text-sm font-bold lg:order-last ${r.status === "pending" ? "text-amber-600" : r.status === "paid" ? "text-sky-deep" : "text-slate-500"}`}>
               {STATUS[r.status]}
               {r.status === "paid" && (

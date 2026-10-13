@@ -9,7 +9,6 @@ import DeliveryList, { type Row } from "./DeliveryList";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "택배 발송 · vella_toeic", robots: { index: false } };
 
-const ORDER = ["paid", "pending", "shipped"];
 
 const SOURCES = { all: "전체", academy: "학원 불라방", ybm: "YBM 인강" } as const;
 type Source = keyof typeof SOURCES;
@@ -23,15 +22,15 @@ export default async function DeliveryPage({ searchParams }: { searchParams: Pro
   await cleanupYbmOrders().catch(() => {});
   const academy: Row[] = (await listApplications())
     .filter((a) => a.cohort === cohort && a.kind === "online" && a.pickup === "delivery" && a.status !== "refunded")
-    .map((a) => ({ id: a.id, name: a.name, klass: klassLabel(a), phone: phoneLabel(a.phone), address: a.address ?? "", books: a.books.map((b) => BOOKS[b]).join(", "), status: a.status as Row["status"] }));
+    .map((a) => ({ id: a.id, name: a.name, klass: klassLabel(a), phone: phoneLabel(a.phone), address: a.address ?? "", books: a.books.map((b) => BOOKS[b]).join(", "), status: a.status as Row["status"], at: a.created_at }));
   // YBM 인강 주문은 기수와 상관없이, 발송 전 주문과 최근 60일 안에 발송한 주문만 보여요.
   const since = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
   const ybm: Row[] = (await listYbmOrders())
     .filter((o) => o.status !== "shipped" || (o.shipped_at ?? o.created_at) > since)
-    .map((o) => ({ id: `ybm:${o.id}`, name: o.name, klass: "YBM 인강", phone: phoneLabel(o.phone), address: o.address, books: `개념 zip${o.depositor !== o.name ? ` · 입금자 ${o.depositor}` : ""}`, status: o.status, proof: o.proof_path ? `/admin/delivery/proof/${o.id}` : undefined, ybm: true }));
+    .map((o) => ({ id: `ybm:${o.id}`, name: o.name, klass: "YBM 인강", phone: phoneLabel(o.phone), address: o.address, books: `개념 zip${o.depositor !== o.name ? ` · 입금자 ${o.depositor}` : ""}`, status: o.status, proof: o.proof_path ? `/admin/delivery/proof/${o.id}` : undefined, ybm: true, at: o.created_at }));
   const all = [...academy, ...ybm];
   const delivery = (from === "academy" ? academy : from === "ybm" ? ybm : all)
-    .sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status) || a.name.localeCompare(b.name, "ko"));
+    .sort((a, b) => b.at.localeCompare(a.at)); // 최신 신청이 맨 위
   const count = (status: string) => delivery.filter((a) => a.status === status).length;
   const total = { all: all.length, academy: academy.length, ybm: ybm.length };
 

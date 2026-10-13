@@ -12,14 +12,18 @@ export async function GET(req: Request) {
   if (!(await isAdmin())) return new NextResponse("관리자 로그인이 필요해요.", { status: 401 });
   const cohort = await currentCohort();
   const apps = (await listApplications())
-    .filter((a) => a.cohort === cohort && a.kind === "online" && a.pickup === "delivery" && a.status !== "refunded")
-    .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    .filter((a) => a.cohort === cohort && a.kind === "online" && a.pickup === "delivery" && a.status !== "refunded");
   const since = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
   const ybm = (await listYbmOrders()).filter((o) => o.status !== "shipped" || (o.shipped_at ?? o.created_at) > since);
+  const day = (iso: string) => new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
   const YBM_STATUS = { pending: "미납", paid: "발송 대기", shipped: "발송 완료" };
+  // 학원·인강을 합쳐 최신 신청이 맨 위
+  const rows = [
+    ...(from === "ybm" ? [] : apps.map((a) => ({ at: a.created_at, cells: [day(a.created_at), a.name, klassLabel(a), phoneLabel(a.phone), a.address, a.books.map((b) => BOOKS[b]).join(", "), STATUS_LABEL[a.status]] }))),
+    ...(from === "academy" ? [] : ybm.map((o) => ({ at: o.created_at, cells: [day(o.created_at), o.name, "YBM 인강", phoneLabel(o.phone), o.address, "개념 zip", YBM_STATUS[o.status]] }))),
+  ].sort((x, y) => y.at.localeCompare(x.at));
   return csvResponse(`택배명단_${cohort}${from === "ybm" ? "_YBM" : from === "academy" ? "_학원" : ""}.csv`, [
-    ["이름", "수강반", "연락처", "주소", "교재", "상태"],
-    ...(from === "ybm" ? [] : apps.map((a) => [a.name, klassLabel(a), phoneLabel(a.phone), a.address, a.books.map((b) => BOOKS[b]).join(", "), STATUS_LABEL[a.status]])),
-    ...(from === "academy" ? [] : ybm.map((o) => [o.name, "YBM 인강", phoneLabel(o.phone), o.address, "개념 zip", YBM_STATUS[o.status]])),
+    ["신청일", "이름", "수강반", "연락처", "주소", "교재", "상태"],
+    ...rows.map((r) => r.cells),
   ]);
 }
