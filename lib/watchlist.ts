@@ -50,3 +50,13 @@ export function watchSummary(classDays: string[], attendance: { day: string; lat
 
 // 심한 순서: 연속 결석 → 결석 수 → 숙제 미제출
 export const watchRank = (s: WatchSummary) => s.streak * 100 + s.absent * 10 + s.hwMissing;
+
+// 관리 필요 학생 카테고리 (학생이 많을 때 나눠 보기). 정렬은 그 카테고리에서 심한 순서.
+export const WATCH_CATEGORIES = {
+  all: { label: "전체", test: (s: WatchSummary) => s.reasons.length > 0, rank: watchRank },
+  streak: { label: "연속 결석", test: (s: WatchSummary) => s.streak >= WATCH_RULES.streak, rank: (s: WatchSummary) => s.streak * 100 + s.absent },
+  absent: { label: `결석 ${WATCH_RULES.absent}회+`, test: (s: WatchSummary) => s.absent >= WATCH_RULES.absent, rank: (s: WatchSummary) => s.absent * 100 + s.streak },
+  homework: { label: "숙제 미제출", test: (s: WatchSummary) => s.hwMissing >= WATCH_RULES.homework, rank: (s: WatchSummary) => s.hwMissing * 100 + s.absent },
+} as const;
+export type WatchCategory = keyof typeof WATCH_CATEGORIES;
+export const isWatchCategory = (v: string | undefined): v is WatchCategory => !!v && Object.hasOwn(WATCH_CATEGORIES, v);

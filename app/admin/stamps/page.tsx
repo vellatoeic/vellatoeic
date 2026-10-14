@@ -5,7 +5,8 @@ import { isAdmin } from "@/lib/auth";
 import { canWatch } from "@/lib/access";
 import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
 import { specialDay } from "@/lib/special";
-import { watchSummary, watchRank, WATCH_RULES, type WatchSummary } from "@/lib/watchlist";
+import { watchSummary, WATCH_CATEGORIES, WATCH_RULES, isWatchCategory, type WatchCategory, type WatchSummary } from "@/lib/watchlist";
+import CopyText from "../CopyText";
 import { bulkStamp, cleanupPhotos, cycleAttendance } from "@/app/actions";
 import SelectAll from "../SelectAll";
 import LoginForm from "../LoginForm";
@@ -25,7 +26,7 @@ function mark(rec: Attendance | undefined, day: string, today: string) {
   return { t: "·", cls: "text-red-400", label: "결석" };
 }
 
-export default async function Stamps({ searchParams }: { searchParams: Promise<{ b?: string; d?: string; t?: string; q?: string }> }) {
+export default async function Stamps({ searchParams }: { searchParams: Promise<{ b?: string; d?: string; t?: string; q?: string; wc?: string; wb?: string; wt?: string }> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
   const sp = await searchParams;
   const cohort = await currentCohort();
@@ -59,12 +60,22 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
   }
   const q = (sp.q ?? "").replace(/\s/g, "");
   const found = q ? everyone.filter((a) => `${a.name}${a.depositor}`.replace(/\s/g, "").includes(q)).sort((a, b) => a.name.localeCompare(b.name, "ko")) : [];
-  const watch = everyone
-    .map((a) => ({ a, s: summaryOf.get(a.id)! }))
-    .filter((x) => x.s && x.s.reasons.length > 0)
-    .sort((x, y) => watchRank(y.s) - watchRank(x.s));
+  // 관리 필요 학생: 카테고리 × 반 × 시간대로 나눠 봐요 (각 칩에 인원수)
+  const wc: WatchCategory = isWatchCategory(sp.wc) ? sp.wc : "all";
+  const wb = classTabs.some((c) => c.key === sp.wb) ? sp.wb! : "all";
+  const wt = sp.wt === "am" || sp.wt === "pm" ? sp.wt : "all";
+  const flagged = everyone.map((a) => ({ a, s: summaryOf.get(a.id)! })).filter((x) => x.s && x.s.reasons.length > 0);
+  const inClass = (x: { a: Application }, b = wb) => b === "all" || `${x.a.course}-${x.a.track}` === b;
+  const inSlot = (x: { a: Application }, t2 = wt) => t2 === "all" || x.a.slot === t2;
+  const inCat = (x: { s: WatchSummary }, c: WatchCategory = wc) => WATCH_CATEGORIES[c].test(x.s);
+  const watch = flagged.filter((x) => inCat(x) && inClass(x) && inSlot(x)).sort((x, y) => WATCH_CATEGORIES[wc].rank(y.s) - WATCH_CATEGORIES[wc].rank(x.s));
+  const wLink = (patch: { wc?: string; wb?: string; wt?: string }) => {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries({ wc, wb, wt, ...patch })) if (v !== "all") p.set(k, v);
+    return `/admin/stamps?${p}#watch`;
+  };
   const classTitle = (a: Application) => `${COURSES[a.course].label} ${TRACKS[a.track]}`;
-  const studentCard = (a: Application, s: WatchSummary | undefined, showReasons = false) => (
+  const studentCard = (a: Application, s: WatchSummary | undefined) => (
     <Link key={a.id} href={`/admin/stamps/${a.id}`} className="block rounded-2xl bg-white p-3 ring-1 ring-sky-main transition hover:ring-2 hover:ring-sky-deep">
       <p className="flex flex-wrap items-baseline gap-x-2">
         <b className="text-lg text-sky-ink">{a.name}</b>
@@ -75,7 +86,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
           출석 <b className="text-sky-deep">{s.attended}/{s.past}</b>{s.late ? ` (지각 ${s.late})` : ""} · 결석 <b className={s.absent >= WATCH_RULES.absent ? "text-red-500" : ""}>{s.absent}</b> · 숙제 <b className="text-amber-600">{s.hwDue - s.hwMissing}/{s.hwDue}</b>
         </p>
       )}
-      {showReasons && s && <p className="mt-1.5 flex flex-wrap gap-1">{s.reasons.map((r) => <span key={r} className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-600">{r}</span>)}</p>}
+      {s && s.reasons.length > 0 && <p className="mt-1.5 flex flex-wrap gap-1">{s.reasons.map((r) => <span key={r} className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-600">{r}</span>)}</p>}
       <p className="mt-1 text-xs text-sky-deep">전체 기록 보기 →</p>
     </Link>
   );
@@ -286,14 +297,77 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
         <p className="text-slate-600">예전 기수 숙제 사진 정리 (새 숙제 인증은 카페 링크를 사용해요)</p>
         <button className="btn-ghost !py-2">지난 기수 사진 지우기</button>
       </form>
-      {/* ── 관리 필요 학생 ── */}
-      <details className="card !p-4" open={watch.length > 0 && !q}>
+      {/* ── 관리 필요 학생 (카테고리·반·시간대로 나눠 보기) ── */}
+      <details id="watch" className="card !p-4" open={flagged.length > 0 && !q}>
         <summary className="font-jua cursor-pointer text-lg text-sky-ink">
-          🚨 관리 필요 학생 <span className={watch.length ? "text-red-500" : "text-slate-400"}>{watch.length}명</span>
+          🚨 관리 필요 학생 <span className={flagged.length ? "text-red-500" : "text-slate-400"}>{flagged.length}명</span>
         </summary>
-        <p className="mt-1 text-xs text-slate-500">결석 {WATCH_RULES.absent}회 이상 · 최근 {WATCH_RULES.streak}회 연속 결석 · 숙제 미제출 {WATCH_RULES.homework}회 이상인 학생이에요. 연속 결석이 많은 순서예요. (오늘 수업과 아직 제출 기한이 남은 숙제는 세지 않아요)</p>
-        {watch.length === 0 ? <p className="mt-3 text-sm text-slate-500">지금은 없어요 ☁️</p> : (
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{watch.map(({ a, s }) => studentCard(a, s, true))}</div>
+        <p className="mt-1 text-xs text-slate-500">결석 {WATCH_RULES.absent}회 이상 · 최근 {WATCH_RULES.streak}회 연속 결석 · 숙제 미제출 {WATCH_RULES.homework}회 이상. 오늘 수업과 아직 제출 기한이 남은 숙제는 세지 않아요. 고른 항목에서 심한 순서로 보여요.</p>
+        {flagged.length === 0 ? <p className="mt-3 text-sm text-slate-500">지금은 없어요 ☁️</p> : (
+          <div className="mt-3 space-y-3">
+            <div className="space-y-2 text-sm">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="w-12 shrink-0 font-bold text-slate-500">항목</span>
+                {(Object.keys(WATCH_CATEGORIES) as WatchCategory[]).map((c) => (
+                  <a key={c} href={wLink({ wc: c })} className={`rounded-full px-3 py-1.5 font-bold ${wc === c ? "bg-red-500 text-white" : "bg-red-50 text-red-600"}`}>
+                    {WATCH_CATEGORIES[c].label} {flagged.filter((x) => inCat(x, c) && inClass(x) && inSlot(x)).length}
+                  </a>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="w-12 shrink-0 font-bold text-slate-500">반</span>
+                {[{ key: "all", title: "전체" }, ...classTabs].map((c) => {
+                  const n = flagged.filter((x) => inCat(x) && inClass(x, c.key) && inSlot(x)).length;
+                  return (
+                    <a key={c.key} href={wLink({ wb: c.key })} className={`rounded-full px-3 py-1.5 font-bold ${wb === c.key ? "bg-sky-deep text-white" : n ? "bg-sky-soft text-sky-ink" : "bg-slate-50 text-slate-300"}`}>{c.title} {n}</a>
+                  );
+                })}
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="w-12 shrink-0 font-bold text-slate-500">시간</span>
+                {([["all", "전체"], ["am", "☀️ 오전반"], ["pm", "🌙 저녁반"]] as const).map(([v, label]) => (
+                  <a key={v} href={wLink({ wt: v })} className={`rounded-full px-3 py-1.5 font-bold ${wt === v ? "bg-sky-deep text-white" : "bg-sky-soft text-sky-ink"}`}>
+                    {label} {flagged.filter((x) => inCat(x) && inClass(x) && inSlot(x, v)).length}
+                  </a>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-bold text-sky-ink">{watch.length}명</p>
+              <CopyText
+                label={`보이는 ${watch.length}명 복사`}
+                text={watch.map(({ a, s }) => [a.name, `${COURSES[a.course].label} ${TRACKS[a.track]}`, a.slot ? TIME_SLOTS[a.slot] : "", KINDS[a.kind].short, a.phone ? a.phone.replace(/(\d{3})(\d{3,4})(\d{4})/, "$1-$2-$3") : "", s.reasons.join(" · ")].join("\t")).join("\n")}
+              />
+            </div>
+            {watch.length === 0 ? <p className="text-sm text-slate-500">이 조건에 해당하는 학생이 없어요.</p> : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-sky-main text-left text-xs text-slate-500">
+                      <th className="py-2 pr-3">이름</th><th className="pr-3">반 · 시간</th><th className="pr-3 text-center">출석</th>
+                      <th className={`pr-3 text-center ${wc === "absent" ? "text-red-500" : ""}`}>결석</th>
+                      <th className={`pr-3 text-center ${wc === "streak" ? "text-red-500" : ""}`}>연속 결석</th>
+                      <th className={`pr-3 text-center ${wc === "homework" ? "text-red-500" : ""}`}>숙제 미제출</th>
+                      <th className="pr-3">연락처</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {watch.map(({ a, s }) => (
+                      <tr key={a.id} className="border-b border-sky-soft">
+                        <td className="whitespace-nowrap py-2 pr-3"><Link href={`/admin/stamps/${a.id}`} className="font-bold text-sky-ink underline decoration-sky-main underline-offset-2">{a.name}</Link></td>
+                        <td className="whitespace-nowrap pr-3 text-slate-600">{COURSES[a.course].label} {TRACKS[a.track]} · {a.slot ? TIME_SLOTS[a.slot] : "미정"} <span className="text-xs text-slate-400">{KINDS[a.kind].short}</span></td>
+                        <td className="pr-3 text-center text-sky-deep">{s.attended}/{s.past}</td>
+                        <td className={`pr-3 text-center ${s.absent >= WATCH_RULES.absent ? "font-bold text-red-500" : "text-slate-400"}`}>{s.absent}</td>
+                        <td className={`pr-3 text-center ${s.streak >= WATCH_RULES.streak ? "font-bold text-red-500" : "text-slate-400"}`}>{s.streak || "-"}</td>
+                        <td className={`pr-3 text-center ${s.hwMissing >= WATCH_RULES.homework ? "font-bold text-amber-600" : "text-slate-400"}`}>{s.hwMissing}/{s.hwDue}</td>
+                        <td className="whitespace-nowrap pr-3 text-slate-500">{a.phone ? a.phone.replace(/(\d{3})(\d{3,4})(\d{4})/, "$1-$2-$3") : "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         )}
       </details>
 

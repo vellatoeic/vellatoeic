@@ -38,3 +38,13 @@ test("잘 나오는 학생은 이유가 없어요", () => {
   const s = watchSummary(days, att(...days), days, "2026-10-14");
   assert.deepEqual(s.reasons, []);
 });
+
+import { WATCH_CATEGORIES } from "@/lib/watchlist";
+
+test("카테고리: 숙제만 안 낸 학생은 숙제 미제출에만 들어가요", () => {
+  const s = watchSummary(days, att(...days), ["2026-10-06"], "2026-10-14");
+  assert.equal(WATCH_CATEGORIES.homework.test(s), true);
+  assert.equal(WATCH_CATEGORIES.streak.test(s), false);
+  assert.equal(WATCH_CATEGORIES.absent.test(s), false);
+  assert.equal(WATCH_CATEGORIES.all.test(s), true);
+});
