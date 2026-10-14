@@ -110,17 +110,6 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
           : <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{found.map((a) => studentCard(a, summaryOf.get(a.id)))}</div>)}
       </section>
 
-      {/* ── 관리 필요 학생 ── */}
-      <details className="card !p-4" open={watch.length > 0 && !q}>
-        <summary className="font-jua cursor-pointer text-lg text-sky-ink">
-          🚨 관리 필요 학생 <span className={watch.length ? "text-red-500" : "text-slate-400"}>{watch.length}명</span>
-        </summary>
-        <p className="mt-1 text-xs text-slate-500">결석 {WATCH_RULES.absent}회 이상 · 최근 {WATCH_RULES.streak}회 연속 결석 · 숙제 미제출 {WATCH_RULES.homework}회 이상인 학생이에요. 연속 결석이 많은 순서예요. (오늘 수업과 아직 제출 기한이 남은 숙제는 세지 않아요)</p>
-        {watch.length === 0 ? <p className="mt-3 text-sm text-slate-500">지금은 없어요 ☁️</p> : (
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{watch.map(({ a, s }) => studentCard(a, s, true))}</div>
-        )}
-      </details>
-
       {/* ── 그날 수업 보드: 반·시간대마다 누가 왔고 누가 숙제를 냈는지 ── */}
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -297,6 +286,17 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
         <p className="text-slate-600">예전 기수 숙제 사진 정리 (새 숙제 인증은 카페 링크를 사용해요)</p>
         <button className="btn-ghost !py-2">지난 기수 사진 지우기</button>
       </form>
+      {/* ── 관리 필요 학생 ── */}
+      <details className="card !p-4" open={watch.length > 0 && !q}>
+        <summary className="font-jua cursor-pointer text-lg text-sky-ink">
+          🚨 관리 필요 학생 <span className={watch.length ? "text-red-500" : "text-slate-400"}>{watch.length}명</span>
+        </summary>
+        <p className="mt-1 text-xs text-slate-500">결석 {WATCH_RULES.absent}회 이상 · 최근 {WATCH_RULES.streak}회 연속 결석 · 숙제 미제출 {WATCH_RULES.homework}회 이상인 학생이에요. 연속 결석이 많은 순서예요. (오늘 수업과 아직 제출 기한이 남은 숙제는 세지 않아요)</p>
+        {watch.length === 0 ? <p className="mt-3 text-sm text-slate-500">지금은 없어요 ☁️</p> : (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{watch.map(({ a, s }) => studentCard(a, s, true))}</div>
+        )}
+      </details>
+
     </div>
   );
 }
