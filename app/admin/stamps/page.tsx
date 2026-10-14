@@ -5,6 +5,7 @@ import { isAdmin } from "@/lib/auth";
 import { canWatch } from "@/lib/access";
 import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
 import { specialDay } from "@/lib/special";
+import { watchSummary, watchRank, WATCH_RULES, type WatchSummary } from "@/lib/watchlist";
 import { bulkStamp, cleanupPhotos, cycleAttendance } from "@/app/actions";
 import SelectAll from "../SelectAll";
 import LoginForm from "../LoginForm";
@@ -24,7 +25,7 @@ function mark(rec: Attendance | undefined, day: string, today: string) {
   return { t: "·", cls: "text-red-400", label: "결석" };
 }
 
-export default async function Stamps({ searchParams }: { searchParams: Promise<{ b?: string; d?: string; t?: string }> }) {
+export default async function Stamps({ searchParams }: { searchParams: Promise<{ b?: string; d?: string; t?: string; q?: string }> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
   const sp = await searchParams;
   const cohort = await currentCohort();
@@ -51,6 +52,33 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
   const d = allDays.includes(sp.d ?? "") ? sp.d! : allDays.filter((x) => x <= today).at(-1) ?? allDays[0] ?? today;
   const prev = allDays.filter((x) => x < d).at(-1);
   const next = allDays.filter((x) => x > d && x <= today).at(0);
+  // 학생마다 출석·숙제 요약 (검색 결과·관리 필요 학생에 써요)
+  const summaryOf = new Map<string, WatchSummary>();
+  for (const c of classTabs) for (const a of c.students) {
+    summaryOf.set(a.id, watchSummary(c.days, attendance.filter((x) => x.app_id === a.id), homework.filter((x) => x.app_id === a.id).map((x) => x.day), today));
+  }
+  const q = (sp.q ?? "").replace(/\s/g, "");
+  const found = q ? everyone.filter((a) => `${a.name}${a.depositor}`.replace(/\s/g, "").includes(q)).sort((a, b) => a.name.localeCompare(b.name, "ko")) : [];
+  const watch = everyone
+    .map((a) => ({ a, s: summaryOf.get(a.id)! }))
+    .filter((x) => x.s && x.s.reasons.length > 0)
+    .sort((x, y) => watchRank(y.s) - watchRank(x.s));
+  const classTitle = (a: Application) => `${COURSES[a.course].label} ${TRACKS[a.track]}`;
+  const studentCard = (a: Application, s: WatchSummary | undefined, showReasons = false) => (
+    <Link key={a.id} href={`/admin/stamps/${a.id}`} className="block rounded-2xl bg-white p-3 ring-1 ring-sky-main transition hover:ring-2 hover:ring-sky-deep">
+      <p className="flex flex-wrap items-baseline gap-x-2">
+        <b className="text-lg text-sky-ink">{a.name}</b>
+        <span className="text-xs text-slate-500">{classTitle(a)} · {a.slot ? TIME_SLOTS[a.slot] : "시간 미정"} · {KINDS[a.kind].short}</span>
+      </p>
+      {s && (
+        <p className="mt-1 text-sm text-slate-600">
+          출석 <b className="text-sky-deep">{s.attended}/{s.past}</b>{s.late ? ` (지각 ${s.late})` : ""} · 결석 <b className={s.absent >= WATCH_RULES.absent ? "text-red-500" : ""}>{s.absent}</b> · 숙제 <b className="text-amber-600">{s.hwDue - s.hwMissing}/{s.hwDue}</b>
+        </p>
+      )}
+      {showReasons && s && <p className="mt-1.5 flex flex-wrap gap-1">{s.reasons.map((r) => <span key={r} className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-600">{r}</span>)}</p>}
+      <p className="mt-1 text-xs text-sky-deep">전체 기록 보기 →</p>
+    </Link>
+  );
   const slotsOf = (students: Application[]): SlotKey[] => [...(["am", "pm"] as const), ...(students.some((a) => !a.slot) ? [null] : [])];
 
   // 일괄 붙이기 (기존 기능)
@@ -68,6 +96,30 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
         </div>
         <Link href="/admin/qr" target="_blank" className="btn !py-3">출석 QR 인쇄하기</Link>
       </div>
+
+      {/* ── 학생 검색 ── */}
+      <section className="card space-y-3 !p-4">
+        <form className="flex items-center gap-2">
+          <span className="font-jua text-lg text-sky-ink">🔍 학생 찾기</span>
+          <input name="q" defaultValue={sp.q ?? ""} placeholder="이름 입력" className="input !w-44 !py-2" autoComplete="off" />
+          <button className="btn !py-2 !text-sm">검색</button>
+          {q && <a href="/admin/stamps" className="text-sm text-slate-400 underline">지우기</a>}
+        </form>
+        {q && (found.length === 0
+          ? <p className="text-sm text-slate-500">&apos;{sp.q}&apos; 학생을 찾지 못했어요. (이번 기수 납부 완료 학생만 찾아요)</p>
+          : <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{found.map((a) => studentCard(a, summaryOf.get(a.id)))}</div>)}
+      </section>
+
+      {/* ── 관리 필요 학생 ── */}
+      <details className="card !p-4" open={watch.length > 0 && !q}>
+        <summary className="font-jua cursor-pointer text-lg text-sky-ink">
+          🚨 관리 필요 학생 <span className={watch.length ? "text-red-500" : "text-slate-400"}>{watch.length}명</span>
+        </summary>
+        <p className="mt-1 text-xs text-slate-500">결석 {WATCH_RULES.absent}회 이상 · 최근 {WATCH_RULES.streak}회 연속 결석 · 숙제 미제출 {WATCH_RULES.homework}회 이상인 학생이에요. 연속 결석이 많은 순서예요. (오늘 수업과 아직 제출 기한이 남은 숙제는 세지 않아요)</p>
+        {watch.length === 0 ? <p className="mt-3 text-sm text-slate-500">지금은 없어요 ☁️</p> : (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{watch.map(({ a, s }) => studentCard(a, s, true))}</div>
+        )}
+      </details>
 
       {/* ── 그날 수업 보드: 반·시간대마다 누가 왔고 누가 숙제를 냈는지 ── */}
       <section className="space-y-3">

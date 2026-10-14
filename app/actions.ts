@@ -151,6 +151,13 @@ export async function login(_: FormState, fd: FormData): Promise<FormState> {
   redirect("/admin");
 }
 
+// 관리자 알림: 새 신청을 확인했어요 → 이 시각 이후 신청만 "새 신청"으로 보여요
+export async function markAppsSeen() {
+  if (!(await isAdmin())) return;
+  await setSetting("admin_seen_apps_at", new Date().toISOString());
+  revalidatePath("/admin", "layout");
+}
+
 export async function logout() {
   await clearAdmin();
   redirect("/admin");

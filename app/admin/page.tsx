@@ -1,3 +1,4 @@
+import { adminAlerts } from "@/lib/adminAlerts";
 import { BOOKS, COURSES, KINDS, TRACKS, TIME_SLOTS, bookStatusLabel, cohortLabel, won, type CourseId, type TimeSlot, type Track } from "@/lib/config";
 import { listApplications, listDepositEvents, listYbmOrders, listMissions, getSetting, currentCohort, roundFor, isPreview, type Application, type Mission } from "@/lib/db";
 import { missionCount } from "@/lib/mission";
@@ -32,7 +33,7 @@ function Badge({ tone, children }: { tone: "amber" | "sky" | "slate" | "green"; 
   return <span className={`inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold ${color}`}>{children}</span>;
 }
 
-function Row({ a, group, mission }: { a: Application; group: string; mission?: Mission }) {
+function Row({ a, group, mission, fresh }: { a: Application; group: string; mission?: Mission; fresh?: boolean }) {
   const book = bookStatusLabel(a);
   return (
     <li className={`py-3 ${a.status === "pending" ? "bg-amber-50/60" : ""}`}>
@@ -40,6 +41,7 @@ function Row({ a, group, mission }: { a: Application; group: string; mission?: M
         <input type="checkbox" form="bulk" name="ids" value={a.id} data-group={group} aria-label={`${a.name} 선택`} className="mt-1 h-5 w-5 shrink-0 accent-sky-deep" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
+            {fresh && <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold text-white">NEW</span>}
             <b className="text-sky-ink">{a.name}</b>
             {a.depositor !== a.name && <span className="text-sm text-slate-500">(입금자 {a.depositor})</span>}
             <Badge tone={a.kind === "onsite" ? "slate" : "sky"}>{KINDS[a.kind].short}{a.kind === "online" ? ` · ${a.pickup === "delivery" ? "택배" : "1층 데스크"}` : ""}</Badge>
@@ -155,6 +157,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
     getSetting("study_board_url"),
   ]);
   const round = await roundFor(now);
+  const alerts = await adminAlerts();
   // 이번 모집 기수에서 아직 입금 확인이 안 된 학생 (수업 전에 확인해야 라이브·강의가 열려요)
   const waiting = everything.filter((a) => a.cohort === now && a.status === "pending").sort((a, b) => a.created_at.localeCompare(b.created_at));
   // 자동으로 확정하지 못한 교재비 입금 문자 (같은 입금자명이 여러 명이거나 금액이 다를 때)
@@ -194,7 +197,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
       SLOT_ORDER.map((slot) => {
         const items = list
           .filter((a) => a.course === co && a.track === tr && (a.slot ?? null) === slot)
-          .sort((x, y) => Number(y.status === "pending") - Number(x.status === "pending") || x.kind.localeCompare(y.kind) || x.name.localeCompare(y.name, "ko"));
+          .sort((x, y) => y.created_at.localeCompare(x.created_at)); // 최신 신청이 위
         return { key: `${co}-${tr}-${slot ?? "none"}`, title: `${COURSES[co].label} ${TRACKS[tr]}`, slot, items };
       }),
     ).filter((g) => g.items.length > 0),
@@ -428,7 +431,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
               {pending > 0 && <Badge tone="amber">미납 {pending}명</Badge>}
             </div>
             <ul className="divide-y divide-sky-soft">
-              {g.items.map((a) => <Row key={a.id} a={a} group={g.key} mission={missions.get(a.id)} />)}
+              {g.items.map((a) => <Row key={a.id} a={a} group={g.key} mission={missions.get(a.id)} fresh={a.created_at > alerts.since} />)}
             </ul>
           </section>
         );
