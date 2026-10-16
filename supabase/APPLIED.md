@@ -24,6 +24,7 @@ Vella가 Supabase SQL Editor에서 실행했다고 확인한 SQL 파일만 기�
 | `18_special_deadline.sql` | 완료 | 특강 신청 마감 일시 칸(registration_deadline) 추가 (비어 있으면 전날 17:00) |
 | `19_ybm_orders.sql` | 완료 | YBM 인강 교재 주문 표(ybm_orders) 생성, 입금 기록에 인강 주문 연결 칸(deposit_events.ybm_order_id) 추가, 수강증 비공개 보관함(ybm-proofs) 생성 |
 | `20_special_notice_1017.sql` | 완료 | 10/17(토) 특강 마감 안내 공지 1개 입력(대상 전체, 10/16~10/17, 팝업·상단 고정) |
+| `21_special_material_note.sql` | 완료 | 특강 자료 안내 문구 칸(special_lectures.material_note) 추가, 10/17 특강 문구 입력(비어 있을 때만) |
 
 ## 기록 갱신 규칙
 
