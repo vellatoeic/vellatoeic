@@ -23,6 +23,7 @@ Vella가 Supabase SQL Editor에서 실행했다고 확인한 SQL 파일만 기�
 | `17_notices.sql` | 완료 | 공지 표(site_notices)·공지 확인 기록 표(site_notice_reads) 생성, 첫 공지 2개(현장 스터디·온라인 참여) 입력. 기존 public.notices 표는 건드리지 않음 |
 | `18_special_deadline.sql` | 완료 | 특강 신청 마감 일시 칸(registration_deadline) 추가 (비어 있으면 전날 17:00) |
 | `19_ybm_orders.sql` | 완료 | YBM 인강 교재 주문 표(ybm_orders) 생성, 입금 기록에 인강 주문 연결 칸(deposit_events.ybm_order_id) 추가, 수강증 비공개 보관함(ybm-proofs) 생성 |
+| `20_special_notice_1017.sql` | 완료 | 10/17(토) 특강 마감 안내 공지 1개 입력(대상 전체, 10/16~10/17, 팝업·상단 고정) |
 
 ## 기록 갱신 규칙
 
