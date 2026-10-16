@@ -708,7 +708,9 @@ function specialFields(fd: FormData) {
   if (!validDate(event_date) || !title || !validTime(starts_at)) return null;
   if (ends_at && (!validTime(ends_at) || ends_at <= starts_at)) return null;
   if (deadline && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(deadline)) return null;
-  return { event_date, title, starts_at, ends_at: ends_at || null, registration_deadline: deadline ? new Date(`${deadline}:00+09:00`).toISOString() : null };
+  // 자료 안내 문구: 줄바꿈 그대로 저장 (앞뒤 빈 줄만 정리)
+  const material_note = String(fd.get("material_note") ?? "").replace(/\r\n/g, "\n").trim().slice(0, 2000) || null;
+  return { event_date, title, starts_at, ends_at: ends_at || null, registration_deadline: deadline ? new Date(`${deadline}:00+09:00`).toISOString() : null, material_note };
 }
 
 export async function addSpecialLecture(fd: FormData) {

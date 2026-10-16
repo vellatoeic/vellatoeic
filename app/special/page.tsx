@@ -15,7 +15,9 @@ export default async function SpecialPage() {
   const [events, mine] = await Promise.all([listSpecialLectures(), activeStudentApps().then(({ apps }) => getSpecialRegistrationsFor(apps.map((a) => a.id)))]);
   const account = await getSetting("bank_account");
   // 아직 열리지 않은(오늘 이후) 특강은 모두 보여주고, 마감된 것은 '신청이 마감됐어요'로 막아요.
-  const upcoming = events.filter((event) => event.event_date >= todayKST());
+  const today = todayKST();
+  const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const upcoming = events.filter((event) => event.event_date >= today);
   const open = upcoming.filter((event) => specialRegistrationOpen(event));
   const eventById = new Map(events.map((event) => [event.id, event]));
   const myRows = await Promise.all(
@@ -76,15 +78,31 @@ export default async function SpecialPage() {
                   <p className="rounded-2xl bg-sky-soft p-4 text-sm text-slate-700">특강 당일 10시까지 필기구를 챙겨 {CLASSROOM}로 와주세요.</p>
                 </div>
               ) : (
-                <div className="flex flex-wrap gap-2">
-                  {(materials.length === 0 || !event.youtube_id) && (
-                    <p className="w-full rounded-2xl bg-sky-soft p-4 text-sm text-slate-700">자료는 특강 하루 전, 참여 링크는 특강 시작 전에 이 페이지에 올라와요.</p>
+                <div className="space-y-3">
+                  {event.material_note && (
+                    <div className="rounded-2xl border-2 border-sky-main bg-white p-4 text-center text-[15px] leading-relaxed text-slate-700">
+                      {event.material_note.split("\n").map((line, i) =>
+                        /^\(.*\)$/.test(line.trim())
+                          ? <p key={i} className="mt-1 text-xs font-bold text-red-500">{line}</p>
+                          : line.trim() ? <p key={i}>{line}</p> : <p key={i} className="h-3" aria-hidden />,
+                      )}
+                    </div>
                   )}
-                  {materials.map((material) => (
-                    <a key={material.id} href={`/special/material/${material.id}`} className="btn-ghost !py-2 text-sm">📄 {material.file_name}</a>
-                  ))}
-                  {event.youtube_id && (
-                    <a href={`https://youtu.be/${event.youtube_id}`} target="_blank" rel="noreferrer" className="btn !py-2 !text-sm">유튜브 특강 보기 ↗</a>
+                  {materials.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {materials.map((material) => (
+                        <a key={material.id} href={`/special/material/${material.id}`} className="btn-ghost !py-2 text-sm">📄 {material.file_name}</a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="rounded-2xl bg-sky-soft p-4 text-sm text-slate-700">자료는 특강 하루 전에 이 페이지에 올라와요.</p>
+                  )}
+                  {event.youtube_id ? (
+                    <a href={`https://youtu.be/${event.youtube_id}`} target="_blank" rel="noreferrer" className="btn block w-full text-center">🎤 특강 입장하기 ↗</a>
+                  ) : (
+                    <p className="rounded-2xl bg-sky-soft p-4 text-center text-sm font-bold text-sky-ink">
+                      📺 특강 링크는 {event.event_date === today ? "특강 시작 전에" : event.event_date === tomorrow ? "내일" : "특강 당일"} 이곳에 올라와요
+                    </p>
                   )}
                 </div>
               )}

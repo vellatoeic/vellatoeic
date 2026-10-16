@@ -28,6 +28,10 @@ function LectureFields({ event }: { event?: SpecialLecture }) {
         <span className="label">신청 마감 일시 <span className="font-normal text-slate-400">(비우면 특강 전날 17:00)</span></span>
         <input type="datetime-local" name="registration_deadline" defaultValue={event?.registration_deadline ? new Date(Date.parse(event.registration_deadline) + 9 * 3600 * 1000).toISOString().slice(0, 16) : ""} className="input" />
       </label>
+      <label>
+        <span className="label">자료 안내 문구 <span className="font-normal text-slate-400">(불라방 신청자 자료 위에 카드로 보여요 · 줄바꿈 그대로 · 괄호로 감싼 줄은 빨간 작은 글씨)</span></span>
+        <textarea name="material_note" defaultValue={event?.material_note ?? ""} rows={5} className="input" placeholder={"벨라토익 특강 자료입니다\n(벨라토익의 소중한 자료입니다 무단 배포 금지!)"} />
+      </label>
     </>
   );
 }
