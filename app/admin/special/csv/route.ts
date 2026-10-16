@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const event = await getSpecialLecture(req.nextUrl.searchParams.get("id") ?? "");
   if (!event) return new NextResponse("특강을 찾을 수 없어요.", { status: 404 });
   const registrations = (await listSpecialRegistrations(event.id))
-    .sort((a, b) => Number(a.mode === "online") - Number(b.mode === "online") || a.name.localeCompare(b.name, "ko"));
+    .sort((a, b) => Number(a.mode === "online") - Number(b.mode === "online") || b.created_at.localeCompare(a.created_at));
   return csvResponse(`특강명단_${event.event_date}.csv`, [
     ["참여 방법", "이름", "보증금", "신청 시각"],
     ...registrations.map((r) => [

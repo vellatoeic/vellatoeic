@@ -159,13 +159,13 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   const round = await roundFor(now);
   const alerts = await adminAlerts();
   // 이번 모집 기수에서 아직 입금 확인이 안 된 학생 (수업 전에 확인해야 라이브·강의가 열려요)
-  const waiting = everything.filter((a) => a.cohort === now && a.status === "pending").sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const waiting = everything.filter((a) => a.cohort === now && a.status === "pending").sort((a, b) => b.created_at.localeCompare(a.created_at));
   // 자동으로 확정하지 못한 교재비 입금 문자 (같은 입금자명이 여러 명이거나 금액이 다를 때)
   const ybmPending = (await listYbmOrders()).filter((o) => o.status === "pending");
   const bookChecks = (await listDepositEvents(50)).filter((e) => e.target === "book" && (e.result === "review" || e.result === "unmatched"));
   const pendingAll = everything.filter((a) => a.status === "pending");
   // 수강 시간이 아직 비어 있는 학생 (예전 신청). 오전/저녁을 정해 주세요.
-  const unslotted = everything.filter((a) => a.cohort === now && !a.slot && a.status !== "refunded").sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  const unslotted = everything.filter((a) => a.cohort === now && !a.slot && a.status !== "refunded").sort((a, b) => b.created_at.localeCompare(a.created_at));
   const cohorts = [...new Set([now, ...everything.map((a) => a.cohort)])].sort().reverse();
   const all = c === "all" ? everything : everything.filter((a) => a.cohort === c);
 

@@ -42,8 +42,7 @@ const DEPOSIT_TONE: Record<DepositStatus, string> = {
 const kst = (iso: string) => new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
 function Roster({ title, items, onsiteForm }: { title: string; items: SpecialRegistration[]; onsiteForm?: string }) {
-  const rank: Record<DepositStatus, number> = { review: 0, pending: 1, paid: 2, cancelled: 3 };
-  const sorted = [...items].sort((a, b) => (onsiteForm ? rank[a.deposit ?? "pending"] - rank[b.deposit ?? "pending"] : 0) || a.name.localeCompare(b.name, "ko"));
+  const sorted = [...items].sort((a, b) => b.created_at.localeCompare(a.created_at)); // 최신 신청이 위
   return (
     <div className="mt-3">
       <h4 className="font-jua text-sky-deep">{title} · {items.length}명</h4>
@@ -57,7 +56,7 @@ function Roster({ title, items, onsiteForm }: { title: string; items: SpecialReg
                   {onsiteForm && <input type="checkbox" name="ids" value={r.id} form={onsiteForm} aria-label={`${r.name} 선택`} className="h-4 w-4 accent-sky-deep" />}
                   <b className="text-sky-ink">{r.name}</b>
                   {onsiteForm && <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${DEPOSIT_TONE[d]}`}>{d === "review" ? "입금 대기" : DEPOSIT_LABEL[d]}</span>}
-                  {onsiteForm && d === "pending" && <span className="text-xs text-slate-400">신청 {kst(r.created_at)}</span>}
+                  <span className="text-xs text-slate-400">신청 {kst(r.created_at)}</span>
                 </span>
                 <details className="text-sm">
                   <summary className="cursor-pointer text-red-400">삭제</summary>

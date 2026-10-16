@@ -17,7 +17,7 @@ function bookCount(apps: Application[]) {
 }
 
 function Table({ apps }: { apps: Application[] }) {
-  const sorted = [...apps].sort((a, b) => Number(a.status === "pending") - Number(b.status === "pending") || a.name.localeCompare(b.name, "ko"));
+  const sorted = [...apps].sort((a, b) => b.created_at.localeCompare(a.created_at)); // 최신 신청이 위
   return (
     <table className="mt-3 w-full text-left text-[15px]">
       <thead>
@@ -35,6 +35,7 @@ function Table({ apps }: { apps: Application[] }) {
             <td className="py-2">
               {a.name}
               {a.depositor !== a.name && <span className="ml-1 text-xs text-slate-400">({a.depositor})</span>}
+              <span className="ml-1.5 text-xs text-slate-400">{new Date(a.created_at).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" })}</span>
             </td>
             <td className="py-2 text-sm text-slate-600">{a.books.map((b) => BOOKS[b]).join(", ")}</td>
             <td className={`py-2 text-right font-bold ${a.status === "pending" ? "text-amber-600" : "text-sky-deep"}`}>
