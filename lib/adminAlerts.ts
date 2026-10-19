@@ -17,7 +17,7 @@ export async function recentApplications(limit = 300): Promise<RecentItem[]> {
       id: a.id, at: a.created_at, type: "수강" as const, name: a.name,
       detail: `${COURSES[a.course].label} ${TRACKS[a.track]} · ${a.slot ? TIME_SLOTS[a.slot] : "시간 미정"} · ${KINDS[a.kind].short}`,
       warn: a.status === "pending" ? "미납" : a.status === "refunded" ? "환불" : undefined,
-      href: `/admin?c=${a.cohort}&q=${encodeURIComponent(a.name)}`,
+      href: `/admin/students/${a.id}`,
     })),
     ...regs.map((r) => {
       const e = eventById.get(r.special_lecture_id);
@@ -25,7 +25,7 @@ export async function recentApplications(limit = 300): Promise<RecentItem[]> {
         id: r.id, at: r.created_at, type: "특강" as const, name: r.name,
         detail: `${e ? `${specialDay(e.event_date)} ${e.title}` : "특강"} · ${r.mode === "onsite" ? `현장 · ${DEPOSIT[r.deposit ?? "pending"]}` : "불라방"}`,
         warn: r.mode === "onsite" && (r.deposit === "pending" || r.deposit === "review") ? "보증금 대기" : undefined,
-        href: "/admin/special",
+        href: r.application_id ? `/admin/students/${r.application_id}` : "/admin/special",
       };
     }),
     ...ybm.map((o) => ({

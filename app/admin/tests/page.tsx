@@ -71,7 +71,7 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
             <tbody>
               {[...group].sort((a, b) => Number(b.declining) - Number(a.declining) || b.missing - a.missing || a.app.name.localeCompare(b.app.name, "ko")).map((s) => (
                 <tr key={s.app.id} className="border-b border-sky-soft">
-                  <td className="py-2 font-bold text-sky-ink">{s.app.name}</td>
+                  <td className="py-2 font-bold text-sky-ink"><Link href={`/admin/students/${s.app.id}`} className="underline decoration-sky-main underline-offset-2">{s.app.name}</Link></td>
                   <td>{SCHEDULE_CLASSES[s.klass]}</td>
                   <td>{s.app.slot ? TIME_SLOTS[s.app.slot] : "-"}</td>
                   <td>{s.avg.word ?? "-"}{s.avg.word !== null && "%"}</td>
@@ -197,7 +197,7 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
                       {results.map(({ s, r }, i) => (
                         <li key={s.app.id} className="flex items-center gap-2 rounded-lg bg-white px-2.5 py-1.5">
                           <span className="w-5 text-right text-xs text-slate-400">{i + 1}</span>
-                          <span className="flex-1">{s.app.name}</span>
+                          <Link href={`/admin/students/${s.app.id}`} className="flex-1 hover:underline">{s.app.name}</Link>
                           <span className="text-xs text-slate-400">{new Date(r.submitted_at).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" })}</span>
                           <b className="w-10 text-right text-sky-ink">{r.score}</b>
                         </li>

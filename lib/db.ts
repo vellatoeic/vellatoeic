@@ -201,6 +201,27 @@ mem.ybmOrders ??= [];
 
 const isUuid = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
 
+// Supabase는 한 번에 최대 1,000줄만 돌려줘요. 학생이 수백 명이면 기록이 잘리지 않게 1,000줄씩 끝까지 읽어요.
+// (make는 매번 새 쿼리를 만들어야 해요. 순서가 정해진 쿼리여야 페이지가 겹치지 않아요)
+const PAGE = 1000;
+type Res = PromiseLike<{ data: unknown; error: unknown }>;
+async function allRows<T>(make: (from: number, to: number) => Res): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await make(from, from + PAGE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < PAGE) return out;
+  }
+}
+// id가 많으면 주소가 너무 길어져서 100개씩 나눠 읽어요.
+async function inChunks<T>(ids: string[], run: (chunk: string[]) => Promise<T[]>): Promise<T[]> {
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += 100) out.push(...(await run(ids.slice(i, i + 100))));
+  return out;
+}
+
 // ── 신청 ───────────────────────────────────────
 export async function createApplication(a: NewApplication): Promise<string> {
   if (sb) {
@@ -226,9 +247,12 @@ export async function getApplications(ids: string[]): Promise<Application[]> {
   const ok = ids.filter(isUuid);
   if (ok.length === 0) return [];
   if (sb) {
-    const { data, error } = await sb.from("applications").select("*").in("id", ok);
-    if (error) throw error;
-    return data as Application[];
+    const db = sb;
+    return inChunks(ok, async (chunk) => {
+      const { data, error } = await db.from("applications").select("*").in("id", chunk);
+      if (error) throw error;
+      return data as Application[];
+    });
   }
   return mem.apps.filter((x) => ok.includes(x.id));
 }
@@ -244,12 +268,8 @@ export async function findApplicationsByName(name: string): Promise<Application[
 
 export async function listApplications(): Promise<Application[]> {
   if (sb) {
-    const { data, error } = await sb
-      .from("applications")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    return data as Application[];
+    const db = sb;
+    return allRows<Application>((from, to) => db.from("applications").select("*").order("created_at", { ascending: false }).order("id").range(from, to));
   }
   return mem.apps;
 }
@@ -281,8 +301,12 @@ export async function updateApplications(ids: string[], patch: ApplicationPatch)
   const ok = ids.filter(isUuid);
   if (ok.length === 0) return;
   if (sb) {
-    const { error } = await sb.from("applications").update(patch).in("id", ok);
-    if (error) throw error;
+    const db = sb;
+    await inChunks(ok, async (chunk) => {
+      const { error } = await db.from("applications").update(patch).in("id", chunk);
+      if (error) throw error;
+      return [];
+    });
     return;
   }
   for (const a of mem.apps) if (ok.includes(a.id)) Object.assign(a, patch);
@@ -292,8 +316,12 @@ export async function deleteApplications(ids: string[]) {
   const ok = ids.filter(isUuid);
   if (ok.length === 0) return;
   if (sb) {
-    const { error } = await sb.from("applications").delete().in("id", ok);
-    if (error) throw error;
+    const db = sb;
+    await inChunks(ok, async (chunk) => {
+      const { error } = await db.from("applications").delete().in("id", chunk);
+      if (error) throw error;
+      return [];
+    });
     return;
   }
   mem.apps = mem.apps.filter((x) => !ok.includes(x.id));
@@ -372,9 +400,8 @@ export async function createYbmOrder(o: Pick<YbmOrder, "name" | "phone" | "addre
 
 export async function listYbmOrders(): Promise<YbmOrder[]> {
   if (sb) {
-    const { data, error } = await sb.from("ybm_orders").select("*").order("created_at", { ascending: false });
-    if (error) throw error;
-    return data as YbmOrder[];
+    const db = sb;
+    return allRows<YbmOrder>((from, to) => db.from("ybm_orders").select("*").order("created_at", { ascending: false }).order("id").range(from, to));
   }
   return [...mem.ybmOrders].sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
@@ -393,8 +420,12 @@ export async function updateYbmOrders(ids: string[], patch: Partial<Pick<YbmOrde
   const ok = ids.filter(isUuid);
   if (ok.length === 0) return;
   if (sb) {
-    const { error } = await sb.from("ybm_orders").update(patch).in("id", ok);
-    if (error) throw error;
+    const db = sb;
+    await inChunks(ok, async (chunk) => {
+      const { error } = await db.from("ybm_orders").update(patch).in("id", chunk);
+      if (error) throw error;
+      return [];
+    });
     return;
   }
   for (const o of mem.ybmOrders) if (ok.includes(o.id)) Object.assign(o, patch);
@@ -483,11 +514,13 @@ export async function listNoticeReads(filter: { appIds?: string[] } = {}): Promi
   const ids = filter.appIds?.filter(isUuid);
   if (ids && ids.length === 0) return [];
   if (sb) {
-    let q = sb.from("site_notice_reads").select("*");
-    if (ids) q = q.in("app_id", ids);
-    const { data, error } = await q;
-    if (error) throw error;
-    return data as NoticeRead[];
+    const db = sb;
+    const run = (chunk?: string[]) => allRows<NoticeRead>((from, to) => {
+      let q = db.from("site_notice_reads").select("*").order("notice_id").order("app_id");
+      if (chunk) q = q.in("app_id", chunk);
+      return q.range(from, to);
+    });
+    return ids ? inChunks(ids, run) : run();
   }
   return mem.noticeReads.filter((r) => !ids || ids.includes(r.app_id));
 }
@@ -560,13 +593,15 @@ export async function listTestResults(filter: { cohort?: string; day?: string; a
   const ids = filter.appIds?.filter(isUuid);
   if (ids && ids.length === 0) return [];
   if (sb) {
-    let q = sb.from("test_results").select("*").order("day").order("kind");
-    if (filter.cohort) q = q.eq("cohort", filter.cohort);
-    if (filter.day) q = q.eq("day", filter.day);
-    if (ids) q = q.in("app_id", ids);
-    const { data, error } = await q;
-    if (error) throw error;
-    return data as TestResult[];
+    const db = sb;
+    const run = (chunk?: string[]) => allRows<TestResult>((from, to) => {
+      let q = db.from("test_results").select("*").order("day").order("kind").order("id");
+      if (filter.cohort) q = q.eq("cohort", filter.cohort);
+      if (filter.day) q = q.eq("day", filter.day);
+      if (chunk) q = q.in("app_id", chunk);
+      return q.range(from, to);
+    });
+    return ids ? inChunks(ids, run) : run();
   }
   return mem.testResults.filter((r) => (!filter.cohort || r.cohort === filter.cohort) && (!filter.day || r.day === filter.day) && (!ids || ids.includes(r.app_id)));
 }
@@ -762,9 +797,8 @@ export async function listMissions(appIds: string[]): Promise<Mission[]> {
   const ok = appIds.filter(isUuid);
   if (ok.length === 0) return [];
   if (sb) {
-    const { data, error } = await sb.from("student_missions").select("*").in("app_id", ok);
-    if (error) throw error;
-    return data as Mission[];
+    const db = sb;
+    return inChunks(ok, (chunk) => allRows<Mission>((from, to) => db.from("student_missions").select("*").in("app_id", chunk).order("app_id").range(from, to)));
   }
   return mem.missions.filter((m) => ok.includes(m.app_id));
 }
@@ -840,11 +874,12 @@ export async function deleteSpecialLecture(id: string) {
 
 export async function listSpecialRegistrations(special_lecture_id?: string): Promise<SpecialRegistration[]> {
   if (sb) {
-    let query = sb.from("special_lecture_registrations").select("*").order("created_at", { ascending: true });
-    if (special_lecture_id) query = query.eq("special_lecture_id", special_lecture_id);
-    const { data, error } = await query;
-    if (error) throw error;
-    return data as SpecialRegistration[];
+    const db = sb;
+    return allRows<SpecialRegistration>((from, to) => {
+      let query = db.from("special_lecture_registrations").select("*").order("created_at", { ascending: true }).order("id");
+      if (special_lecture_id) query = query.eq("special_lecture_id", special_lecture_id);
+      return query.range(from, to);
+    });
   }
   return mem.specialRegistrations.filter((registration) => !special_lecture_id || registration.special_lecture_id === special_lecture_id);
 }
@@ -854,9 +889,8 @@ export async function getSpecialRegistrationsFor(application_ids: string[]): Pro
   const ok = application_ids.filter(isUuid);
   if (ok.length === 0) return [];
   if (sb) {
-    const { data, error } = await sb.from("special_lecture_registrations").select("*").in("application_id", ok);
-    if (error) throw error;
-    return data as SpecialRegistration[];
+    const db = sb;
+    return inChunks(ok, (chunk) => allRows<SpecialRegistration>((from, to) => db.from("special_lecture_registrations").select("*").in("application_id", chunk).order("id").range(from, to)));
   }
   return mem.specialRegistrations.filter((registration) => registration.application_id && ok.includes(registration.application_id));
 }
@@ -868,8 +902,12 @@ export async function updateOnsiteRegistrations(ids: string[], patch: SpecialReg
   const ok = ids.filter(isUuid);
   if (ok.length === 0) return;
   if (sb) {
-    const { error } = await sb.from("special_lecture_registrations").update(patch).in("id", ok).eq("mode", "onsite");
-    if (error) throw error;
+    const db = sb;
+    await inChunks(ok, async (chunk) => {
+      const { error } = await db.from("special_lecture_registrations").update(patch).in("id", chunk).eq("mode", "onsite");
+      if (error) throw error;
+      return [];
+    });
     return;
   }
   for (const r of mem.specialRegistrations) if (ok.includes(r.id) && r.mode === "onsite") Object.assign(r, patch);
@@ -1107,13 +1145,12 @@ export async function listStamps(appIds: string[]): Promise<{ attendance: Attend
   const ok = appIds.filter(isUuid);
   if (ok.length === 0) return { attendance: [], homework: [] };
   if (sb) {
-    const [a, h] = await Promise.all([
-      sb.from("attendance").select("app_id, day, late").in("app_id", ok),
-      sb.from("homework").select("app_id, day, photo_path, created_at").in("app_id", ok),
+    const db = sb;
+    const [attendance, homework] = await Promise.all([
+      inChunks(ok, (chunk) => allRows<Attendance>((from, to) => db.from("attendance").select("app_id, day, late").in("app_id", chunk).order("app_id").order("day").range(from, to))),
+      inChunks(ok, (chunk) => allRows<Homework>((from, to) => db.from("homework").select("app_id, day, photo_path, created_at").in("app_id", chunk).order("app_id").order("day").range(from, to))),
     ]);
-    if (a.error) throw a.error;
-    if (h.error) throw h.error;
-    return { attendance: a.data as Attendance[], homework: h.data as Homework[] };
+    return { attendance, homework };
   }
   return {
     attendance: mem.attendance.filter((x) => ok.includes(x.app_id)),

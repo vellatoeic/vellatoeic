@@ -76,7 +76,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
   };
   const classTitle = (a: Application) => `${COURSES[a.course].label} ${TRACKS[a.track]}`;
   const studentCard = (a: Application, s: WatchSummary | undefined) => (
-    <Link key={a.id} href={`/admin/stamps/${a.id}`} className="block rounded-2xl bg-white p-3 ring-1 ring-sky-main transition hover:ring-2 hover:ring-sky-deep">
+    <Link key={a.id} href={`/admin/students/${a.id}`} className="block rounded-2xl bg-white p-3 ring-1 ring-sky-main transition hover:ring-2 hover:ring-sky-deep">
       <p className="flex flex-wrap items-baseline gap-x-2">
         <b className="text-lg text-sky-ink">{a.name}</b>
         <span className="text-xs text-slate-500">{classTitle(a)} · {a.slot ? TIME_SLOTS[a.slot] : "시간 미정"} · {KINDS[a.kind].short}</span>
@@ -217,7 +217,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
                         return (
                           <tr key={a.id} className="border-b border-sky-soft">
                             <td className={`sticky left-0 whitespace-nowrap bg-white py-1 pr-2 text-left ${absentCnt >= 3 ? "font-bold text-red-500" : ""}`}>
-                              <Link href={`/admin/stamps/${a.id}`} className="underline decoration-sky-main underline-offset-2">{a.name}</Link>
+                              <Link href={`/admin/students/${a.id}`} className="underline decoration-sky-main underline-offset-2">{a.name}</Link>
                               <span className="ml-1 text-[11px] text-slate-400">{KINDS[a.kind].short}</span>
                             </td>
                             {current.days.map((day) => {
@@ -354,7 +354,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
                   <tbody>
                     {watch.map(({ a, s }) => (
                       <tr key={a.id} className="border-b border-sky-soft">
-                        <td className="whitespace-nowrap py-2 pr-3"><Link href={`/admin/stamps/${a.id}`} className="font-bold text-sky-ink underline decoration-sky-main underline-offset-2">{a.name}</Link></td>
+                        <td className="whitespace-nowrap py-2 pr-3"><Link href={`/admin/students/${a.id}`} className="font-bold text-sky-ink underline decoration-sky-main underline-offset-2">{a.name}</Link></td>
                         <td className="whitespace-nowrap pr-3 text-slate-600">{COURSES[a.course].label} {TRACKS[a.track]} · {a.slot ? TIME_SLOTS[a.slot] : "미정"} <span className="text-xs text-slate-400">{KINDS[a.kind].short}</span></td>
                         <td className="pr-3 text-center text-sky-deep">{s.attended}/{s.past}</td>
                         <td className={`pr-3 text-center ${s.absent >= WATCH_RULES.absent ? "font-bold text-red-500" : "text-slate-400"}`}>{s.absent}</td>

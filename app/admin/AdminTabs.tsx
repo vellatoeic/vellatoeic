@@ -28,9 +28,15 @@ export default async function AdminTabs({ active }: { active: "apps" | "roster" 
           <Link href="/admin/faq" className={tab(active === "faq")}>FAQ·질문함</Link>
           <Link href="/admin/special" className={tab(active === "special")}>특강 관리{dot(refunds)}</Link>
         </div>
-        <form action={logout}>
-          <button className="text-sm text-slate-500 underline">로그아웃</button>
-        </form>
+        <div className="flex items-center gap-3">
+          <form action="/admin/students" className="flex items-center gap-1.5">
+            <input name="q" placeholder="🔍 학생 이름·번호" autoComplete="off" className="input !w-40 !rounded-full !py-2 text-sm" />
+            <button className="btn !rounded-full !py-2 !text-sm">찾기</button>
+          </form>
+          <form action={logout}>
+            <button className="text-sm text-slate-500 underline">로그아웃</button>
+          </form>
+        </div>
       </div>
 
       {appsTodo + delivery + refunds > 0 && (

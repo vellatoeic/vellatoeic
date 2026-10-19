@@ -2,6 +2,9 @@ import { adminAlerts } from "@/lib/adminAlerts";
 import { BOOKS, COURSES, KINDS, TRACKS, TIME_SLOTS, bookStatusLabel, cohortLabel, won, type CourseId, type TimeSlot, type Track } from "@/lib/config";
 import { listApplications, listDepositEvents, listYbmOrders, listMissions, getSetting, currentCohort, roundFor, isPreview, type Application, type Mission } from "@/lib/db";
 import { missionCount } from "@/lib/mission";
+import { summariesFor } from "@/lib/studentSummary";
+import { WATCH_RULES, type WatchSummary } from "@/lib/watchlist";
+import Link from "next/link";
 import { isAdmin } from "@/lib/auth";
 import { changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove, resolveBookDepositEvent } from "@/app/actions";
 import LoginForm from "./LoginForm";
@@ -33,7 +36,7 @@ function Badge({ tone, children }: { tone: "amber" | "sky" | "slate" | "green"; 
   return <span className={`inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold ${color}`}>{children}</span>;
 }
 
-function Row({ a, group, mission, fresh }: { a: Application; group: string; mission?: Mission; fresh?: boolean }) {
+function Row({ a, group, mission, fresh, sum }: { a: Application; group: string; mission?: Mission; fresh?: boolean; sum?: WatchSummary }) {
   const book = bookStatusLabel(a);
   return (
     <li className={`py-3 ${a.status === "pending" ? "bg-amber-50/60" : ""}`}>
@@ -42,7 +45,7 @@ function Row({ a, group, mission, fresh }: { a: Application; group: string; miss
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             {fresh && <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold text-white">NEW</span>}
-            <b className="text-sky-ink">{a.name}</b>
+            <Link href={`/admin/students/${a.id}`} className="font-bold text-sky-ink underline decoration-sky-main underline-offset-2">{a.name}</Link>
             {a.depositor !== a.name && <span className="text-sm text-slate-500">(입금자 {a.depositor})</span>}
             <Badge tone={a.kind === "onsite" ? "slate" : "sky"}>{KINDS[a.kind].short}{a.kind === "online" ? ` · ${a.pickup === "delivery" ? "택배" : "1층 데스크"}` : ""}</Badge>
             <Badge tone={a.status === "pending" ? "amber" : a.status === "refunded" ? "slate" : "green"}>{a.status === "pending" ? "미납" : a.status === "refunded" ? "환불" : "납부 완료"}</Badge>
@@ -50,6 +53,13 @@ function Row({ a, group, mission, fresh }: { a: Application; group: string; miss
             {a.continuing && <Badge tone="slate">이어듣기</Badge>}
             <Badge tone={missionCount(mission) === 4 ? "green" : "slate"}>미션 {missionCount(mission)}/4</Badge>
           </div>
+          {sum && sum.past > 0 && (
+            <p className="mt-1 text-xs">
+              <span className="text-sky-deep">출석 {sum.attended}/{sum.past}</span>
+              {" · "}<span className={sum.absent >= WATCH_RULES.absent || sum.streak >= WATCH_RULES.streak ? "font-bold text-red-500" : "text-slate-500"}>결석 {sum.absent}{sum.streak >= WATCH_RULES.streak ? ` (연속 ${sum.streak})` : ""}</span>
+              {" · "}<span className={sum.hwMissing >= WATCH_RULES.homework ? "font-bold text-amber-600" : "text-slate-500"}>숙제 {sum.hwDue - sum.hwMissing}/{sum.hwDue}</span>
+            </p>
+          )}
           <p className="mt-1 text-xs text-slate-500">
             {won(a.amount)} · {a.books.map((b) => BOOKS[b]).join(", ")}
             {a.phone && ` · ${a.phone.replace(/(\d{3})(\d{3,4})(\d{4})/, "$1-$2-$3")}`}
@@ -183,6 +193,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
 
   const count = (fn: (a: Application) => boolean) => all.filter(fn).length;
   const missions = new Map((await listMissions(list.map((a) => a.id))).map((m) => [m.app_id, m]));
+  const sums = await summariesFor(list);
   const link = (patch: Partial<Filters>) => {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries({ c, k, p, b, t, q, ...patch })) {
@@ -457,7 +468,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
               {pending > 0 && <Badge tone="amber">미납 {pending}명</Badge>}
             </div>
             <ul className="divide-y divide-sky-soft">
-              {g.items.map((a) => <Row key={a.id} a={a} group={g.key} mission={missions.get(a.id)} fresh={a.created_at > alerts.since} />)}
+              {g.items.map((a) => <Row key={a.id} a={a} group={g.key} mission={missions.get(a.id)} fresh={a.created_at > alerts.since} sum={sums.get(a.id)} />)}
             </ul>
           </section>
         );

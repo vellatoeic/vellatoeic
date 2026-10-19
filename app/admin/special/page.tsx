@@ -59,7 +59,7 @@ function Roster({ title, items, onsiteForm, refunded }: { title: string; items: 
               <li key={r.id} className={`flex items-center justify-between gap-3 py-2 text-[15px] ${d === "cancelled" ? "opacity-50" : ""}`}>
                 <span className="flex flex-wrap items-center gap-1.5">
                   {onsiteForm && <input type="checkbox" name="ids" value={r.id} form={onsiteForm} aria-label={`${r.name} 선택`} className="h-4 w-4 accent-sky-deep" />}
-                  <b className="text-sky-ink">{r.name}</b>
+                  {r.application_id ? <a href={`/admin/students/${r.application_id}`} className="font-bold text-sky-ink underline decoration-sky-main underline-offset-2">{r.name}</a> : <b className="text-sky-ink">{r.name}</b>}
                   {r.application_id && refunded.has(r.application_id) && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-600">수강 환불</span>}
                   {r.deposit_refunded_at && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">💸 보증금 환불 완료</span>}
                   {onsiteForm && <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${DEPOSIT_TONE[d]}`}>{d === "review" ? "입금 대기" : DEPOSIT_LABEL[d]}</span>}
