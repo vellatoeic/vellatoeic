@@ -10,6 +10,9 @@ import { TEST_LABEL } from "@/lib/tests";
 import { missionCount } from "@/lib/mission";
 import { watchSummary } from "@/lib/watchlist";
 import { cancelHomeworkSticker, cycleAttendance } from "@/app/actions";
+import { getSetting } from "@/lib/db";
+import { defaultHolidays, holidayKey, parseHolidays, schoolDaysFor, scheduleClassFor, scheduleKey } from "@/lib/schedule";
+import StickerBoard from "@/app/class/StickerBoard";
 import AdminTabs from "../../AdminTabs";
 import LoginForm from "../../LoginForm";
 
@@ -31,6 +34,9 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
     listMissions([a.id]), getSpecialRegistrationsFor([a.id]), listSpecialLectures(), listApplications(),
   ]);
   const classDays = days.filter((d) => !holidays[d]);
+  // 학생 강의실과 똑같은 스티커판 (보기 전용)
+  const klass = scheduleClassFor(a.course, a.track);
+  const [rawDays, rawHolidays, cafeUrl] = await Promise.all([getSetting(scheduleKey(a.cohort, klass)), getSetting(holidayKey(a.cohort)), getSetting("cafe_homework_url")]);
   const offDays = attendance.map((x) => x.day).filter((d) => !classDays.includes(d));
   const all = [...new Set([...classDays, ...offDays])].sort();
   const s = watchSummary(classDays, attendance, homework.map((h) => h.day), today);
@@ -133,8 +139,26 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
+      <div className="grid items-start gap-4 lg:grid-cols-[400px_1fr]">
+      <div className="mx-auto w-full max-w-[400px]">
+        <StickerBoard
+          appId={a.id}
+          name={a.name}
+          cohort={a.cohort}
+          className={`${COURSES[a.course].label} ${TRACKS[a.track]}`}
+          klass={klass}
+          scheduleDays={schoolDaysFor(rawDays, a.cohort, klass)}
+          holidays={rawHolidays ? parseHolidays(rawHolidays, a.cohort) : defaultHolidays(a.cohort)}
+          attendance={attendance}
+          homework={homework.map(({ day, created_at }) => ({ day, created_at }))}
+          cafeUrl={cafeUrl}
+          today={today}
+          welcome={missionCount(mission) === 4}
+          readOnly
+        />
+      </div>
       <section className="card !p-4">
-        <p className="font-jua px-1 text-lg text-sky-ink">📅 날짜별 출석·숙제·테스트</p>
+        <p className="font-jua px-1 text-lg text-sky-ink">📅 날짜별 출석·숙제·테스트 (고치기)</p>
         <p className="px-1 text-xs text-slate-500">출석 칸을 누르면 출석 → 지각 → 결석 순서로 바뀌어요. 숙제를 누르면 기록을 취소해요.</p>
         <ul className="mt-2 divide-y divide-sky-soft">
           {all.map((d) => {
@@ -169,6 +193,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
           })}
         </ul>
       </section>
+      </div>
     </div>
   );
 }

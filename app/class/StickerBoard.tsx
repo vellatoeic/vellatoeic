@@ -20,6 +20,7 @@ export default function StickerBoard({
   cafeUrl,
   today,
   welcome,
+  readOnly = false,
 }: {
   appId: string;
   name: string;
@@ -33,6 +34,7 @@ export default function StickerBoard({
   cafeUrl: string;
   today: string;
   welcome: boolean;
+  readOnly?: boolean; // 관리자 화면: 학생 스티커판을 보기만 해요 (숙제 버튼 없음)
 }) {
   const [newBadges, setNewBadges] = useState<string[]>([]);
   const [newStickers, setNewStickers] = useState<string[]>([]);
@@ -242,7 +244,7 @@ export default function StickerBoard({
           </div>
         )}
 
-        <div ref={homeworkBox} className="mt-[14px] rounded-[22px] border-2 border-[#ffe58a] bg-gradient-to-br from-[#fff9e0] to-white p-4 shadow-[0_2px_0_#d5ecf9]">
+        {!readOnly && <div ref={homeworkBox} className="mt-[14px] rounded-[22px] border-2 border-[#ffe58a] bg-gradient-to-br from-[#fff9e0] to-white p-4 shadow-[0_2px_0_#d5ecf9]">
           {homeworkAssignments.length > 0 ? (
             <div className="mb-3 text-center">
               <p className="font-jua text-base text-[#7d6728]">수강일을 선택하여 숙제를 확인해주세요</p>
@@ -269,7 +271,7 @@ export default function StickerBoard({
               <button className="block w-full rounded-2xl border-2 border-dashed border-[#e0b400] bg-white px-3 py-2.5 font-jua text-[15px] text-[#a7741a]">카페에 올렸어요 ✓ 별 받기</button>
             </form>
           ) : null}
-        </div>
+        </div>}
 
         <div className="mt-[14px] rounded-[22px] bg-white p-4 shadow-[0_2px_0_#d5ecf9]">
           <div className="grid grid-cols-5 gap-1 text-center">
@@ -302,7 +304,7 @@ export default function StickerBoard({
               const rotation = ((Number(day.slice(-2)) * 7) % 25) - 12;
               const cloudNew = newStickers.includes(`${day}:attendance`);
               const starNew = newStickers.includes(`${day}:homework`);
-              const pickable = homeworkAssignments.includes(day);
+              const pickable = !readOnly && homeworkAssignments.includes(day);
               const picked = pickable && day === homeworkTargetDay;
               return (
                 <div
@@ -331,7 +333,7 @@ export default function StickerBoard({
           <div className="mt-3 flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-[#5b88a6]">
             <span className="flex items-center gap-[3px]"><CloudSticker fill="#79c6ef" size={22} />출석</span>
             <span className="flex items-center gap-[3px]"><StarSticker size={18} />숙제</span>
-            <span className="w-full text-center text-[#a7741a]">수업 날짜를 누르면 그날 숙제를 확인할 수 있어요</span>
+            {!readOnly && <span className="w-full text-center text-[#a7741a]">수업 날짜를 누르면 그날 숙제를 확인할 수 있어요</span>}
           </div>
         </div>
 
