@@ -99,3 +99,17 @@ test("미제출 횟수와 최근 3회 연속 하락", async () => {
   assert.equal(s.missing, 2); // 단어 10/8, 10/12 미제출 (오늘 10/13 것은 아직 안 셈)
   assert.equal(s.avg.word, 90);
 });
+
+import { earlyTestDay } from "@/lib/tests";
+
+test("미리 제출: 다음 수업일 하나만 (주말·공휴일 건너뛰고)", () => {
+  const days = ["2026-10-15", "2026-10-19", "2026-10-20"];
+  assert.equal(earlyTestDay(days, "2026-10-15"), "2026-10-19");
+  assert.equal(earlyTestDay(days, "2026-10-17"), "2026-10-19");
+  assert.equal(earlyTestDay(days, "2026-10-19"), "2026-10-20");
+});
+
+test("미리 제출: 다음 수업일이 다음 달이면 없어요", () => {
+  assert.equal(earlyTestDay(["2026-10-29", "2026-11-02"], "2026-10-29"), null);
+  assert.equal(earlyTestDay(["2026-10-29"], "2026-10-29"), null);
+});

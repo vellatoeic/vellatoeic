@@ -2,7 +2,7 @@ import { activeStudentApps } from "@/lib/student";
 import { expireSpecialDeposits, getSetting, getSpecialRegistrationsFor, listSpecialLectures, listSpecialMaterials } from "@/lib/db";
 import { CLASSROOM, DEPOSIT_MINUTES, SPECIAL_DEPOSIT, won } from "@/lib/config";
 import { specialLogout } from "@/app/actions";
-import { deadlineBadge, specialRegistrationOpen, specialWhen } from "@/lib/special";
+import { canSeeSpecialMaterials, deadlineBadge, specialRegistrationOpen, specialWhen } from "@/lib/special";
 import { todayKST } from "@/lib/config";
 import SpecialForm from "./SpecialForm";
 import SpecialLogin from "./SpecialLogin";
@@ -22,14 +22,20 @@ export default async function SpecialPage() {
   const eventById = new Map(events.map((event) => [event.id, event]));
   const myRows = await Promise.all(
     mine
-      .filter((registration) => eventById.has(registration.special_lecture_id))
-      .map(async (registration) => ({
-        registration,
-        event: eventById.get(registration.special_lecture_id)!,
-        materials: registration.mode === "online" ? await listSpecialMaterials(registration.special_lecture_id) : [],
-      })),
+      // 지난달 이전 특강은 열람 기간이 끝나서 목록에서 빼요
+      .filter((registration) => eventById.has(registration.special_lecture_id) && eventById.get(registration.special_lecture_id)!.event_date.slice(0, 7) >= today.slice(0, 7))
+      .map(async (registration) => {
+        const event = eventById.get(registration.special_lecture_id)!;
+        const canSee = canSeeSpecialMaterials(registration, event.event_date, today);
+        return { registration, event, canSee, materials: canSee ? await listSpecialMaterials(registration.special_lecture_id) : [] };
+      }),
   );
-  myRows.sort((a, b) => a.event.event_date.localeCompare(b.event.event_date));
+  // 다가오는 특강이 먼저(가까운 순), 지난 특강은 그 아래(최근 순)
+  myRows.sort((a, b) => {
+    const pa = a.event.event_date < today, pb = b.event.event_date < today;
+    if (pa !== pb) return pa ? 1 : -1;
+    return pa ? b.event.event_date.localeCompare(a.event.event_date) : a.event.event_date.localeCompare(b.event.event_date);
+  });
 
   return (
     <div className="space-y-6 pt-8">
@@ -46,14 +52,14 @@ export default async function SpecialPage() {
       {myRows.length > 0 ? (
         <section className="space-y-3">
           <h2 className="font-jua text-2xl text-sky-ink">내 특강 신청</h2>
-          {myRows.map(({ registration, event, materials }) => (
+          {myRows.map(({ registration, event, materials, canSee }) => (
             <div key={registration.id} className="card space-y-3">
               <div>
                 <p className="text-sm text-sky-deep">{specialWhen(event)}</p>
                 <p className="font-jua text-xl text-sky-ink">{event.title} · {registration.mode === "onsite" ? "현장" : "불라방"}</p>
                 <p className="text-sm text-slate-500">{registration.name}</p>
               </div>
-              {registration.mode === "onsite" ? (
+              {registration.mode === "onsite" && event.event_date >= today ? (
                 <div className="space-y-3">
                   {registration.deposit === "paid" ? (
                     <p className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-800">
@@ -77,8 +83,13 @@ export default async function SpecialPage() {
                   )}
                   <p className="rounded-2xl bg-sky-soft p-4 text-sm text-slate-700">특강 당일 10시까지 필기구를 챙겨 {CLASSROOM}로 와주세요.</p>
                 </div>
+              ) : !canSee ? (
+                <p className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-600">보증금이 확인된 신청만 지난 특강 자료와 영상을 볼 수 있어요.</p>
               ) : (
                 <div className="space-y-3">
+                  {event.event_date < today && (
+                    <p className="rounded-2xl bg-emerald-50 p-3 text-center text-sm font-bold text-emerald-700">📚 지난 특강 · {Number(event.event_date.slice(5, 7))}월 말까지 다시 볼 수 있어요</p>
+                  )}
                   {event.material_note && (
                     <div className="rounded-2xl border-2 border-sky-main bg-white p-4 text-center text-[15px] leading-relaxed text-slate-700">
                       {event.material_note.split("\n").map((line, i) =>
@@ -95,10 +106,12 @@ export default async function SpecialPage() {
                       ))}
                     </div>
                   ) : (
-                    <p className="rounded-2xl bg-sky-soft p-4 text-sm text-slate-700">자료는 특강 하루 전에 이 페이지에 올라와요.</p>
+                    <p className="rounded-2xl bg-sky-soft p-4 text-sm text-slate-700">{event.event_date < today ? "올라온 자료가 없어요." : "자료는 특강 하루 전에 이 페이지에 올라와요."}</p>
                   )}
                   {event.youtube_id ? (
-                    <a href={`https://youtu.be/${event.youtube_id}`} target="_blank" rel="noreferrer" className="btn block w-full text-center">🎤 특강 입장하기 ↗</a>
+                    <a href={`https://youtu.be/${event.youtube_id}`} target="_blank" rel="noreferrer" className="btn block w-full text-center">{event.event_date < today ? "📺 특강 다시 보기 ↗" : "🎤 특강 입장하기 ↗"}</a>
+                  ) : event.event_date < today ? (
+                    <p className="rounded-2xl bg-sky-soft p-4 text-center text-sm text-slate-600">특강 영상이 준비되면 이곳에 올라와요.</p>
                   ) : (
                     <p className="rounded-2xl bg-sky-soft p-4 text-center text-sm font-bold text-sky-ink">
                       📺 특강 링크는 {event.event_date === today ? "특강 시작 전에" : event.event_date === tomorrow ? "내일" : "특강 당일"} 이곳에 올라와요

@@ -12,7 +12,7 @@ import {
 } from "@/lib/db";
 import { canWatch, isActive, loginApps } from "@/lib/access";
 import { parseBankSms } from "@/lib/bankSms";
-import { checkTestAnswer, testsForClassDay, type TestKind } from "@/lib/tests";
+import { checkTestAnswer, earlyTestDay, testsForClassDay, type TestKind } from "@/lib/tests";
 import { classDaysOf, planFor, takesTests } from "@/lib/dailyTests";
 import { noticeIdentity } from "@/lib/noticeView";
 import type { NoticeSection, NoticeTarget } from "@/lib/notices";
@@ -455,10 +455,13 @@ export async function submitTestResult(_: FormState, fd: FormData): Promise<Form
   const { apps } = await activeStudentApps();
   const app = apps.find((a) => a.id === appId);
   if (!app || !takesTests(app)) return { error: "테스트를 볼 수 있는 수강 신청이 아니에요." };
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day > today) return { error: "아직 제출할 수 없는 테스트예요." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return { error: "아직 제출할 수 없는 테스트예요." };
   if (day.slice(0, 7) !== today.slice(0, 7)) return { error: "지난달 테스트는 제출할 수 없어요." };
   const { plan } = await planFor(app.cohort);
-  const spec = testsForClassDay(plan, await classDaysOf(app), day).find((t) => t.kind === kind);
+  const classDays = await classDaysOf(app);
+  // 앞으로의 테스트는 다음 수업일 것만 미리 낼 수 있어요
+  if (day > today && day !== earlyTestDay(classDays, today)) return { error: "아직 제출할 수 없는 테스트예요. 다음 수업일 테스트만 미리 낼 수 있어요." };
+  const spec = testsForClassDay(plan, classDays, day).find((t) => t.kind === kind);
   if (!spec) return { error: "이 날짜에는 이 테스트가 없어요." };
   if (clean(fd.get("score")) === "") return { error: "맞은 개수를 적어 주세요." };
   const problem = checkTestAnswer(spec.questions, score, kind === "rc" ? wrong : []);
@@ -471,7 +474,8 @@ export async function submitTestResult(_: FormState, fd: FormData): Promise<Form
   revalidatePath("/class");
   revalidatePath("/class/tests");
   revalidatePath("/admin/tests");
-  return { ok: late ? "저장했어요!" : "저장했어요! 오늘 23:59까지 고칠 수 있어요." };
+  const [, m, dd] = day.split("-").map(Number);
+  return { ok: late ? "저장했어요!" : day > today ? `미리 저장했어요! ${m}/${dd} 23:59까지 고칠 수 있어요.` : "저장했어요! 오늘 23:59까지 고칠 수 있어요." };
 }
 
 // 관리자: 특정 날짜 테스트 번호·문항 수 직접 고치기 / 자동 계산으로 되돌리기

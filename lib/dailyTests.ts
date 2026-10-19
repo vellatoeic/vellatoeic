@@ -2,7 +2,7 @@ import "server-only";
 import { getSetting, listApplications, listTestOverrides, listTestResults, type Application, type TestResult } from "./db";
 import { canWatch } from "./access";
 import { scheduleClassFor, scheduleKey, schoolDaysFor, type ScheduleClass } from "./schedule";
-import { testPlan, testsForClassDay, type TestSpec } from "./tests";
+import { earlyTestDay, testPlan, testsForClassDay, type TestSpec } from "./tests";
 
 // 문풀반·속성반(속성반도 문풀반 수업을 들어요) 납부 완료 학생만 테스트를 봐요. 시작반은 X
 export const takesTests = (a: Application) => canWatch(a) && (a.course === "solve" || a.course === "intensive");
@@ -29,8 +29,12 @@ export async function studentTests(a: Application, today: string) {
     .filter((d) => d <= today)
     .flatMap((d) => testsForClassDay(plan, classDays, d).map((spec) => ({ day: d, spec, result: find(d, spec.kind) })));
   const sameMonth = today.slice(0, 7) === a.cohort;
+  // 다음 수업일 테스트는 미리 낼 수 있어요 (그날 23:59까지 수정)
+  const early = sameMonth ? earlyTestDay(classDays, today) : null;
+  const next: TestSlotView[] = early ? testsForClassDay(plan, classDays, early).map((spec) => ({ day: early, spec, result: find(early, spec.kind) })) : [];
   return {
     today: all.filter((t) => t.day === today),
+    next,
     missed: sameMonth ? all.filter((t) => t.day < today && !t.result) : [],
     results,
   };

@@ -124,7 +124,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
       </div>
 
 
-      {testApp && myTests && (myTests.today.length > 0 || myTests.missed.length > 0) && (
+      {testApp && myTests && (myTests.today.length > 0 || myTests.missed.length > 0 || myTests.next.length > 0) && (
         <section className="space-y-2 rounded-3xl border-2 border-[#ffd23f] bg-[#fffbea] p-4">
           {myTests.today.length > 0 && (
             // 눌러서 접고 펼 수 있어요. 아직 안 낸 테스트가 있으면 펼친 채로 시작해요.
@@ -140,6 +140,23 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
                     existing={t.result ? { score: t.result.score, wrong: t.result.wrong, late: t.result.late } : null} />
                 ))}
                 <p className="text-xs text-slate-500">오늘 23:59까지 제출하고 고칠 수 있어요.</p>
+              </div>
+            </details>
+          )}
+          {myTests.next.length > 0 && (
+            // 다음 수업일 테스트 미리 내기 (접어 두고 필요할 때 펼쳐요)
+            <details className="group rounded-2xl bg-white/60 px-3 py-2">
+              <summary className="flex cursor-pointer list-none items-center justify-between font-jua text-lg text-sky-ink">
+                <span>⏩ 다음 수업 테스트 미리 내기 <span className="text-sm text-slate-500">· {specialDay(myTests.next[0].day)} · 제출 {myTests.next.filter((t) => t.result).length}/{myTests.next.length}</span></span>
+                <span className="text-sm text-slate-400 group-open:hidden">펼치기 ▾</span>
+                <span className="hidden text-sm text-slate-400 group-open:inline">접기 ▴</span>
+              </summary>
+              <div className="mt-2 space-y-2">
+                {myTests.next.map((t) => (
+                  <TestForm key={t.spec.kind} appId={testApp.id} day={t.day} kind={t.spec.kind} label={`${TEST_LABEL[t.spec.kind]} ${t.spec.no}`} questions={t.spec.questions}
+                    existing={t.result ? { score: t.result.score, wrong: t.result.wrong, late: t.result.late } : null} />
+                ))}
+                <p className="text-xs text-slate-500">결석 예정이거나 미리 풀었다면 여기서 내 주세요. {specialDay(myTests.next[0].day)} 23:59까지 고칠 수 있어요.</p>
               </div>
             </details>
           )}

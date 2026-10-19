@@ -66,3 +66,9 @@ export function checkTestAnswer(questions: number, score: number, wrong: number[
   }
   return null;
 }
+
+// 미리 제출: 다음 수업일 1개만 (같은 달 안에서만). 없으면 null
+export function earlyTestDay(classDays: string[], today: string): string | null {
+  const next = [...classDays].sort().find((d) => d > today) ?? null;
+  return next && next.slice(0, 7) === today.slice(0, 7) ? next : null;
+}
