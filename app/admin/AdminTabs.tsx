@@ -39,7 +39,7 @@ export default async function AdminTabs({ active }: { active: "apps" | "roster" 
         </div>
       </div>
 
-      {appsTodo + delivery + refunds > 0 && (
+      {appsTodo + delivery > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-3xl border-2 border-red-200 bg-white p-3 shadow-sm">
           <span className="font-jua px-1 text-lg text-red-500">🔔 할 일</span>
           {fresh.length > 0 && (
@@ -53,7 +53,6 @@ export default async function AdminTabs({ active }: { active: "apps" | "roster" 
           )}
           {waiting > 0 && <Link href="/admin" className={`${chip} bg-amber-50 text-amber-700`}>💰 입금 대기 {waiting}명</Link>}
           {checks > 0 && <Link href="/admin" className={`${chip} bg-red-50 text-red-600`}>⚠️ 입금 문자 확인 {checks}건</Link>}
-          {refunds > 0 && <Link href="/admin/special#refunds" className={`${chip} bg-red-500 text-white`}>💸 특강 보증금 환불 {refunds}명</Link>}
           {delivery > 0 && <Link href="/admin/delivery" className={`${chip} bg-sky-deep text-white`}>📦 택배 발송 대기 {delivery}건</Link>}
         </div>
       )}

@@ -1,17 +1,14 @@
 import { COURSES, TRACKS, TIME_SLOTS, KINDS } from "./config";
-import { currentCohort, getSetting, listApplications, listDepositEvents, listSpecialLectures, listSpecialRegistrations, listYbmOrders } from "./db";
-import { specialDay } from "./special";
+import { currentCohort, getSetting, listApplications, listDepositEvents, listYbmOrders } from "./db";
 import { specialRefundsDue } from "./specialRefunds";
 
-// 수강 · 특강 · YBM 인강 주문을 한 줄씩 (최신순)
-export type RecentItem = { id: string; at: string; type: "수강" | "특강" | "인강"; name: string; detail: string; warn?: string; href: string; quiet?: boolean };
+// 수강 · YBM 인강 주문을 한 줄씩 (최신순). 특강은 [특강 관리]에서 따로 관리해요.
+export type RecentItem = { id: string; at: string; type: "수강" | "인강"; name: string; detail: string; warn?: string; href: string };
 
-const DEPOSIT = { pending: "보증금 대기", review: "입금 확인 중", paid: "보증금 확정", cancelled: "취소" } as const;
 const YBM = { pending: "입금 대기", paid: "발송 대기", shipped: "발송 완료" } as const;
 
 export async function recentApplications(limit = 300): Promise<RecentItem[]> {
-  const [apps, regs, events, ybm] = await Promise.all([listApplications(), listSpecialRegistrations(), listSpecialLectures(), listYbmOrders()]);
-  const eventById = new Map(events.map((e) => [e.id, e]));
+  const [apps, ybm] = await Promise.all([listApplications(), listYbmOrders()]);
   const items: RecentItem[] = [
     ...apps.map((a) => ({
       id: a.id, at: a.created_at, type: "수강" as const, name: a.name,
@@ -19,16 +16,6 @@ export async function recentApplications(limit = 300): Promise<RecentItem[]> {
       warn: a.status === "pending" ? "미납" : a.status === "refunded" ? "환불" : undefined,
       href: `/admin/students/${a.id}`,
     })),
-    ...regs.map((r) => {
-      const e = eventById.get(r.special_lecture_id);
-      return {
-        id: r.id, at: r.created_at, type: "특강" as const, name: r.name,
-        detail: `${e ? `${specialDay(e.event_date)} ${e.title}` : "특강"} · ${r.mode === "onsite" ? `현장 · ${DEPOSIT[r.deposit ?? "pending"]}` : "불라방"}`,
-        warn: r.mode === "onsite" && (r.deposit === "pending" || r.deposit === "review") ? "보증금 대기" : undefined,
-        href: r.application_id ? `/admin/students/${r.application_id}` : "/admin/special",
-        quiet: r.mode === "online", // 불라방 특강 신청은 확인할 일이 없어서 알림에서 빼요
-      };
-    }),
     ...ybm.map((o) => ({
       id: o.id, at: o.created_at, type: "인강" as const, name: o.name,
       detail: `개념 zip · ${YBM[o.status]}`,
@@ -46,7 +33,7 @@ export async function adminAlerts() {
   ]);
   // 처음 쓸 때(확인 기록 없음)는 최근 3일 신청만 새 신청으로 봐요
   const since = seenAt || new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString();
-  const fresh = recent.filter((x) => x.at > since && !x.quiet);
+  const fresh = recent.filter((x) => x.at > since);
   const waiting = apps.filter((a) => a.cohort === cohort && a.status === "pending").length;
   const checks = events.filter((e) => e.target === "book" && (e.result === "review" || e.result === "unmatched")).length;
   const delivery =

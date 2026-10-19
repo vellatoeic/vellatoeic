@@ -290,17 +290,17 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
         </CloseOnSubmitForm>
       )}
 
-      {/* ── 최근 신청: 수강·특강·YBM 인강 주문을 한 목록에 최신순으로 (놓치는 신청 없게) ── */}
+      {/* ── 최근 신청: 수강·YBM 인강 주문을 한 목록에 최신순으로 (특강은 [특강 관리]에서) ── */}
       <details id="recent" className="card !p-4" open={alerts.fresh.length > 0}>
         <summary className="font-jua cursor-pointer text-lg text-sky-ink">
-          🆕 최근 신청 <span className="text-sm text-slate-500">· 수강·특강·인강 주문 최신순</span>
+          🆕 최근 신청 <span className="text-sm text-slate-500">· 수강·인강 주문 최신순 (특강은 [특강 관리]에서)</span>
           {alerts.fresh.length > 0 && <span className="ml-2 rounded-full bg-red-500 px-2 py-0.5 text-sm text-white">{alerts.fresh.length}</span>}
         </summary>
         <ul className="mt-2 divide-y divide-sky-soft text-sm">
           {alerts.recent.slice(0, ra ? 300 : 30).map((x) => (
-            <li key={`${x.type}${x.id}`} className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 py-2 ${x.at > alerts.since && !x.quiet ? "bg-red-50" : ""}`}>
+            <li key={`${x.type}${x.id}`} className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 py-2 ${x.at > alerts.since ? "bg-red-50" : ""}`}>
               <span className="w-24 shrink-0 text-xs text-slate-400">{new Date(x.at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${x.type === "수강" ? "bg-sky-soft text-sky-ink" : x.type === "특강" ? "bg-violet-100 text-violet-700" : "bg-amber-100 text-amber-700"}`}>{x.type}</span>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${x.type === "수강" ? "bg-sky-soft text-sky-ink" : "bg-amber-100 text-amber-700"}`}>{x.type}</span>
               <a href={x.href} className="font-bold text-sky-ink underline decoration-sky-main underline-offset-2">{x.name}</a>
               <span className="text-slate-500">{x.detail}</span>
               {x.warn && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700">{x.warn}</span>}
