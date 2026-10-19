@@ -5,10 +5,12 @@
 // - RC TEST: 홀수달 1~20, 짝수달 21~40 (한 달 20개까지). 30문항, 단 1번·21번은 25문항.
 // - 격일반·속성반은 같은 날짜 문풀반 종합의 번호를 그대로 따라가요(본인 반 수업일에만 보여요).
 // - 관리자가 특정 날짜의 번호·문항 수를 직접 고치면(override) 그 값이 우선이에요.
+// - '두 개 보는 날'(double): 그날 그 종류 테스트를 2개 보고, 다음 수업부터 번호가 하나씩 밀려요.
 
 export type TestKind = "word" | "rc";
 export type TestSpec = { kind: TestKind; no: number; questions: number };
 export type TestOverride = { day: string; kind: TestKind; test_no: number | null; questions: number | null };
+export type TestDouble = { day: string; kind: TestKind };
 
 export const TEST_LABEL: Record<TestKind, string> = { word: "단어 TEST", rc: "RC TEST" };
 export const WORD_QUESTIONS = 20;
@@ -17,18 +19,20 @@ export const RC_PER_MONTH = 20;
 const isOddMonth = (cohort: string) => Number(cohort.slice(5, 7)) % 2 === 1;
 export const rcQuestions = (no: number) => (no === 1 || no === 21 ? 25 : 30);
 
-// 문풀반 종합 수업일 → 날짜별 테스트 (관리자 수정 반영)
-export function testPlan(cohort: string, solveAllDays: string[], overrides: TestOverride[] = []) {
+// 문풀반 종합 수업일 → 날짜별 테스트 (두 개 보는 날 · 관리자 수정 반영)
+export function testPlan(cohort: string, solveAllDays: string[], overrides: TestOverride[] = [], doubles: TestDouble[] = []) {
   const plan = new Map<string, TestSpec[]>();
   const days = [...new Set(solveAllDays)].sort();
+  const isDouble = (day: string, kind: TestKind) => doubles.some((x) => x.day === day && x.kind === kind);
+  const rcBase = isOddMonth(cohort) ? 0 : 20;
+  let word = 1, rc = 1; // 다음에 볼 번호
   days.forEach((day, i) => {
-    const n = i; // DAY(i+1) - 1 : DAY 2 → 1번
     const tests: TestSpec[] = [];
-    if (n >= 1) {
-      tests.push({ kind: "word", no: n, questions: WORD_QUESTIONS });
-      if (n <= RC_PER_MONTH) {
-        const no = isOddMonth(cohort) ? n : 20 + n;
-        tests.push({ kind: "rc", no, questions: rcQuestions(no) });
+    if (i >= 1) { // DAY 1은 테스트 없음
+      for (let k = isDouble(day, "word") ? 2 : 1; k > 0; k--) tests.push({ kind: "word", no: word++, questions: WORD_QUESTIONS });
+      for (let k = isDouble(day, "rc") ? 2 : 1; k > 0; k--) {
+        if (rc <= RC_PER_MONTH) tests.push({ kind: "rc", no: rcBase + rc, questions: rcQuestions(rcBase + rc) });
+        rc++;
       }
     }
     plan.set(day, tests);
@@ -39,8 +43,10 @@ export function testPlan(cohort: string, solveAllDays: string[], overrides: Test
       const base = plan.get(o.day)?.find((t) => t.kind === o.kind);
       const questions = o.questions ?? base?.questions ?? (o.kind === "word" ? WORD_QUESTIONS : rcQuestions(o.test_no));
       rest.push({ kind: o.kind, no: o.test_no, questions });
+      // 두 개 보는 날이면 고친 번호 다음 번호도 함께 봐요
+      if (isDouble(o.day, o.kind)) rest.push({ kind: o.kind, no: o.test_no + 1, questions: o.kind === "word" ? WORD_QUESTIONS : rcQuestions(o.test_no + 1) });
     }
-    plan.set(o.day, rest.sort((a, b) => (a.kind === "word" ? -1 : 1) - (b.kind === "word" ? -1 : 1)));
+    plan.set(o.day, rest.sort((a, b) => (a.kind === b.kind ? a.no - b.no : a.kind === "word" ? -1 : 1)));
   }
   return plan;
 }

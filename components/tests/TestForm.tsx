@@ -7,6 +7,7 @@ type Props = {
   appId: string;
   day: string;
   kind: "word" | "rc";
+  no: number; // 테스트 번호 (같은 날 같은 종류 2개일 때 구분)
   label: string; // 예: RC TEST 22
   questions: number;
   existing?: { score: number; wrong: number[]; late: boolean } | null;
@@ -14,7 +15,7 @@ type Props = {
 };
 
 // 테스트 결과 입력: 맞은 개수(필수) + RC 틀린 번호(선택). 맞은 개수와 틀린 번호 수가 안 맞으면 바로 알려줘요.
-export default function TestForm({ appId, day, kind, label, questions, existing, late }: Props) {
+export default function TestForm({ appId, day, kind, no, label, questions, existing, late }: Props) {
   const [state, action, pending] = useActionState<FormState, FormData>(submitTestResult, {});
   const [score, setScore] = useState(existing ? String(existing.score) : "");
   const [wrong, setWrong] = useState<number[]>(existing?.wrong ?? []);
@@ -28,6 +29,7 @@ export default function TestForm({ appId, day, kind, label, questions, existing,
     fd.set("app_id", appId);
     fd.set("day", day);
     fd.set("kind", kind);
+    fd.set("test_no", String(no));
     fd.set("score", score);
     fd.set("wrong", wrong.join(","));
     startTransition(() => action(fd));

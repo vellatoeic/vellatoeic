@@ -1,5 +1,5 @@
 import "server-only";
-import { getSetting, listApplications, listTestOverrides, listTestResults, type Application, type TestResult } from "./db";
+import { getSetting, listApplications, listTestDoubles, listTestOverrides, listTestResults, type Application, type TestResult } from "./db";
 import { canWatch } from "./access";
 import { scheduleClassFor, scheduleKey, schoolDaysFor, type ScheduleClass } from "./schedule";
 import { earlyTestDay, testPlan, testsForClassDay, type TestSpec } from "./tests";
@@ -14,9 +14,9 @@ export async function classDaysOf(a: Application) {
 
 // 그 달 문풀반 종합 수업일 + 관리자 수정 → 날짜별 테스트
 export async function planFor(cohort: string) {
-  const [raw, overrides] = await Promise.all([getSetting(scheduleKey(cohort, "solve-all")), listTestOverrides(cohort)]);
+  const [raw, overrides, doubles] = await Promise.all([getSetting(scheduleKey(cohort, "solve-all")), listTestOverrides(cohort), listTestDoubles(cohort)]);
   const solveAllDays = schoolDaysFor(raw, cohort, "solve-all");
-  return { plan: testPlan(cohort, solveAllDays, overrides), solveAllDays, overrides };
+  return { plan: testPlan(cohort, solveAllDays, overrides, doubles), solveAllDays, overrides, doubles };
 }
 
 export type TestSlotView = { day: string; spec: TestSpec; result: TestResult | null };
@@ -24,14 +24,14 @@ export type TestSlotView = { day: string; spec: TestSpec; result: TestResult | n
 // 학생 한 명의 오늘 테스트와 밀린 테스트(같은 달, 오늘 이전, 미제출)
 export async function studentTests(a: Application, today: string) {
   const [{ plan }, classDays, results] = await Promise.all([planFor(a.cohort), classDaysOf(a), listTestResults({ appIds: [a.id] })]);
-  const find = (day: string, kind: string) => results.find((r) => r.day === day && r.kind === kind) ?? null;
+  const find = (day: string, spec: TestSpec) => results.find((r) => r.day === day && r.kind === spec.kind && r.test_no === spec.no) ?? null;
   const all: TestSlotView[] = classDays
     .filter((d) => d <= today)
-    .flatMap((d) => testsForClassDay(plan, classDays, d).map((spec) => ({ day: d, spec, result: find(d, spec.kind) })));
+    .flatMap((d) => testsForClassDay(plan, classDays, d).map((spec) => ({ day: d, spec, result: find(d, spec) })));
   const sameMonth = today.slice(0, 7) === a.cohort;
   // 다음 수업일 테스트는 미리 낼 수 있어요 (그날 23:59까지 수정)
   const early = sameMonth ? earlyTestDay(classDays, today) : null;
-  const next: TestSlotView[] = early ? testsForClassDay(plan, classDays, early).map((spec) => ({ day: early, spec, result: find(early, spec.kind) })) : [];
+  const next: TestSlotView[] = early ? testsForClassDay(plan, classDays, early).map((spec) => ({ day: early, spec, result: find(early, spec) })) : [];
   return {
     today: all.filter((t) => t.day === today),
     next,
@@ -76,7 +76,7 @@ export async function cohortTestStats(cohort: string, today: string): Promise<{ 
       const rs = mine.filter((r) => r.kind === kind).sort((a, b) => a.day.localeCompare(b.day)).slice(-3).map(pct);
       return rs.length === 3 && rs[0] > rs[1] && rs[1] > rs[2];
     };
-    const missing = expected.filter((e) => e.day < today && !mine.some((r) => r.day === e.day && r.kind === e.spec.kind)).length;
+    const missing = expected.filter((e) => e.day < today && !mine.some((r) => r.day === e.day && r.kind === e.spec.kind && r.test_no === e.spec.no)).length;
     return { app, klass, expected, results: mine, avg: { word: avgOf("word"), rc: avgOf("rc") }, missing, declining: falling("word") || falling("rc") };
   });
   return { stats, plan, classDays };

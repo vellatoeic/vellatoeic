@@ -136,7 +136,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
               </summary>
               <div className="mt-2 space-y-2">
                 {myTests.today.map((t) => (
-                  <TestForm key={t.spec.kind} appId={testApp.id} day={t.day} kind={t.spec.kind} label={`${TEST_LABEL[t.spec.kind]} ${t.spec.no}`} questions={t.spec.questions}
+                  <TestForm key={`${t.spec.kind}${t.spec.no}`} appId={testApp.id} day={t.day} kind={t.spec.kind} no={t.spec.no} label={`${TEST_LABEL[t.spec.kind]} ${t.spec.no}`} questions={t.spec.questions}
                     existing={t.result ? { score: t.result.score, wrong: t.result.wrong, late: t.result.late } : null} />
                 ))}
                 <p className="text-xs text-slate-500">오늘 23:59까지 제출하고 고칠 수 있어요.</p>
@@ -153,7 +153,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
               </summary>
               <div className="mt-2 space-y-2">
                 {myTests.next.map((t) => (
-                  <TestForm key={t.spec.kind} appId={testApp.id} day={t.day} kind={t.spec.kind} label={`${TEST_LABEL[t.spec.kind]} ${t.spec.no}`} questions={t.spec.questions}
+                  <TestForm key={`${t.spec.kind}${t.spec.no}`} appId={testApp.id} day={t.day} kind={t.spec.kind} no={t.spec.no} label={`${TEST_LABEL[t.spec.kind]} ${t.spec.no}`} questions={t.spec.questions}
                     existing={t.result ? { score: t.result.score, wrong: t.result.wrong, late: t.result.late } : null} />
                 ))}
                 <p className="text-xs text-slate-500">결석 예정이거나 미리 풀었다면 여기서 내 주세요. {specialDay(myTests.next[0].day)} 23:59까지 고칠 수 있어요.</p>

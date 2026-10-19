@@ -38,9 +38,9 @@ export default async function TestsPage() {
       <section className="space-y-2">
         <h2 className="font-jua text-xl text-sky-ink">⏰ 밀린 테스트 <span className="text-sm text-slate-500">({cohortLabel(current.cohort)} · 지난 수업 테스트도 낼 수 있어요)</span></h2>
         {missed.length === 0 ? <p className="rounded-2xl bg-white p-4 text-sm text-slate-500">밀린 테스트가 없어요 👍</p> : missed.map((t) => (
-          <div key={`${t.day}-${t.spec.kind}`}>
+          <div key={`${t.day}-${t.spec.kind}${t.spec.no}`}>
             <p className="mb-1 px-1 text-xs text-slate-500">{md(t.day)} 수업</p>
-            <TestForm appId={current.id} day={t.day} kind={t.spec.kind} label={`${TEST_LABEL[t.spec.kind]} ${t.spec.no}`} questions={t.spec.questions} late />
+            <TestForm appId={current.id} day={t.day} kind={t.spec.kind} no={t.spec.no} label={`${TEST_LABEL[t.spec.kind]} ${t.spec.no}`} questions={t.spec.questions} late />
           </div>
         ))}
       </section>

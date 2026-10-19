@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { TestKind, TestOverride } from "./tests";
+import type { TestDouble, TestKind, TestOverride } from "./tests";
 import type { Notice } from "./notices";
 import { thisMonthKST, roundOf, type BookId, type CourseId, type Kind, type Part, type Pickup, type Status, type TimeSlot, type Track, type DepositStatus } from "./config";
 
@@ -133,6 +133,7 @@ export type SpecialRegistration = {
   name: string;
   deposit: DepositStatus | null; // 현장 신청 보증금 (불라방은 없음)
   deposit_paid_at: string | null;
+  deposit_refunded_at?: string | null; // 수강 환불로 보증금을 돌려준 시각
   created_at: string;
 };
 
@@ -173,12 +174,13 @@ type Mem = {
   depositEvents: DepositEvent[];
   testResults: TestResult[];
   testOverrides: TestOverride[];
+  testDoubles: TestDouble[];
   notices: Notice[];
   noticeReads: NoticeRead[];
   ybmOrders: YbmOrder[];
 };
 const g = globalThis as unknown as { __vellaMem?: Mem };
-const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [], testResults: [], testOverrides: [], notices: [], noticeReads: [], ybmOrders: [] });
+const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [], testResults: [], testOverrides: [], testDoubles: [], notices: [], noticeReads: [], ybmOrders: [] });
 mem.specialLectures ??= [];
 mem.specialRegistrations ??= [];
 mem.specialMaterials ??= [];
@@ -513,6 +515,29 @@ export async function listTestOverrides(cohort: string): Promise<TestOverride[]>
   return mem.testOverrides.filter((o) => o.day.startsWith(cohort));
 }
 
+// 두 개 보는 날 (그날 그 종류 테스트 2개, 이후 번호가 밀려요)
+export async function listTestDoubles(cohort: string): Promise<TestDouble[]> {
+  const from = `${cohort}-01`, to = `${cohort}-31`;
+  if (sb) {
+    const { data, error } = await sb.from("test_doubles").select("day,kind").gte("day", from).lte("day", to);
+    if (error) throw error;
+    return data as TestDouble[];
+  }
+  return mem.testDoubles.filter((o) => o.day.startsWith(cohort));
+}
+
+export async function setTestDouble(d: TestDouble, on: boolean) {
+  if (sb) {
+    const { error } = on
+      ? await sb.from("test_doubles").upsert(d, { onConflict: "day,kind" })
+      : await sb.from("test_doubles").delete().eq("day", d.day).eq("kind", d.kind);
+    if (error) throw error;
+    return;
+  }
+  mem.testDoubles = mem.testDoubles.filter((x) => !(x.day === d.day && x.kind === d.kind));
+  if (on) mem.testDoubles.push(d);
+}
+
 export async function saveTestOverride(o: TestOverride) {
   if (sb) {
     const { error } = await sb.from("test_overrides").upsert(o, { onConflict: "day,kind" });
@@ -549,11 +574,11 @@ export async function listTestResults(filter: { cohort?: string; day?: string; a
 export async function saveTestResult(r: Omit<TestResult, "id" | "submitted_at">) {
   const row = { ...r, submitted_at: new Date().toISOString() };
   if (sb) {
-    const { error } = await sb.from("test_results").upsert(row, { onConflict: "app_id,day,kind" });
+    const { error } = await sb.from("test_results").upsert(row, { onConflict: "app_id,day,kind,test_no" });
     if (error) throw error;
     return;
   }
-  const old = mem.testResults.find((x) => x.app_id === r.app_id && x.day === r.day && x.kind === r.kind);
+  const old = mem.testResults.find((x) => x.app_id === r.app_id && x.day === r.day && x.kind === r.kind && x.test_no === r.test_no);
   if (old) Object.assign(old, row);
   else mem.testResults.push({ ...row, id: crypto.randomUUID() });
 }
@@ -836,7 +861,7 @@ export async function getSpecialRegistrationsFor(application_ids: string[]): Pro
   return mem.specialRegistrations.filter((registration) => registration.application_id && ok.includes(registration.application_id));
 }
 
-type SpecialRegistrationPatch = Partial<Pick<SpecialRegistration, "deposit" | "deposit_paid_at">>;
+type SpecialRegistrationPatch = Partial<Pick<SpecialRegistration, "deposit" | "deposit_paid_at" | "deposit_refunded_at">>;
 
 // 현장 신청 여러 건의 보증금·참석·환급 상태를 한 번에 바꿔요.
 export async function updateOnsiteRegistrations(ids: string[], patch: SpecialRegistrationPatch) {

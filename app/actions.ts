@@ -8,7 +8,7 @@ import {
 } from "@/lib/config";
 import {
   createApplication, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  saveMission, type Mission, createYbmOrder, listYbmOrders, updateYbmOrders, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
+  saveMission, type Mission, createYbmOrder, listYbmOrders, updateYbmOrders, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, setTestDouble, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
 } from "@/lib/db";
 import { canWatch, isActive, loginApps } from "@/lib/access";
 import { parseBankSms } from "@/lib/bankSms";
@@ -167,8 +167,24 @@ export async function changeStatus(fd: FormData) {
   if (!(await isAdmin())) return;
   const status = clean(fd.get("status")) as Status;
   if (!["pending", "paid", "shipped", "refunded"].includes(status)) return;
-  await updateApplication(clean(fd.get("id")), { status });
+  const id = clean(fd.get("id"));
+  await updateApplication(id, { status });
+  if (status === "refunded") {
+    // 환불하면 아직 입금 전인 현장 특강 신청은 자동 취소해요. (입금한 보증금은 관리자 알림으로 돌려줘요)
+    const waiting = (await getSpecialRegistrationsFor([id])).filter((r) => r.mode === "onsite" && (r.deposit === "pending" || r.deposit === "review"));
+    await updateOnsiteRegistrations(waiting.map((r) => r.id), { deposit: "cancelled" });
+    revalidatePath("/admin/special");
+  }
   revalidatePath("/admin");
+}
+
+// 관리자: 수강 환불자의 특강 보증금을 돌려줬어요 (여러 명 한 번에)
+export async function markDepositRefunded(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const ids = fd.getAll("ids").map(clean).filter(Boolean);
+  await updateOnsiteRegistrations(ids, { deposit: "cancelled", deposit_refunded_at: new Date().toISOString() });
+  revalidatePath("/admin/special");
+  revalidatePath("/admin", "layout");
 }
 
 export async function resetPin(fd: FormData) {
@@ -449,6 +465,7 @@ export async function submitTestResult(_: FormState, fd: FormData): Promise<Form
   const appId = clean(fd.get("app_id"));
   const day = clean(fd.get("day"));
   const kind = clean(fd.get("kind")) as TestKind;
+  const testNo = Number(clean(fd.get("test_no")));
   const score = Number(clean(fd.get("score")));
   const wrong = clean(fd.get("wrong")).split(",").filter(Boolean).map(Number).sort((a, b) => a - b);
   const today = todayKST();
@@ -461,13 +478,15 @@ export async function submitTestResult(_: FormState, fd: FormData): Promise<Form
   const classDays = await classDaysOf(app);
   // 앞으로의 테스트는 다음 수업일 것만 미리 낼 수 있어요
   if (day > today && day !== earlyTestDay(classDays, today)) return { error: "아직 제출할 수 없는 테스트예요. 다음 수업일 테스트만 미리 낼 수 있어요." };
-  const spec = testsForClassDay(plan, classDays, day).find((t) => t.kind === kind);
+  // 같은 날 같은 종류를 2개 보는 날도 있어서 번호까지 맞춰 찾아요 (번호가 없으면 그날 첫 번째)
+  const specs = testsForClassDay(plan, classDays, day).filter((t) => t.kind === kind);
+  const spec = specs.find((t) => t.no === testNo) ?? (testNo ? undefined : specs[0]);
   if (!spec) return { error: "이 날짜에는 이 테스트가 없어요." };
   if (clean(fd.get("score")) === "") return { error: "맞은 개수를 적어 주세요." };
   const problem = checkTestAnswer(spec.questions, score, kind === "rc" ? wrong : []);
   if (problem) return { error: problem };
   const late = day < today;
-  if (late && (await listTestResults({ appIds: [app.id] })).some((r) => r.day === day && r.kind === kind)) {
+  if (late && (await listTestResults({ appIds: [app.id] })).some((r) => r.day === day && r.kind === kind && r.test_no === spec.no)) {
     return { error: "지난 테스트는 한 번만 제출할 수 있어요." };
   }
   await saveTestResult({ app_id: app.id, cohort: app.cohort, day, kind, test_no: spec.no, questions: spec.questions, score, wrong: kind === "rc" ? wrong : [], late });
@@ -476,6 +495,18 @@ export async function submitTestResult(_: FormState, fd: FormData): Promise<Form
   revalidatePath("/admin/tests");
   const [, m, dd] = day.split("-").map(Number);
   return { ok: late ? "저장했어요!" : day > today ? `미리 저장했어요! ${m}/${dd} 23:59까지 고칠 수 있어요.` : "저장했어요! 오늘 23:59까지 고칠 수 있어요." };
+}
+
+// 관리자: 두 개 보는 날 켜기/끄기 (그날 그 종류 2개, 이후 번호가 밀려요)
+export async function setTestDoubleAction(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const day = clean(fd.get("day"));
+  const kind = clean(fd.get("kind"));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || (kind !== "word" && kind !== "rc")) return;
+  await setTestDouble({ day, kind }, clean(fd.get("on")) === "1");
+  revalidatePath("/admin/tests");
+  revalidatePath("/class");
+  revalidatePath("/class/tests");
 }
 
 // 관리자: 특정 날짜 테스트 번호·문항 수 직접 고치기 / 자동 계산으로 되돌리기

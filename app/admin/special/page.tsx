@@ -1,10 +1,11 @@
 import { isAdmin } from "@/lib/auth";
-import { expireSpecialDeposits, listDepositEvents, listSpecialLectures, listSpecialMaterials, listSpecialRegistrations, listWaitingDeposits, isPreview, type SpecialLecture, type SpecialRegistration } from "@/lib/db";
-import { addSpecialLecture, bulkSpecialOnsite, removeSpecialLecture, removeSpecialMaterial, removeSpecialRegistration, resolveDepositEvent, saveSpecialLecture } from "@/app/actions";
+import { listApplications, expireSpecialDeposits, listDepositEvents, listSpecialLectures, listSpecialMaterials, listSpecialRegistrations, listWaitingDeposits, isPreview, type SpecialLecture, type SpecialRegistration } from "@/lib/db";
+import { markDepositRefunded, addSpecialLecture, bulkSpecialOnsite, removeSpecialLecture, removeSpecialMaterial, removeSpecialRegistration, resolveDepositEvent, saveSpecialLecture } from "@/app/actions";
 import { DEPOSIT_MINUTES, DEPOSIT_LABEL, SPECIAL_DEPOSIT, won, type DepositStatus } from "@/lib/config";
 import SmsTest from "./SmsTest";
 import SelectAll from "../SelectAll";
-import { deadlineOf, kstLabel, specialRegistrationOpen, specialWhen } from "@/lib/special";
+import { deadlineOf, kstLabel, specialDay, specialRegistrationOpen, specialWhen } from "@/lib/special";
+import { specialRefundsDue } from "@/lib/specialRefunds";
 import AdminTabs from "../AdminTabs";
 import LoginForm from "../LoginForm";
 import CloseOnSubmitForm from "../CloseOnSubmitForm";
@@ -45,7 +46,7 @@ const DEPOSIT_TONE: Record<DepositStatus, string> = {
 };
 const kst = (iso: string) => new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
-function Roster({ title, items, onsiteForm }: { title: string; items: SpecialRegistration[]; onsiteForm?: string }) {
+function Roster({ title, items, onsiteForm, refunded }: { title: string; items: SpecialRegistration[]; onsiteForm?: string; refunded: Set<string> }) {
   const sorted = [...items].sort((a, b) => b.created_at.localeCompare(a.created_at)); // 최신 신청이 위
   return (
     <div className="mt-3">
@@ -59,6 +60,8 @@ function Roster({ title, items, onsiteForm }: { title: string; items: SpecialReg
                 <span className="flex flex-wrap items-center gap-1.5">
                   {onsiteForm && <input type="checkbox" name="ids" value={r.id} form={onsiteForm} aria-label={`${r.name} 선택`} className="h-4 w-4 accent-sky-deep" />}
                   <b className="text-sky-ink">{r.name}</b>
+                  {r.application_id && refunded.has(r.application_id) && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-600">수강 환불</span>}
+                  {r.deposit_refunded_at && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">💸 보증금 환불 완료</span>}
                   {onsiteForm && <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${DEPOSIT_TONE[d]}`}>{d === "review" ? "입금 대기" : DEPOSIT_LABEL[d]}</span>}
                   <span className="text-xs text-slate-400">신청 {kst(r.created_at)}</span>
                 </span>
@@ -81,7 +84,8 @@ function Roster({ title, items, onsiteForm }: { title: string; items: SpecialReg
 export default async function SpecialAdminPage() {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
   await expireSpecialDeposits(DEPOSIT_MINUTES);
-  const [events, depositEvents, waitingDeposits] = await Promise.all([listSpecialLectures(), listDepositEvents(20), listWaitingDeposits()]);
+  const [events, depositEvents, waitingDeposits, apps, refundsDue] = await Promise.all([listSpecialLectures(), listDepositEvents(20), listWaitingDeposits(), listApplications(), specialRefundsDue()]);
+  const refunded = new Set(apps.filter((a) => a.status === "refunded").map((a) => a.id));
   const toCheck = depositEvents.filter((e) => e.target === "special" && (e.result === "review" || e.result === "unmatched"));
   const webhookOn = (process.env.DEPOSIT_WEBHOOK_TOKEN ?? "").length >= 16;
   const rows = await Promise.all(events.map(async (event) => ({
@@ -93,6 +97,27 @@ export default async function SpecialAdminPage() {
   return (
     <div className="space-y-6 pt-8">
       <AdminTabs active="special" />
+
+      {refundsDue.length > 0 && (
+        <CloseOnSubmitForm id="refunds" action={markDepositRefunded} className="block rounded-3xl border-2 border-red-300 bg-red-50 p-5">
+          <p className="font-jua text-2xl text-red-600">💸 특강 보증금 환불 필요 {refundsDue.length}명</p>
+          <p className="mt-1 text-sm text-slate-600">수강을 환불한 학생이 아직 열리지 않은 특강에 보증금을 냈어요. 보증금 {won(SPECIAL_DEPOSIT)}을 계좌로 돌려준 뒤 체크하고 [환불 완료]를 눌러 주세요. (신청은 취소로 바뀌어요)</p>
+          <label className="mt-3 flex items-center gap-2 text-sm font-bold text-sky-ink"><SelectAll group="refunds" /> {refundsDue.length}명 전체 선택</label>
+          <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+            {refundsDue.map(({ registration: r, event }) => (
+              <li key={r.id}>
+                <label className="flex items-center gap-2 rounded-xl bg-white p-2.5 text-sm">
+                  <input type="checkbox" name="ids" value={r.id} data-group="refunds" className="h-5 w-5 accent-sky-deep" />
+                  <b className="text-sky-ink">{r.name}</b>
+                  <span className="text-slate-500">{specialDay(event.event_date)} {event.title}</span>
+                  <span className="ml-auto text-xs text-slate-400">입금 {r.deposit_paid_at ? kst(r.deposit_paid_at) : "확인됨"}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <button className="btn mt-3 w-full !py-3 !text-base">체크한 학생 보증금 환불 완료</button>
+        </CloseOnSubmitForm>
+      )}
 
       {toCheck.length > 0 && (
         <section className="rounded-3xl border-2 border-red-200 bg-red-50 p-5">
@@ -244,7 +269,7 @@ export default async function SpecialAdminPage() {
                 <h3 className="font-jua text-lg text-sky-ink">신청 명단 {registrations.length}명</h3>
                 <a href={`/admin/special/csv?id=${event.id}`} className="btn-ghost !py-2 text-sm">CSV 받기</a>
               </div>
-              <Roster title="현장" items={onsite} onsiteForm={`onsite-${event.id}`} />
+              <Roster title="현장" items={onsite} onsiteForm={`onsite-${event.id}`} refunded={refunded} />
               {onsite.length > 0 && (
                 <CloseOnSubmitForm id={`onsite-${event.id}`} action={bulkSpecialOnsite} className="mt-2 space-y-2 rounded-2xl bg-amber-50 p-3 text-sm">
                   <p className="text-slate-600">
@@ -258,7 +283,7 @@ export default async function SpecialAdminPage() {
                   <p className="text-xs text-slate-500">입금 문자가 오면 자동으로 확정돼요. 신청 후 {DEPOSIT_MINUTES}분 안에 입금이 없으면 자동 취소돼요. 보증금은 특강 당일 현장에서 돌려주세요.</p>
                 </CloseOnSubmitForm>
               )}
-              <Roster title="불라방" items={online} />
+              <Roster title="불라방" items={online} refunded={refunded} />
             </div>
           </section>
         );

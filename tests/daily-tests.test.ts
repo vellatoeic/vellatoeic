@@ -113,3 +113,19 @@ test("미리 제출: 다음 수업일이 다음 달이면 없어요", () => {
   assert.equal(earlyTestDay(["2026-10-29", "2026-11-02"], "2026-10-29"), null);
   assert.equal(earlyTestDay(["2026-10-29"], "2026-10-29"), null);
 });
+
+test("두 개 보는 날: 그날 RC 2개, 다음 수업부터 번호가 하나씩 밀려요", () => {
+  const days = ["2026-10-06", "2026-10-07", "2026-10-08", "2026-10-12"];
+  const p = testPlan("2026-10", days, [], [{ day: "2026-10-08", kind: "rc" }]);
+  assert.deepEqual(p.get("2026-10-07")!.map((t) => `${t.kind}${t.no}`), ["word1", "rc21"]);
+  assert.deepEqual(p.get("2026-10-08")!.map((t) => `${t.kind}${t.no}`), ["word2", "rc22", "rc23"]);
+  assert.deepEqual(p.get("2026-10-12")!.map((t) => `${t.kind}${t.no}`), ["word3", "rc24"]);
+});
+
+test("두 개 보는 날: 홀수달 RC는 1번부터, 한 달 20개를 넘으면 안 봐요", () => {
+  const days = Array.from({ length: 22 }, (_, i) => `2026-11-${String(i + 1).padStart(2, "0")}`);
+  const p = testPlan("2026-11", days, [], [{ day: "2026-11-02", kind: "rc" }]);
+  assert.deepEqual(p.get("2026-11-02")!.filter((t) => t.kind === "rc").map((t) => t.no), [1, 2]);
+  assert.equal(p.get("2026-11-20")!.filter((t) => t.kind === "rc").at(-1)?.no, 20);
+  assert.equal(p.get("2026-11-21")!.some((t) => t.kind === "rc"), false);
+});

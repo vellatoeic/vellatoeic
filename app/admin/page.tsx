@@ -12,7 +12,7 @@ import SelectAll from "./SelectAll";
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
 
-type Filters = { k: string; p: string; b: string; t: string; q: string; c: string };
+type Filters = { k: string; p: string; b: string; t: string; q: string; c: string; ra: string };
 
 const KIND_FILTERS = [["all", "전체"], ["onsite", "현장"], ["online", "불라방"]] as const;
 const PAY_FILTERS = [["all", "전체"], ["pending", "미납"], ["paid", "납부 완료"], ["refunded", "환불"]] as const;
@@ -147,7 +147,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
 
   const now = await currentCohort();
-  const { k = "all", p = "all", b = "all", t = "all", q = "", c = now } = await searchParams;
+  const { k = "all", p = "all", b = "all", t = "all", q = "", c = now, ra = "" } = await searchParams;
   const everything = await listApplications();
   const [account, cafeHomeworkUrl, cafeUrl, blogUrl, studyBoardUrl] = await Promise.all([
     getSetting("bank_account"),
@@ -279,6 +279,32 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
           </div>
         </CloseOnSubmitForm>
       )}
+
+      {/* ── 최근 신청: 수강·특강·YBM 인강 주문을 한 목록에 최신순으로 (놓치는 신청 없게) ── */}
+      <details id="recent" className="card !p-4" open={alerts.fresh.length > 0}>
+        <summary className="font-jua cursor-pointer text-lg text-sky-ink">
+          🆕 최근 신청 <span className="text-sm text-slate-500">· 수강·특강·인강 주문 최신순</span>
+          {alerts.fresh.length > 0 && <span className="ml-2 rounded-full bg-red-500 px-2 py-0.5 text-sm text-white">NEW {alerts.fresh.length}</span>}
+        </summary>
+        <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+          {(["수강", "특강", "인강"] as const).map((ty) => (
+            <span key={ty} className="rounded-full bg-sky-soft px-2.5 py-1 font-bold text-sky-ink">{ty} {alerts.recent.filter((x) => x.type === ty && x.at > alerts.since).length}건 새로</span>
+          ))}
+        </div>
+        <ul className="mt-2 divide-y divide-sky-soft text-sm">
+          {alerts.recent.slice(0, ra ? 300 : 30).map((x) => (
+            <li key={`${x.type}${x.id}`} className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 py-2 ${x.at > alerts.since ? "bg-red-50/50" : ""}`}>
+              <span className="w-24 shrink-0 text-xs text-slate-400">{new Date(x.at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+              {x.at > alerts.since && <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">NEW</span>}
+              <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${x.type === "수강" ? "bg-sky-soft text-sky-ink" : x.type === "특강" ? "bg-violet-100 text-violet-700" : "bg-amber-100 text-amber-700"}`}>{x.type}</span>
+              <a href={x.href} className="font-bold text-sky-ink underline decoration-sky-main underline-offset-2">{x.name}</a>
+              <span className="text-slate-500">{x.detail}</span>
+              {x.warn && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700">{x.warn}</span>}
+            </li>
+          ))}
+        </ul>
+        {!ra && alerts.recent.length > 30 && <a href={`${link({ ra: "1" })}#recent`} className="mt-2 block text-center text-sm text-sky-deep underline">더 보기 (최근 300건)</a>}
+      </details>
 
       <details className="card !p-4">
         <summary className="font-jua cursor-pointer text-lg text-sky-ink">⚙️ 기본 설정 (모집 기수 · 계좌 · 카페·블로그 주소)</summary>

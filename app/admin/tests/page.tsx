@@ -6,7 +6,7 @@ import { SCHEDULE_CLASSES, type ScheduleClass } from "@/lib/schedule";
 import { cohortTestStats, planFor, type StudentTestStat } from "@/lib/dailyTests";
 import { dayNumber, testPlan, TEST_LABEL, type TestSpec } from "@/lib/tests";
 import { specialDay } from "@/lib/special";
-import { saveTestOverrideAction } from "@/app/actions";
+import { saveTestOverrideAction, setTestDoubleAction } from "@/app/actions";
 import AdminTabs from "../AdminTabs";
 import LoginForm from "../LoginForm";
 import CloseOnSubmitForm from "../CloseOnSubmitForm";
@@ -47,8 +47,8 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
   const cohort = d.slice(0, 7);
   const link = (patch: Record<string, string>) => `/admin/tests?${new URLSearchParams(Object.entries({ d, g, t, tv, sort, ...patch }).filter(([, v]) => v))}`;
 
-  const [{ stats, plan, classDays }, { solveAllDays, overrides }] = await Promise.all([cohortTestStats(cohort, today), planFor(cohort)]);
-  const autoPlan = testPlan(cohort, solveAllDays);
+  const [{ stats, plan, classDays }, { solveAllDays, overrides, doubles }] = await Promise.all([cohortTestStats(cohort, today), planFor(cohort)]);
+  const autoPlan = testPlan(cohort, solveAllDays, [], doubles);
   const inGroup = (s: StudentTestStat) => (g === "all" || s.klass === g) && (t === "all" || s.app.slot === t);
   const group = stats.filter(inGroup);
 
@@ -98,7 +98,7 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
   const view = (spec: TestSpec, sl: "am" | "pm" | null) => {
     const expected = byClass.filter((s) => (s.app.slot ?? null) === sl && (classDays.get(s.klass) ?? []).includes(d));
     const results = expected
-      .map((s) => ({ s, r: s.results.find((r) => r.day === d && r.kind === spec.kind) }))
+      .map((s) => ({ s, r: s.results.find((r) => r.day === d && r.kind === spec.kind && r.test_no === spec.no) }))
       .filter((x): x is { s: StudentTestStat; r: TestResult } => !!x.r)
       .sort((a, b) => (sort === "rank" ? b.r.score - a.r.score : 0) || a.r.submitted_at.localeCompare(b.r.submitted_at));
     const missing = expected.filter((s) => !results.some((x) => x.s.app.id === s.app.id));
@@ -121,7 +121,7 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
             const { expected, results, avg } = view(spec, sl);
             const rank = wrongRank(results.map((x) => x.r), 5);
             return (
-              <section key={`${spec.kind}-${sl}`} className="card space-y-5 !p-8">
+              <section key={`${spec.kind}${spec.no}-${sl}`} className="card space-y-5 !p-8">
                 <p className="font-jua text-4xl text-sky-ink">{TEST_LABEL[spec.kind]} {spec.no}{tv === "1" ? <span className="text-2xl text-slate-500"> · {slotName(sl)}</span> : null}</p>
                 <div className="grid grid-cols-2 gap-4 text-center">
                   <div><p className="text-xl text-slate-500">제출</p><p className="font-jua text-6xl text-sky-deep">{results.length}<span className="text-3xl text-slate-400">/{expected.length}</span></p></div>
@@ -169,7 +169,7 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
       {specs.length === 0 && <p className="card text-center text-slate-500">이 날짜에는 테스트가 없어요. (DAY 1이거나 문풀반 종합 수업일이 아니에요)</p>}
 
       {specs.map((spec) => (
-        <section key={spec.kind} className="card space-y-4">
+        <section key={`${spec.kind}${spec.no}`} className="card space-y-4">
           <p className="font-jua text-2xl text-sky-ink">{TEST_LABEL[spec.kind]} {spec.no} <span className="text-base text-slate-400">· {spec.questions}문항</span></p>
           <div className="grid gap-4 lg:grid-cols-2">
             {slotsShown.map((sl) => {
@@ -212,6 +212,29 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
           </div>
         </section>
       ))}
+
+      <section className="card space-y-2 text-sm">
+        <p className="font-jua text-lg text-sky-ink">➕ {specialDay(d)} 테스트 두 개 보는 날</p>
+        <p className="text-xs text-slate-500">켜면 그날 그 테스트를 2개 보고, 다음 수업부터 번호가 하나씩 밀려요. 학생 화면에 바로 반영돼요. (미리 낸 다음 수업 테스트가 있으면 번호가 바뀌기 전에 정해 주세요)</p>
+        <div className="flex flex-wrap gap-2">
+          {(["word", "rc"] as const).map((kind) => {
+            const on = doubles.some((x) => x.day === d && x.kind === kind);
+            return (
+              <form key={kind} action={setTestDoubleAction}>
+                <input type="hidden" name="day" value={d} />
+                <input type="hidden" name="kind" value={kind} />
+                <input type="hidden" name="on" value={on ? "0" : "1"} />
+                <button className={`rounded-full px-4 py-2 font-bold ${on ? "bg-sky-deep text-white" : "bg-sky-soft text-sky-ink"}`}>
+                  {on ? "✓ " : ""}{TEST_LABEL[kind]} 2개{on ? " (켜짐 · 누르면 끄기)" : ""}
+                </button>
+              </form>
+            );
+          })}
+        </div>
+        {doubles.length > 0 && (
+          <p className="text-xs text-slate-600">이번 달 두 개 보는 날: {[...doubles].sort((a, b) => a.day.localeCompare(b.day)).map((x) => `${specialDay(x.day)} ${TEST_LABEL[x.kind]}`).join(" · ")}</p>
+        )}
+      </section>
 
       <details className="card">
         <summary className="font-jua cursor-pointer text-lg text-sky-ink">✏️ 이 날짜 테스트 번호·문항 수 직접 고치기 (예외용)</summary>
