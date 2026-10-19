@@ -1,3 +1,4 @@
+import { todayKST } from "@/lib/config";
 import Link from "next/link";
 import Cloud from "@/components/Cloud";
 import NoticePopupHost from "@/components/notices/NoticePopupHost";
@@ -36,7 +37,10 @@ function MenuItem({ href, icon, bg, title, sub, alert }: { href: string; icon: s
 }
 
 export default async function Home() {
-  const open = (await listSpecialLectures()).filter((event) => specialRegistrationOpen(event));
+  // 이번 달 특강이 하나라도 있으면(마감·지난 특강 포함) 메뉴를 보여줘요. 신청 가능하면 '특강 신청', 아니면 '특강 다시 보기'.
+  const month = todayKST().slice(0, 7);
+  const thisMonth = (await listSpecialLectures()).filter((event) => event.event_date.startsWith(month));
+  const open = thisMonth.filter((event) => specialRegistrationOpen(event));
 
   return (
     // 휴대폰·태블릿: 한 줄로 쌓아요(태블릿은 조금 넓게). 컴퓨터: 왼쪽에 인사·수강 형태, 오른쪽에 메뉴를 나란히 놓아요.
@@ -67,8 +71,10 @@ export default async function Home() {
           <MenuItem href="/class" icon="☁️" bg="#e3f4fd" title="강의실" sub="출석 · 스티커판 · 강의 영상" />
           <MenuItem href="/mission" icon="✅" bg="#e8f8ef" title="첫 수업 미션" sub="첫 수업 시간에 다 같이 해요" />
           <MenuItem href="/faq" icon="❓" bg="#f3efff" title="자주 묻는 질문" sub="교재비 · 강의실 · 라이브 · 출석 · 숙제" />
-          {open.length > 0 && (
+          {open.length > 0 ? (
             <MenuItem href="/special" icon="🎤" bg="#fff5cc" title="특강 신청" sub={open.map((e) => specialDay(e.event_date)).join(" · ")} alert={deadlineBadge(open[0])} />
+          ) : thisMonth.length > 0 && (
+            <MenuItem href="/special" icon="🎤" bg="#fff5cc" title="특강 다시 보기" sub="신청한 학생은 이번 달 말까지 다시 볼 수 있어요" />
           )}
         </div>
       </div>
