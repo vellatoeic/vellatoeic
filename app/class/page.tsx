@@ -124,6 +124,32 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
       </div>
 
 
+
+      {pending.map((a) => (
+        <div key={a.id} className="rounded-3xl border-2 border-amber-300 bg-amber-50 p-5 text-center">
+          <p className="font-jua text-2xl text-amber-700">⏳ 입금 확인 중이에요</p>
+          <p className="mt-1 text-slate-700">확인되면 라이브 입장 버튼이 열려요.</p>
+          <p className="font-jua mt-3 text-3xl text-sky-ink">{won(a.amount)}</p>
+          <p className="mt-2 rounded-2xl bg-white p-3 font-bold text-sky-ink">{account || "계좌 안내 준비 중이에요"}</p>
+          <p className="mt-2 text-sm text-slate-600">입금자명: <b>{a.depositor}</b> · {COURSES[a.course].label} {TRACKS[a.track]}</p>
+        </div>
+      ))}
+
+      {paid.length > 0 && (
+        <div>
+          <div className="grid grid-cols-2 gap-1 rounded-2xl bg-white p-1 shadow-[0_2px_0_#d5ecf9]">
+            {(["am", "pm"] as const).map((s) => (
+              <Link key={s} href={`/class?t=${s}`} scroll={false} className={`rounded-xl py-2.5 text-center font-jua text-lg ${tab === s ? "bg-sky-deep text-white" : "text-sky-ink"}`}>
+                {s === "am" ? "☀️ 오전반" : "🌙 저녁반"}
+              </Link>
+            ))}
+          </div>
+          {tab !== ownSlot && <p className="mt-1.5 text-center text-xs text-slate-500">내 수강 시간은 {TIME_SLOTS[ownSlot]}이에요. 같은 반 수업은 교차 수강할 수 있어요.</p>}
+        </div>
+      )}
+
+      {liveButton}
+
       {testApp && myTests && (myTests.today.length > 0 || myTests.missed.length > 0 || myTests.next.length > 0) && (
         <section className="space-y-2 rounded-3xl border-2 border-[#ffd23f] bg-[#fffbea] p-4">
           {myTests.today.length > 0 && (
@@ -166,31 +192,6 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
           </Link>
         </section>
       )}
-
-      {pending.map((a) => (
-        <div key={a.id} className="rounded-3xl border-2 border-amber-300 bg-amber-50 p-5 text-center">
-          <p className="font-jua text-2xl text-amber-700">⏳ 입금 확인 중이에요</p>
-          <p className="mt-1 text-slate-700">확인되면 라이브 입장 버튼이 열려요.</p>
-          <p className="font-jua mt-3 text-3xl text-sky-ink">{won(a.amount)}</p>
-          <p className="mt-2 rounded-2xl bg-white p-3 font-bold text-sky-ink">{account || "계좌 안내 준비 중이에요"}</p>
-          <p className="mt-2 text-sm text-slate-600">입금자명: <b>{a.depositor}</b> · {COURSES[a.course].label} {TRACKS[a.track]}</p>
-        </div>
-      ))}
-
-      {paid.length > 0 && (
-        <div>
-          <div className="grid grid-cols-2 gap-1 rounded-2xl bg-white p-1 shadow-[0_2px_0_#d5ecf9]">
-            {(["am", "pm"] as const).map((s) => (
-              <Link key={s} href={`/class?t=${s}`} scroll={false} className={`rounded-xl py-2.5 text-center font-jua text-lg ${tab === s ? "bg-sky-deep text-white" : "text-sky-ink"}`}>
-                {s === "am" ? "☀️ 오전반" : "🌙 저녁반"}
-              </Link>
-            ))}
-          </div>
-          {tab !== ownSlot && <p className="mt-1.5 text-center text-xs text-slate-500">내 수강 시간은 {TIME_SLOTS[ownSlot]}이에요. 같은 반 수업은 교차 수강할 수 있어요.</p>}
-        </div>
-      )}
-
-      {liveButton}
 
       {apps.filter((a) => a.kind === "online" && a.pickup === "classroom" && a.status === "paid").map((a) => (
         <BookReceived key={a.id} id={a.id} when={a.pickup_date ? `${specialDay(a.pickup_date)} ${a.pickup_time ?? ""}` : undefined} />

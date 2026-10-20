@@ -9,8 +9,8 @@ import { deadlineBadge, specialDay, specialRegistrationOpen } from "@/lib/specia
 export const dynamic = "force-dynamic";
 
 const KIND_BUTTONS = [
-  { href: "/guide/onsite", icon: "🏫", label: "현장 수강생", sub: "703호 수업" },
-  { href: "/guide/online", icon: "💻", label: "불라방 수강생", sub: "온라인 라이브" },
+  { href: "/guide/onsite", icon: "🏫", label: "현장 수강생", sub: "수강 신청 · 교재비" },
+  { href: "/guide/online", icon: "💻", label: "불라방 수강생", sub: "수강 신청 · 교재비" },
 ];
 
 // 배경에 떠 있는 구름 (위치 · 크기 · 색)
@@ -54,6 +54,7 @@ export default async function Home() {
           <div className="pb-5 pt-10 text-center lg:pt-0 lg:text-left">
             <h1 className="font-jua text-[40px] text-sky-ink lg:text-6xl">반가워요:)</h1>
             <p className="mt-2 text-[15px] text-[#5b88a6] lg:text-lg">수강 신청을 마치셨나요?</p>
+            <Link href="/class" className="mt-1 inline-block text-xs text-sky-deep underline underline-offset-2 lg:text-sm">이미 신청했다면 ☁️ 강의실로 →</Link>
           </div>
 
           <div className="grid grid-cols-2 gap-2.5 lg:gap-4">
