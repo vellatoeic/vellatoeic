@@ -19,6 +19,9 @@ export default async function SpecialPage() {
   const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 24 * 3600 * 1000).toISOString().slice(0, 10);
   const upcoming = events.filter((event) => event.event_date >= today);
   const open = upcoming.filter((event) => specialRegistrationOpen(event));
+  // 맨 위 글자: 다가오는 첫 특강 요일 (금 → 금요 특강, 토 → 토요 특강, 그 외·없음 → 특강)
+  const firstDay = upcoming.length ? new Date(`${[...upcoming].sort((x, y) => x.event_date.localeCompare(y.event_date))[0].event_date}T00:00:00Z`).getUTCDay() : -1;
+  const weekdayLabel = firstDay === 5 ? "금요 특강" : firstDay === 6 ? "토요 특강" : "특강";
   const eventById = new Map(events.map((event) => [event.id, event]));
   const myRows = await Promise.all(
     mine
@@ -40,7 +43,7 @@ export default async function SpecialPage() {
   return (
     <div className="space-y-6 pt-8">
       <div className="text-center">
-        <span className="rounded-full bg-sky-main px-4 py-1.5 text-sm font-bold text-sky-ink">토요 특강</span>
+        <span className="rounded-full bg-sky-main px-4 py-1.5 text-sm font-bold text-sky-ink">{weekdayLabel}</span>
         <h1 className="font-jua mt-3 text-4xl text-sky-ink">특강 신청</h1>
         <p className="mt-2 text-slate-600">현장 또는 불라방으로 신청할 수 있어요.</p>
       </div>
