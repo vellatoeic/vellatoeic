@@ -61,7 +61,7 @@ export default async function SpecialPage() {
                 // 다가오는 특강: 신청 상태를 카드 맨 위에 크게
                 const d = registration.deposit ?? "pending";
                 const banner = registration.mode === "online"
-                  ? { tone: "bg-emerald-500 text-white", title: "✅ 신청 확정", sub: "따로 할 일 없어요. 특강 날 이 페이지에서 입장해요." }
+                  ? { tone: "bg-emerald-500 text-white", title: "✅ 신청 확정", sub: "특강 날 해당 페이지로 입장해요." }
                   : d === "paid"
                     ? { tone: "bg-emerald-500 text-white", title: "✅ 신청 확정", sub: `보증금 확인 완료 · 특강 당일 10시까지 ${CLASSROOM}` }
                     : d === "cancelled"
