@@ -8,7 +8,7 @@ import TestForm from "@/components/tests/TestForm";
 import { studentTests, takesTests } from "@/lib/dailyTests";
 import { TEST_LABEL } from "@/lib/tests";
 import { specialDay } from "@/lib/special";
-import { listAudios, listLectures, listMissions, listStamps, currentCohort, getSetting } from "@/lib/db";
+import { listAudios, listLectures, listMissions, listStamps, currentCohort, getSetting, getSpecialRegistrationsFor, listSpecialLectures } from "@/lib/db";
 import { missionCount, missionFor } from "@/lib/mission";
 import { audioBooksFor, dayDiff, studentAudioWindow } from "@/lib/audio";
 import { activeStudentApps } from "@/lib/student";
@@ -85,6 +85,13 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
   const tab: TimeSlot = t === "am" || t === "pm" ? t : ownSlot;
 
   // 맨 위 "🔴 라이브 입장": 고른 시간대 수업 10분 전 ~ 종료까지 빨간색, 그 외엔 다음 라이브 안내
+  // 다가오는 특강 신청 (취소 제외) → 라이브 버튼 아래 작은 카드
+  const [mySpecialRegs, specialEvents] = await Promise.all([getSpecialRegistrationsFor(apps.map((x) => x.id)), listSpecialLectures()]);
+  const mySpecials = mySpecialRegs
+    .filter((r) => r.deposit !== "cancelled")
+    .map((r) => ({ r, e: specialEvents.find((e) => e.id === r.special_lecture_id) }))
+    .filter((x): x is { r: typeof x.r; e: NonNullable<typeof x.e> } => !!x.e && x.e.event_date >= today)
+    .sort((x, y) => x.e.event_date.localeCompare(y.e.event_date));
   const liveButton = (() => {
     if (!liveApp) return null;
     const schedule = schedulesByClass.get(`${liveApp.cohort}:${scheduleClassFor(liveApp.course, liveApp.track)}`);
@@ -149,6 +156,16 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
       )}
 
       {liveButton}
+
+      {mySpecials.map(({ r, e }) => {
+        const ok = r.mode === "online" || r.deposit === "paid";
+        return (
+          <Link key={r.id} href="/special" className={`flex items-center justify-between gap-2 rounded-2xl border-2 px-4 py-3 text-sm ${ok ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+            <span className="font-bold text-slate-700">🎤 {specialDay(e.event_date)} 특강 · <span className={ok ? "text-emerald-700" : "text-amber-700"}>{ok ? "✅ 신청 확정" : "⏳ 보증금 입금 대기"}</span></span>
+            <span className="shrink-0 text-sky-deep">특강 페이지로 →</span>
+          </Link>
+        );
+      })}
 
       {testApp && myTests && (myTests.today.length > 0 || myTests.missed.length > 0 || myTests.next.length > 0) && (
         <section className="space-y-2 rounded-3xl border-2 border-[#ffd23f] bg-[#fffbea] p-4">

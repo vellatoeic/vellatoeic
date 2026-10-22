@@ -57,6 +57,23 @@ export default async function SpecialPage() {
           <h2 className="font-jua text-2xl text-sky-ink">내 특강 신청</h2>
           {myRows.map(({ registration, event, materials, canSee }) => (
             <div key={registration.id} className="card space-y-3">
+              {event.event_date >= today && (() => {
+                // 다가오는 특강: 신청 상태를 카드 맨 위에 크게
+                const d = registration.deposit ?? "pending";
+                const banner = registration.mode === "online"
+                  ? { tone: "bg-emerald-500 text-white", title: "✅ 신청 확정", sub: "따로 할 일 없어요. 특강 날 이 페이지에서 입장해요." }
+                  : d === "paid"
+                    ? { tone: "bg-emerald-500 text-white", title: "✅ 신청 확정", sub: `보증금 확인 완료 · 특강 당일 10시까지 ${CLASSROOM}` }
+                    : d === "cancelled"
+                      ? { tone: "bg-slate-200 text-slate-600", title: "신청이 취소됐어요", sub: "" }
+                      : { tone: "bg-amber-300 text-amber-900", title: "⏳ 아직 확정 전 · 보증금 입금이 필요해요", sub: "" };
+                return (
+                  <div className={`-mx-1 rounded-2xl px-4 py-3 text-center ${banner.tone}`}>
+                    <p className="font-jua text-2xl">{banner.title}</p>
+                    {banner.sub && <p className="mt-0.5 text-sm opacity-90">{banner.sub}</p>}
+                  </div>
+                );
+              })()}
               <div>
                 <p className="text-sm text-sky-deep">{specialWhen(event)}</p>
                 <p className="font-jua text-xl text-sky-ink">{event.title} · {registration.mode === "onsite" ? "현장" : "불라방"}</p>
@@ -66,7 +83,7 @@ export default async function SpecialPage() {
                 <div className="space-y-3">
                   {registration.deposit === "paid" ? (
                     <p className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-800">
-                      <b>보증금 입금 확인! 신청이 확정됐어요.</b><br />특강에 참여하면 현장에서 {won(SPECIAL_DEPOSIT)}을 100% 돌려드려요. 그날 만나요!
+                      특강에 참여하면 현장에서 보증금 {won(SPECIAL_DEPOSIT)}을 100% 돌려드려요. 그날 만나요!
                     </p>
                   ) : registration.deposit === "review" ? (
                     <p className="rounded-2xl bg-sky-soft p-4 text-sm text-slate-700"><b>입금 대기 · 확인 중이에요.</b><br />Vella쌤이 확인하면 신청이 확정돼요.</p>
