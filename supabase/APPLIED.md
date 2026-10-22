@@ -26,6 +26,7 @@ Vella가 Supabase SQL Editor에서 실행했다고 확인한 SQL 파일만 기�
 | `20_special_notice_1017.sql` | 완료 | 10/17(토) 특강 마감 안내 공지 1개 입력(대상 전체, 10/16~10/17, 팝업·상단 고정) |
 | `21_special_material_note.sql` | 완료 | 특강 자료 안내 문구 칸(special_lectures.material_note) 추가, 10/17 특강 문구 입력(비어 있을 때만) |
 | `22_refund_double_tests.sql` | 완료 | 특강 보증금 환불 시각 칸(deposit_refunded_at) 추가, 테스트 두 개 보는 날 표(test_doubles) 생성, 테스트 결과 고유키를 (신청·날짜·종류·번호)로 변경(기존 3칸 규칙 삭제, 데이터 그대로) |
+| `23_faq_update.sql` | 완료 | FAQ 답 2개 수정(불라방 특강 듣는 법, 입금 확인 중), 🎤 특강 질문 3개·📝 데일리 테스트 카테고리 질문 3개 추가 |
 
 ## 기록 갱신 규칙
 
