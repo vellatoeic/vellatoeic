@@ -15,6 +15,9 @@ import { activeStudentApps } from "@/lib/student";
 import { canWatch, covers, liveLinkFor } from "@/lib/access";
 import type { TimeSlot } from "@/lib/config";
 import { studentLogout } from "@/app/actions";
+import AudioBanner from "@/components/audio/AudioBanner";
+import AudioList from "@/components/audio/AudioList";
+import AudioPopup from "@/components/audio/AudioPopup";
 import StudentLogin from "./StudentLogin";
 import StickerBoard from "./StickerBoard";
 import { defaultHolidays, holidayKey, parseHolidays, schoolDaysFor, scheduleClassFor, scheduleKey } from "@/lib/schedule";
@@ -58,6 +61,9 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
       : [];
     return [a.id, { period, list }] as const;
   })));
+  // 지금 다운로드 기간인 음원 (배너·팝업은 첫 번째 것 기준)
+  const audioNow = paid.map((a) => ({ a, box: audioBoxes.get(a.id) }))
+    .find((x) => x.box?.period && today >= x.box.period.start && today <= x.box.period.end && x.box.list.length > 0);
   const latestMission = missionCount(missionFor([...apps].sort((a, b) => b.cohort.localeCompare(a.cohort))[0].id, missions));
   const boardKeys = [...new Map(paid.map((a) => {
     const klass = scheduleClassFor(a.course, a.track);
@@ -157,6 +163,13 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
       {liveButton}
 
+      {audioNow && (
+        <>
+          <AudioBanner cohort={audioNow.a.cohort} ids={audioNow.box!.list.map((x) => x.id)} end={audioNow.box!.period!.end} left={dayDiff(today, audioNow.box!.period!.end)} today={today} />
+          <AudioPopup cohort={audioNow.a.cohort} end={audioNow.box!.period!.end} />
+        </>
+      )}
+
       {mySpecials.map(({ r, e }) => {
         const ok = r.mode === "online" || r.deposit === "paid";
         return (
@@ -249,29 +262,15 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
                 return <p className="mt-4 rounded-2xl bg-sky-soft p-4 text-sm text-slate-600">🎧 LC 음원은 첫 수업일({sm}/{sd})부터 14일 동안 받을 수 있어요.</p>;
               }
               return (
-                // 눌러서 접고 펼 수 있어요. 마감이 3일 이내면 놓치지 않게 펼친 채로 시작해요.
-                <details open={left <= 3} className="group mt-4 rounded-2xl bg-sky-soft p-4">
-                  <summary className="flex cursor-pointer list-none items-start justify-between gap-2">
-                    <span>
-                      <span className="block font-jua text-lg text-sky-ink">🎧 LC 음원 <span className="text-sm text-slate-500">({audioBooksFor(a).map((b) => BOOKS[b]).join(", ")} 교재 · {box.list.length}개)</span></span>
-                      <span className="block text-sm text-sky-deep">{m}/{d}까지 다운로드 가능 ({left === 0 ? "D-DAY" : `D-${left}`})</span>
-                    </span>
-                    <span className="shrink-0 text-sm text-slate-400 group-open:hidden">펼치기 ▾</span>
-                    <span className="hidden shrink-0 text-sm text-slate-400 group-open:inline">접기 ▴</span>
-                  </summary>
+                // 다운로드 기간에는 항상 펼쳐 둬요. 누른 파일은 '받음 ✓' (이 기기에 기록)
+                <div id="lc-audio" className="mt-4 scroll-mt-4 rounded-2xl bg-sky-soft p-4">
+                  <p className="font-jua text-lg text-sky-ink">🎧 LC 음원 <span className="text-sm text-slate-500">({audioBooksFor(a).map((b) => BOOKS[b]).join(", ")} 교재 · {box.list.length}개)</span></p>
+                  <p className={`text-sm font-bold ${left <= 3 ? "text-red-500" : "text-sky-deep"}`}>{m}/{d}까지 다운로드 가능 ({left === 0 ? "D-DAY" : `D-${left}`}) · 기간이 지나면 다시 받을 수 없어요</p>
                   {box.list.length === 0 ? <p className="mt-2 text-sm text-slate-500">음원이 올라오면 여기에 보여요.</p> : (
-                    <ol className="mt-2 space-y-1.5">
-                      {box.list.map((x) => (
-                        <li key={x.id}>
-                          <a href={`/class/audio/${x.id}`} className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-[15px] text-slate-800">
-                            <span className="flex-1">{x.title}</span>
-                            <span className="text-sm text-sky-deep">zip 받기 ↓</span>
-                          </a>
-                        </li>
-                      ))}
-                    </ol>
+                    <AudioList cohort={a.cohort} items={box.list.map((x) => ({ id: x.id, title: x.title }))} />
                   )}
-                </details>
+                  <p className="mt-2 text-xs text-slate-500">받은 파일 위치 · 아이폰: 파일 앱 → 다운로드 / 갤럭시: 내 파일 → 다운로드</p>
+                </div>
               );
             })()}
             {(() => {
