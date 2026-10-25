@@ -1,16 +1,16 @@
 import "server-only";
-import { currentCohort, getSetting, listNoticeReads, listNotices, type Application } from "./db";
+import { getSetting, listNoticeReads, listNotices, type Application } from "./db";
 import { activeStudentApps } from "./student";
 import { isForEveryone, isLive, myNotices, popupNotices, type Notice } from "./notices";
 import { todayKST } from "./config";
+import { classAppsFor } from "./classCohort";
 
 // 공지를 판단할 때 쓰는 학생 신청: 이번 모집 기수 신청(없으면 가장 최근 기수)
 export async function noticeIdentity(): Promise<{ loggedIn: boolean; apps: Application[] }> {
   const { loggedIn, apps } = await activeStudentApps();
   if (apps.length === 0) return { loggedIn, apps: [] };
-  const now = await currentCohort();
-  const latest = apps.some((a) => a.cohort === now) ? now : apps.map((a) => a.cohort).sort().at(-1)!;
-  return { loggedIn, apps: apps.filter((a) => a.cohort === latest) };
+  // 수업 기수(날짜 기준)의 신청으로 공지 대상을 판단해요
+  return { loggedIn, apps: (await classAppsFor(apps)).apps };
 }
 
 // '@study' 링크는 관리자 설정의 스터디 인증 게시판 주소로 바꿔요. (주소가 없으면 버튼을 숨겨요)

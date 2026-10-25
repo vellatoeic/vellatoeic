@@ -347,7 +347,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
           </label>
           <button className="btn !py-3">저장</button>
           <p className="text-xs text-slate-500 sm:col-span-3">
-            새로 들어오는 신청은 &apos;현재 모집 기수&apos;로 저장돼요.<br />다음 달 모집을 시작할 때 바꿔 주세요.
+            새 신청만 이 기수로 저장돼요.<br />바꿔도 지금 수업 중인 반에는 영향이 없어요.
           </p>
         </CloseOnSubmitForm>
         </div>

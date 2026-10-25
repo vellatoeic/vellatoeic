@@ -8,7 +8,7 @@ import TestForm from "@/components/tests/TestForm";
 import { studentTests, takesTests } from "@/lib/dailyTests";
 import { TEST_LABEL } from "@/lib/tests";
 import { specialDay } from "@/lib/special";
-import { listAudios, listLectures, listMissions, listStamps, currentCohort, getSetting, getSpecialRegistrationsFor, listSpecialLectures } from "@/lib/db";
+import { listAudios, listLectures, listMissions, listStamps, getSetting, getSpecialRegistrationsFor, listSpecialLectures } from "@/lib/db";
 import { missionCount, missionFor } from "@/lib/mission";
 import { audioBooksFor, dayDiff, studentAudioWindow } from "@/lib/audio";
 import { activeStudentApps } from "@/lib/student";
@@ -21,6 +21,7 @@ import AudioPopup from "@/components/audio/AudioPopup";
 import StudentLogin from "./StudentLogin";
 import StickerBoard from "./StickerBoard";
 import { defaultHolidays, holidayKey, parseHolidays, schoolDaysFor, scheduleClassFor, scheduleKey } from "@/lib/schedule";
+import { classAppsFor } from "@/lib/classCohort";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "강의실 · vella_toeic", robots: { index: false } };
@@ -46,7 +47,8 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
   const lectures = paid.length ? await listLectures() : [];
 
   // 스티커판: 같은 기수·같은 수업 학생들의 출석 날짜 = 수업일
-  const cohort = await currentCohort();
+  // 수업 기수(날짜 기준): 모집 기수를 다음 달로 바꿔도 이번 달 라이브·테스트는 그대로 열려요
+  const { cohort } = await classAppsFor(paid);
   const [cafeUrl, account] = await Promise.all([getSetting("cafe_homework_url"), getSetting("bank_account")]);
   const pending = apps.filter((a) => a.status === "pending");
   const today = todayKST();

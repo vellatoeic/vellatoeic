@@ -6,13 +6,14 @@ import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
 import UploadForm from "./UploadForm";
 import CloseOnSubmitForm from "../CloseOnSubmitForm";
+import { classCohortNow } from "@/lib/classCohort";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
 
 export default async function Lectures() {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
-  const now = await currentCohort();
+  const now = await classCohortNow(); // 강의는 지금 수업 중인 기수가 기본
   const all = await listLectures();
   const cohorts = [...new Set([now, ...all.map((l) => l.cohort)])].sort().reverse();
 

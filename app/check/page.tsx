@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { todayKST } from "@/lib/config";
-import { addAttendance, currentCohort, listStamps } from "@/lib/db";
+import { addAttendance, listStamps } from "@/lib/db";
 import { activeStudentApps } from "@/lib/student";
 import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
 import { isClassDay, nextClassDay } from "@/lib/attendanceDays";
 import { specialDay } from "@/lib/special";
 import { canWatch } from "@/lib/access";
 import StudentLogin from "../class/StudentLogin";
+import { classAppsFor } from "@/lib/classCohort";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "출석 체크 · vella_toeic", robots: { index: false } };
@@ -34,8 +35,8 @@ export default async function Check() {
     return <StudentLogin next="/check" note="출석하려면 먼저 로그인해 주세요. (처음 한 번만)" />;
   }
 
-  const cohort = await currentCohort();
-  const thisMonth = apps.filter((a) => a.cohort === cohort);
+  // 수업 기수(날짜 기준)의 신청으로 출석해요. 모집 기수와 상관없어요.
+  const { apps: thisMonth } = await classAppsFor(apps);
   const mine = thisMonth.filter(canWatch);
   if (mine.length === 0) {
     return (

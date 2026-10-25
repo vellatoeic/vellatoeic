@@ -3,6 +3,7 @@ import { isAdmin } from "@/lib/auth";
 import { currentCohort, listApplications, listYbmOrders } from "@/lib/db";
 import { BOOKS, STATUS_LABEL, klassLabel } from "@/lib/config";
 import { csvResponse, phoneLabel } from "@/lib/csv";
+import { classCohortNow } from "@/lib/classCohort";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +12,10 @@ export async function GET(req: Request) {
   const from = new URL(req.url).searchParams.get("from");
   if (!(await isAdmin())) return new NextResponse("관리자 로그인이 필요해요.", { status: 401 });
   const cohort = await currentCohort();
+  // 모집 기수 + 지금 수업 중인 기수 (모집 기수를 바꿔도 이번 달 택배가 빠지지 않게)
+  const cohorts = new Set([cohort, await classCohortNow()]);
   const apps = (await listApplications())
-    .filter((a) => a.cohort === cohort && a.kind === "online" && a.pickup === "delivery" && a.status !== "refunded");
+    .filter((a) => cohorts.has(a.cohort) && a.kind === "online" && a.pickup === "delivery" && a.status !== "refunded");
   const since = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
   const ybm = (await listYbmOrders()).filter((o) => o.status !== "shipped" || (o.shipped_at ?? o.created_at) > since);
   const day = (iso: string) => new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });

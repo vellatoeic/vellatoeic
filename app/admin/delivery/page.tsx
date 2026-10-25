@@ -5,6 +5,7 @@ import { phoneLabel } from "@/lib/csv";
 import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
 import DeliveryList, { type Row } from "./DeliveryList";
+import { classCohortNow } from "@/lib/classCohort";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "택배 발송 · vella_toeic", robots: { index: false } };
@@ -18,10 +19,12 @@ export default async function DeliveryPage({ searchParams }: { searchParams: Pro
   const { from: raw } = await searchParams;
   const from: Source = raw === "academy" || raw === "ybm" ? raw : "all";
   const cohort = await currentCohort();
+  // 모집 기수 + 지금 수업 중인 기수 (모집 기수를 바꿔도 이번 달 택배가 빠지지 않게)
+  const cohorts = new Set([cohort, await classCohortNow()]);
   await cleanupYbmProofs().catch(() => {});
   await cleanupYbmOrders().catch(() => {});
   const academy: Row[] = (await listApplications())
-    .filter((a) => a.cohort === cohort && a.kind === "online" && a.pickup === "delivery" && a.status !== "refunded")
+    .filter((a) => cohorts.has(a.cohort) && a.kind === "online" && a.pickup === "delivery" && a.status !== "refunded")
     .map((a) => ({ id: a.id, name: a.name, klass: klassLabel(a), phone: phoneLabel(a.phone), address: a.address ?? "", books: a.books.map((b) => BOOKS[b]).join(", "), status: a.status as Row["status"], at: a.created_at }));
   // YBM 인강 주문은 기수와 상관없이, 발송 전 주문과 최근 60일 안에 발송한 주문만 보여요.
   const since = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();

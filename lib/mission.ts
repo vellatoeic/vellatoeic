@@ -1,6 +1,7 @@
 import "server-only";
 import { listMissions, type Application, type Mission } from "./db";
 import { activeStudentApps } from "./student";
+import { classAppsFor } from "./classCohort";
 
 export const MISSION_STEPS = ["intro_at", "cafe_at", "blog_at", "insta_at"] as const;
 export type MissionStep = (typeof MISSION_STEPS)[number];
@@ -20,7 +21,8 @@ export function missionFor(appId: string, missions: Mission[]) {
 export async function studentMission(): Promise<{ app: Application; mission: Mission | null } | null> {
   const { apps } = await activeStudentApps();
   if (apps.length === 0) return null;
-  const app = [...apps].sort((a, b) => b.cohort.localeCompare(a.cohort) || b.created_at.localeCompare(a.created_at))[0];
+  // 수업 기수(날짜 기준)의 신청에 기록해요. 다음 달을 미리 신청했어도 이번 달 신청으로.
+  const app = [...(await classAppsFor(apps)).apps].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
   const missions = await listMissions(apps.map((a) => a.id));
   return { app, mission: missionFor(app.id, missions) };
 }

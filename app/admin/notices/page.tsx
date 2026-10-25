@@ -9,6 +9,7 @@ import AdminTabs from "../AdminTabs";
 import LoginForm from "../LoginForm";
 import CloseOnSubmitForm from "../CloseOnSubmitForm";
 import NoticeEditor from "./NoticeEditor";
+import { classCohortNow } from "@/lib/classCohort";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "공지 · vella_toeic", robots: { index: false } };
@@ -30,9 +31,9 @@ export default async function NoticesAdmin() {
   const today = todayKST();
   const [y, m] = today.split("-").map(Number);
   const monthEnd = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
-  const cohort = await currentCohort();
+  const cohort = await classCohortNow(); // 공지 대상: 지금 수업 중인 기수
   const [notices, apps, reads] = await Promise.all([listNotices(), listApplications(), listNoticeReads()]);
-  // 대상 인원: 이번 모집 기수의 환불되지 않은 신청 (학생 1명 = 신청 1건)
+  // 대상 인원: 수업 기수의 환불되지 않은 신청 (학생 1명 = 신청 1건)
   const people = apps.filter((a) => a.cohort === cohort && isActive(a));
 
   return (

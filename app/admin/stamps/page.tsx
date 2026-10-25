@@ -11,6 +11,7 @@ import { bulkStamp, cleanupPhotos, cycleAttendance } from "@/app/actions";
 import SelectAll from "../SelectAll";
 import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
+import { classCohortNow } from "@/lib/classCohort";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "출결 · vella_toeic", robots: { index: false } };
@@ -29,7 +30,7 @@ function mark(rec: Attendance | undefined, day: string, today: string) {
 export default async function Stamps({ searchParams }: { searchParams: Promise<{ b?: string; d?: string; t?: string; q?: string; wc?: string; wb?: string; wt?: string }> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
   const sp = await searchParams;
-  const cohort = await currentCohort();
+  const cohort = await classCohortNow(); // 수업 기수(날짜 기준)
   const today = todayKST();
   const t = sp.t ?? "am";
 

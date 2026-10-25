@@ -21,6 +21,7 @@ import { SCHEDULE_CLASSES, holidayKey, homeworkAssignmentDays, parseHolidays, pa
 import { specialRegistrationOpen } from "@/lib/special";
 import { MISSION_STEPS, studentMission, type MissionStep } from "@/lib/mission";
 import { AUDIO_MAX_BYTES, audioExpiresOn, isAudioBook } from "@/lib/audio";
+import { classCohortNow } from "@/lib/classCohort";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
 } from "@/lib/auth";
@@ -936,7 +937,7 @@ export async function cancelHomeworkSticker(fd: FormData) {
 // 예전에 저장한 숙제 사진을 지난 기수 기준으로 정리해요.
 export async function cleanupPhotos(): Promise<void> {
   if (!(await isAdmin())) return;
-  await deletePhotosBefore(await currentCohort());
+  await deletePhotosBefore(await classCohortNow()); // 모집 기수를 앞당겨도 지금 수업 중인 달 사진은 남아요
   revalidatePath("/admin/stamps");
 }
 
@@ -947,7 +948,7 @@ export async function markAttendanceManual(fd: FormData) {
   const day = clean(fd.get("day"));
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
   const app = await getApplication(id);
-  if (!app || !canWatch(app) || app.cohort !== (await currentCohort())) return;
+  if (!app || !canWatch(app) || app.cohort !== (await classCohortNow())) return;
   await addAttendance(app.id, day);
   revalidatePath("/admin/stamps");
 }
