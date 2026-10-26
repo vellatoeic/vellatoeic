@@ -274,7 +274,7 @@ export async function listApplications(): Promise<Application[]> {
   return mem.apps;
 }
 
-type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "continuing" | "slot" | "books" | "amount">>;
+type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "continuing" | "slot" | "books" | "amount" | "cohort">>;
 
 export async function updateApplication(id: string, patch: ApplicationPatch) {
   if (sb) {

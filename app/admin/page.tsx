@@ -1,12 +1,13 @@
 import { adminAlerts } from "@/lib/adminAlerts";
-import { BOOKS, COURSES, KINDS, TRACKS, TIME_SLOTS, bookStatusLabel, cohortLabel, won, type CourseId, type TimeSlot, type Track } from "@/lib/config";
+import { BOOKS, COURSES, KINDS, TRACKS, TIME_SLOTS, bookStatusLabel, cohortLabel, thisMonthKST, won, type CourseId, type TimeSlot, type Track } from "@/lib/config";
 import { listApplications, listDepositEvents, listYbmOrders, listMissions, getSetting, currentCohort, roundFor, isPreview, type Application, type Mission } from "@/lib/db";
 import { missionCount } from "@/lib/mission";
 import { summariesFor } from "@/lib/studentSummary";
+import { movableCohorts } from "@/lib/cohortMove";
 import { WATCH_RULES, type WatchSummary } from "@/lib/watchlist";
 import Link from "next/link";
 import { isAdmin } from "@/lib/auth";
-import { changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove, resolveBookDepositEvent } from "@/app/actions";
+import { changeCohort, bulkChangeCohort, changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove, resolveBookDepositEvent } from "@/app/actions";
 import LoginForm from "./LoginForm";
 import AdminTabs from "./AdminTabs";
 import CloseOnSubmitForm from "./CloseOnSubmitForm";
@@ -15,7 +16,7 @@ import SelectAll from "./SelectAll";
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
 
-type Filters = { k: string; p: string; b: string; t: string; q: string; c: string; ra: string };
+type Filters = { k: string; p: string; b: string; t: string; q: string; c: string; ra: string; mv: string };
 
 const KIND_FILTERS = [["all", "전체"], ["onsite", "현장"], ["online", "불라방"]] as const;
 const PAY_FILTERS = [["all", "전체"], ["pending", "미납"], ["paid", "납부 완료"], ["refunded", "환불"]] as const;
@@ -36,7 +37,7 @@ function Badge({ tone, children }: { tone: "amber" | "sky" | "slate" | "green"; 
   return <span className={`inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold ${color}`}>{children}</span>;
 }
 
-function Row({ a, group, mission, fresh, sum }: { a: Application; group: string; mission?: Mission; fresh?: boolean; sum?: WatchSummary }) {
+function Row({ a, group, mission, fresh, sum, back }: { a: Application; group: string; mission?: Mission; fresh?: boolean; sum?: WatchSummary; back: string }) {
   const book = bookStatusLabel(a);
   return (
     <li className={`py-3 ${fresh ? "bg-red-50" : a.status === "pending" ? "bg-amber-50/60" : ""}`}>
@@ -110,6 +111,18 @@ function Row({ a, group, mission, fresh, sum }: { a: Application; group: string;
               <button className="btn-ghost !py-1.5 text-sm">시간 저장</button>
             </CloseOnSubmitForm>
             <details className="text-sm">
+              <summary className="cursor-pointer text-slate-500">기수 변경</summary>
+              <CloseOnSubmitForm action={changeCohort} className="mt-2 flex gap-2">
+                <input type="hidden" name="id" value={a.id} />
+                <input type="hidden" name="back" value={back} />
+                <select name="cohort" className="input !w-40 !py-2">
+                  {movableCohorts(thisMonthKST()).filter((x) => x !== a.cohort).map((x) => <option key={x} value={x}>{cohortLabel(x)}</option>)}
+                </select>
+                <label className="flex items-center gap-1 whitespace-nowrap text-xs text-slate-500"><input type="checkbox" name="force" value="1" className="h-4 w-4" />같은 이름이 있어도 옮기기</label>
+                <button className="btn-ghost whitespace-nowrap !py-2">옮기기</button>
+              </CloseOnSubmitForm>
+            </details>
+            <details className="text-sm">
               <summary className="cursor-pointer text-slate-500">반 변경</summary>
               <CloseOnSubmitForm action={changeClass} className="mt-2 flex gap-2">
                 <input type="hidden" name="id" value={a.id} />
@@ -156,7 +169,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
 
   const now = await currentCohort();
-  const { k = "all", p = "all", b = "all", t = "all", q = "", c = now, ra = "" } = await searchParams;
+  const { k = "all", p = "all", b = "all", t = "all", q = "", c = now, ra = "", mv = "" } = await searchParams;
   const everything = await listApplications();
   const [account, cafeHomeworkUrl, cafeUrl, blogUrl, studyBoardUrl] = await Promise.all([
     getSetting("bank_account"),
@@ -218,6 +231,16 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   return (
     <div className="space-y-5 pt-8">
       <AdminTabs active="apps" />
+      {mv && (() => {
+        const [target, n, changed, errors] = mv.split("|");
+        return (
+          <div className="space-y-1 rounded-3xl border-2 border-sky-main bg-white p-4 text-sm">
+            {Number(n) > 0 && <p className="font-jua text-lg text-sky-ink">🔁 {cohortLabel(target)}(으)로 {n}명 옮겼어요 · 교재를 새 기수 회차로 다시 계산했어요</p>}
+            {changed && <p className="font-bold text-amber-700">💰 금액 변경됨: {changed}</p>}
+            {errors && <p className="font-bold text-red-600">⚠️ 옮기지 못함: {errors}</p>}
+          </div>
+        );
+      })()}
 
       {waiting.length > 0 && (
         <CloseOnSubmitForm action={bulkConfirmPayment} className="block rounded-3xl border-2 border-amber-300 bg-amber-50 p-5">
@@ -425,6 +448,17 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
             </div>
           </details>
           <details className="relative">
+            <summary className="btn-ghost cursor-pointer list-none !py-2 text-sm">기수 변경</summary>
+            <div className="absolute left-0 z-20 mt-1 flex gap-2 rounded-2xl bg-white p-3 shadow-lg">
+              <input type="hidden" name="back" value={link({})} />
+              <select name="cohort" defaultValue={movableCohorts(thisMonthKST()).find((x) => x !== c)} className="input !w-40 !py-2">
+                {movableCohorts(thisMonthKST()).map((x) => <option key={x} value={x}>{cohortLabel(x)}</option>)}
+              </select>
+              <label className="flex items-center gap-1 whitespace-nowrap text-xs text-slate-500"><input type="checkbox" name="force" value="1" className="h-4 w-4" />같은 이름이 있어도 옮기기</label>
+              <button formAction={bulkChangeCohort} className="btn-ghost whitespace-nowrap !py-2">옮기기</button>
+            </div>
+          </details>
+          <details className="relative">
             <summary className="btn-ghost cursor-pointer list-none !py-2 text-sm">시간 변경</summary>
             <div className="absolute left-0 z-20 mt-1 flex gap-2 rounded-2xl bg-white p-3 shadow-lg">
               <select name="slot" className="input !w-36 !py-2">
@@ -461,7 +495,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
               {pending > 0 && <Badge tone="amber">미납 {pending}명</Badge>}
             </div>
             <ul className="divide-y divide-sky-soft">
-              {g.items.map((a) => <Row key={a.id} a={a} group={g.key} mission={missions.get(a.id)} fresh={a.created_at > alerts.since} sum={sums.get(a.id)} />)}
+              {g.items.map((a) => <Row key={a.id} a={a} group={g.key} mission={missions.get(a.id)} fresh={a.created_at > alerts.since} sum={sums.get(a.id)} back={link({})} />)}
             </ul>
           </section>
         );

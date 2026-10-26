@@ -9,7 +9,10 @@ import { specialDay } from "@/lib/special";
 import { TEST_LABEL } from "@/lib/tests";
 import { missionCount } from "@/lib/mission";
 import { watchSummary } from "@/lib/watchlist";
-import { cancelHomeworkSticker, cycleAttendance } from "@/app/actions";
+import { cancelHomeworkSticker, changeCohort, cycleAttendance } from "@/app/actions";
+import { movableCohorts } from "@/lib/cohortMove";
+import { thisMonthKST } from "@/lib/config";
+import CloseOnSubmitForm from "../../CloseOnSubmitForm";
 import { getSetting } from "@/lib/db";
 import { defaultHolidays, holidayKey, parseHolidays, schoolDaysFor, scheduleClassFor, scheduleKey } from "@/lib/schedule";
 import StickerBoard from "@/app/class/StickerBoard";
@@ -23,9 +26,10 @@ const STATUS = { pending: "미납", paid: "납부 완료", shipped: "납부 완�
 const DEPOSIT = { pending: "보증금 대기", review: "입금 확인 중", paid: "보증금 확정", cancelled: "취소" } as const;
 
 // 학생 한 명의 모든 정보: 신청·납부·교재 / 출석·숙제·테스트 / 미션 / 특강 / 수강 이력
-export default async function StudentPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function StudentPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ mv?: string }> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
   const { id } = await params;
+  const { mv = "" } = await searchParams;
   const a = await getApplication(id);
   if (!a) notFound();
   const today = todayKST();
@@ -54,6 +58,16 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
   return (
     <div className="space-y-5 pt-8">
       <AdminTabs active="apps" />
+      {mv && (() => {
+        const [target, n, changed, errors] = mv.split("|");
+        return (
+          <div className="space-y-1 rounded-3xl border-2 border-sky-main bg-white p-4 text-sm">
+            {Number(n) > 0 && <p className="font-jua text-lg text-sky-ink">🔁 {cohortLabel(target)}(으)로 옮겼어요 · 교재를 새 기수 회차로 다시 계산했어요</p>}
+            {changed && <p className="font-bold text-amber-700">💰 금액 변경됨: {changed}</p>}
+            {errors && <p className="font-bold text-red-600">⚠️ 옮기지 못함: {errors}</p>}
+          </div>
+        );
+      })()}
 
       <section className="card space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -61,7 +75,21 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
             <p className="text-sm text-slate-500">{cohortLabel(a.cohort)} · {COURSES[a.course].label} {TRACKS[a.track]} · {a.slot ? TIME_SLOTS[a.slot] : "시간 미정"} · {KINDS[a.kind].short}</p>
             <h2 className="font-jua text-3xl text-sky-ink">{a.name}</h2>
           </div>
-          <Link href={`/admin?c=${a.cohort}&q=${encodeURIComponent(a.name)}`} className="btn-ghost !py-2 text-sm">신청 관리에서 바꾸기 (납부·반·시간·환불)</Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href={`/admin?c=${a.cohort}&q=${encodeURIComponent(a.name)}`} className="btn-ghost !py-2 text-sm">신청 관리에서 바꾸기 (납부·반·시간·환불)</Link>
+            <details className="relative text-sm">
+              <summary className="btn-ghost cursor-pointer list-none !py-2">기수 변경</summary>
+              <CloseOnSubmitForm action={changeCohort} className="absolute right-0 z-20 mt-1 flex gap-2 rounded-2xl bg-white p-3 shadow-lg">
+                <input type="hidden" name="id" value={a.id} />
+                <input type="hidden" name="back" value={`/admin/students/${a.id}`} />
+                <select name="cohort" className="input !w-40 !py-2">
+                  {movableCohorts(thisMonthKST()).filter((x) => x !== a.cohort).map((x) => <option key={x} value={x}>{cohortLabel(x)}</option>)}
+                </select>
+                <label className="flex items-center gap-1 whitespace-nowrap text-xs text-slate-500"><input type="checkbox" name="force" value="1" className="h-4 w-4" />같은 이름이 있어도 옮기기</label>
+                <button className="btn whitespace-nowrap !py-2 !text-sm">옮기기</button>
+              </CloseOnSubmitForm>
+            </details>
+          </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
           <span className={`${chip} ${a.status === "pending" ? "bg-amber-100 text-amber-700" : a.status === "refunded" ? "bg-slate-200 text-slate-600" : "bg-emerald-100 text-emerald-700"}`}>{STATUS[a.status]}</span>

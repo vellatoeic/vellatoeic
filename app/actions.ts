@@ -7,7 +7,7 @@ import {
   type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
 } from "@/lib/config";
 import {
-  createApplication, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
+  createApplication, listApplications, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
   saveMission, type Mission, createYbmOrder, listYbmOrders, updateYbmOrders, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, setTestDouble, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
 } from "@/lib/db";
 import { canWatch, isActive, loginApps } from "@/lib/access";
@@ -22,6 +22,7 @@ import { specialRegistrationOpen } from "@/lib/special";
 import { MISSION_STEPS, studentMission, type MissionStep } from "@/lib/mission";
 import { AUDIO_MAX_BYTES, audioExpiresOn, isAudioBook } from "@/lib/audio";
 import { classCohortNow } from "@/lib/classCohort";
+import { planCohortMove } from "@/lib/cohortMove";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
 } from "@/lib/auth";
@@ -874,6 +875,45 @@ export async function changeClass(fd: FormData) {
   const books = booksFor(course, track, await roundFor(a.cohort), continuing);
   await updateApplication(id, { course, track, continuing, books, amount: calcAmount(books, a.pickup) });
   revalidatePath("/admin");
+}
+
+// 기수 변경 (개별·일괄): 교재를 새 기수 회차로 다시 계산. 결과는 돌아갈 화면 주소에 붙여 보여줘요.
+async function moveCohorts(ids: string[], target: string, force = false) {
+  const [apps, all] = await Promise.all([getApplications(ids), listApplications()]);
+  const round = await roundFor(target);
+  const moved: string[] = [], changed: string[] = [], errors: string[] = [];
+  for (const a of apps) {
+    const plan = planCohortMove(a, target, round, all, force);
+    if (!plan.ok) { errors.push(plan.error); continue; }
+    await updateApplication(a.id, plan.patch);
+    moved.push(a.name);
+    if (plan.amountChanged) changed.push(`${a.name}(${a.amount.toLocaleString("ko-KR")}→${plan.patch.amount.toLocaleString("ko-KR")}원)`);
+  }
+  revalidatePath("/admin", "layout");
+  return { moved, changed, errors };
+}
+
+function backWith(fd: FormData, r: { moved: string[]; changed: string[]; errors: string[] }, target: string) {
+  const back = clean(fd.get("back"));
+  const url = new URL(back.startsWith("/admin") ? back : "/admin", "http://x");
+  url.searchParams.set("mv", `${target}|${r.moved.length}|${r.changed.join(", ")}|${r.errors.join(" / ")}`);
+  return `${url.pathname}?${url.searchParams}`;
+}
+
+export async function changeCohort(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const target = clean(fd.get("cohort"));
+  const r = await moveCohorts([clean(fd.get("id"))], target, clean(fd.get("force")) === "1");
+  redirect(backWith(fd, r, target));
+}
+
+export async function bulkChangeCohort(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const ids = checkedIds(fd);
+  const target = clean(fd.get("cohort"));
+  if (ids.length === 0) return;
+  const r = await moveCohorts(ids, target, clean(fd.get("force")) === "1");
+  redirect(backWith(fd, r, target));
 }
 
 // 수강 시간(오전반/저녁반) 바꾸기. 시간 미정으로 되돌릴 수는 없어요.
