@@ -88,6 +88,7 @@ export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 })
     else if (pickup === "delivery" && manualAddress && get("address_manual").length < 10) error = "택배 받을 주소를 정확히 입력해 주세요.";
     else if (!/^\d{4}$/.test(get("pin"))) error = "강의실 비밀번호를 숫자 4자리로 정해 주세요.";
     else if (get("pin") !== get("pin2")) error = "비밀번호 확인이 맞지 않아요. 같은 숫자 4자리를 두 번 입력해 주세요.";
+    else if (!fd.get("ybm_registered")) error = "YBM 학원 수강 등록을 먼저 마쳐 주세요. (등록했다면 체크)";
     else if (!fd.get("agree")) error = "필독 사항 확인에 체크해 주세요.";
     setCheckError(error);
     if (error) return;
@@ -250,6 +251,14 @@ export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 })
             <span className="block text-sm font-bold text-red-600">* 교재를 받을 수 있도록 동·호수까지 정확한 주소를 입력해 주세요.</span>
           </div>
         )}
+      </div>
+
+      <div className="flex items-start gap-3 rounded-2xl bg-sky-soft p-4">
+        <input id="ybm_registered" type="checkbox" name="ybm_registered" className="mt-1 h-5 w-5 accent-sky-deep" />
+        <span className="text-[15px] text-slate-700">
+          <label htmlFor="ybm_registered">YBM 학원 수강 등록을 마쳤어요.</label>
+          <a href="https://www.ybmedu.com/seomyon/vellatoeic" target="_blank" rel="noreferrer" className="mt-0.5 block text-xs text-sky-deep underline underline-offset-2">아직이라면 먼저 등록하기 ↗</a>
+        </span>
       </div>
 
       <label className="flex items-start gap-3 rounded-2xl bg-sky-soft p-4">

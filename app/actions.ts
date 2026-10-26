@@ -89,6 +89,7 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   if (pickup === "delivery" && address.length < 10) return { error: "택배 받을 주소를 입력해 주세요." };
   if (!/^\d{4}$/.test(pin)) return { error: "강의실 비밀번호를 숫자 4자리로 정해 주세요." };
   if (pin !== clean(fd.get("pin2"))) return { error: "비밀번호 확인이 맞지 않아요. 같은 숫자 4자리를 두 번 입력해 주세요." };
+  if (!fd.get("ybm_registered")) return { error: "YBM 학원 수강 등록을 먼저 마쳐 주세요. (등록했다면 체크)" };
   if (!fd.get("agree")) return { error: "필독 사항 확인에 체크해 주세요." };
 
   // 같은 달에 같은 이름 + 같은 비밀번호로 이미 낸 신청이 있으면 새로 만들지 않고 그 신청 화면으로 보내요.
