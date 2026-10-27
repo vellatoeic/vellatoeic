@@ -32,6 +32,8 @@ const addDays = (day: string, n: number) => new Date(Date.parse(`${day}T00:00:00
 
 // '확인했어요' 기록 열쇠: 반복 공지는 공지id+기수, 일반 공지는 공지id
 export const readKey = (n: Pick<Notice, "id" | "repeat_monthly">, cohort?: string) => (n.repeat_monthly ? `${n.id}:${cohort ?? ""}` : n.id);
+// 기기(브라우저)에 남기는 '봤어요' 기록도 서버와 같은 규칙: 반복 공지는 기수마다 따로
+export const seenStorageKey = (n: Pick<Notice, "id" | "repeat_monthly">, cohort?: string) => `vella-notice-seen:${readKey(n, cohort)}`;
 
 export const TRACK_GROUP_LABEL: Record<TrackGroup, string> = { all: "종합(격일 포함)", alt: "격일", rc: "RC 단과", lc: "LC 단과" };
 

@@ -30,7 +30,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </span>
             </Link>
             <div className="flex items-center gap-2">
-              <Bell count={notice.unread} visitorIds={notice.visitorIds} />
+              <Bell count={notice.unread} visitorKeys={notice.visitorKeys} />
               <Link href="/class" className="rounded-full bg-sky-main px-3 py-2 text-sm font-bold text-sky-ink">
                 강의실
               </Link>

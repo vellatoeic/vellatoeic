@@ -107,3 +107,20 @@ test("B: 날짜가 안 된 항목은 회색 '○일부터'", async () => {
   const later = await monthlyChecklist("2026-10-27");
   assert.equal(later.items.find((i) => i.key === "audio")!.state, "todo");
 });
+
+// ── 반복 공지: 기기(브라우저) 기록도 기수마다 따로 ──
+import { seenStorageKey } from "@/lib/notices";
+
+test("D: 지난 기수에 확인한 반복 공지는 이번 기수에 기기에서도 다시 떠요", () => {
+  const octKey = seenStorageKey(repeatNotice, "2026-10");
+  const novKey = seenStorageKey(repeatNotice, "2026-11");
+  assert.notEqual(octKey, novKey);
+  assert.equal(novKey, "vella-notice-seen:n1:2026-11");
+  // 기기에 10월 기록만 있으면 11월 열쇠는 비어 있어 다시 떠요 (팝업·🔔 같은 규칙)
+  const stored = new Set([octKey]);
+  assert.equal(stored.has(novKey), false);
+  // 일반 공지는 기수와 상관없이 한 번만
+  const normal = { ...repeatNotice, id: "n2", repeat_monthly: false };
+  assert.equal(seenStorageKey(normal, "2026-10"), seenStorageKey(normal, "2026-11"));
+  assert.equal(seenStorageKey(normal), "vella-notice-seen:n2");
+});

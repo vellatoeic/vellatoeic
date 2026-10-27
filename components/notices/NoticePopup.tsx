@@ -2,25 +2,24 @@
 
 import { useEffect, useState, startTransition } from "react";
 import { readNotice } from "@/app/actions";
-import type { Notice } from "@/lib/notices";
+import { seenStorageKey, type Notice } from "@/lib/notices";
 import { NoticeBody, NoticeHeader } from "./NoticeContent";
-
-const SEEN_KEY = (id: string) => `vella-notice-seen:${id}`;
 
 // 아래에서 올라오는 공지 창. 여러 개면 최신순으로 넘겨 봐요(1/2). [확인했어요]를 누르면 다시 안 떠요.
 // 로그인 안 한 방문자는 '전체' 공지만, 기기당 한 번 (브라우저에 기록).
-export default function NoticePopup({ notices, loggedIn }: { notices: Notice[]; loggedIn: boolean }) {
+// 브라우저 기록 열쇠는 서버와 같아요: 일반 공지 '{id}', 매달 반복 공지 '{id}:{기수}' → 다음 기수에 다시 떠요.
+export default function NoticePopup({ notices, loggedIn, cohort }: { notices: Notice[]; loggedIn: boolean; cohort: string }) {
   const [list, setList] = useState<Notice[]>(loggedIn ? notices : []);
   const [i, setI] = useState(0);
 
   useEffect(() => {
     if (loggedIn) return;
     try {
-      setList(notices.filter((n) => !localStorage.getItem(SEEN_KEY(n.id))));
+      setList(notices.filter((n) => !localStorage.getItem(seenStorageKey(n, cohort))));
     } catch {
       setList([]);
     }
-  }, [notices, loggedIn]);
+  }, [notices, loggedIn, cohort]);
 
   if (list.length === 0) return null;
   const n = list[Math.min(i, list.length - 1)];
@@ -31,7 +30,7 @@ export default function NoticePopup({ notices, loggedIn }: { notices: Notice[]; 
       fd.set("id", n.id);
       startTransition(() => readNotice(fd));
     } else {
-      try { localStorage.setItem(SEEN_KEY(n.id), "1"); } catch { /* 저장이 안 돼도 창은 닫아요 */ }
+      try { localStorage.setItem(seenStorageKey(n, cohort), "1"); } catch { /* 저장이 안 돼도 창은 닫아요 */ }
     }
     setList((l) => l.filter((x) => x.id !== n.id));
     setI(0);
