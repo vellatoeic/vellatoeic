@@ -20,9 +20,11 @@ import { activeStudentApps } from "@/lib/student";
 import { SCHEDULE_CLASSES, holidayKey, homeworkAssignmentDays, parseHolidays, parseSchoolDays, previousMonth, scheduleKey, scheduleClassFor, schoolDaysFor, shiftSchoolDays, type ScheduleClass } from "@/lib/schedule";
 import { specialRegistrationOpen } from "@/lib/special";
 import { MISSION_STEPS, studentMission, type MissionStep } from "@/lib/mission";
-import { AUDIO_MAX_BYTES, audioExpiresOn, isAudioBook } from "@/lib/audio";
+import { AUDIO_MAX_BYTES, audioExpiresOn, autoCleanupAudios, isAudioBook } from "@/lib/audio";
 import { classCohortNow } from "@/lib/classCohort";
 import { planCohortMove } from "@/lib/cohortMove";
+import { linkWaitingDeposit } from "@/lib/deposits";
+import { signupMonths } from "@/lib/signupMonthsServer";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
 } from "@/lib/auth";
@@ -61,7 +63,9 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   const track = clean(fd.get("track")) as Track;
   // 이어듣기 교재 할인은 시작반 격일반에만 적용해요
   const continuing = course === "start" && isAlt(track) && !!fd.get("continuing");
-  const cohort = await currentCohort();
+  // 수강 월: 학생이 신청서에서 고른 달 (오늘 고를 수 있는 달만 받아요)
+  const cohort = clean(fd.get("cohort"));
+  if (!(await signupMonths()).some((m) => m.cohort === cohort)) return { error: "몇 월 수업인지 다시 골라 주세요." };
   // 교재는 반·과정·회차로 자동 결정 (학생이 고르지 않아요)
   const books = Object.hasOwn(COURSES, course) && COURSES[course].tracks.includes(track)
     ? booksFor(course, track, await roundFor(cohort), continuing)
@@ -119,6 +123,8 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
     amount: calcAmount(books, pickup),
     pin_hash: hashPin(pin),
   });
+  // 신청서보다 먼저 온 입금이 있으면 바로 연결해서 납부 확인해요
+  await linkWaitingDeposit({ kind: "app", id, depositor, amount: calcAmount(books, pickup) });
   await setStudent([id]); // 신청하면 바로 강의실 로그인 상태
   redirect(`/my/${id}`);
 }
@@ -198,14 +204,44 @@ export async function resetPin(fd: FormData) {
   revalidatePath("/admin");
 }
 
+// '이번 달 할 일': 다음 달 수업일을 확인했어요
+export async function confirmSchedule(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const cohort = clean(fd.get("cohort"));
+  if (!/^\d{4}-\d{2}$/.test(cohort)) return;
+  await setSetting(`schedule_confirmed:${cohort}`, clean(fd.get("undo")) ? "" : "1");
+  revalidatePath("/admin", "layout");
+}
+
+// '이번 달 할 일': 이번 달 환불 학생을 단톡방에서 내보냈어요
+export async function markChatKicked() {
+  if (!(await isAdmin())) return;
+  const running = await classCohortNow();
+  const ids = (await listApplications()).filter((a) => a.cohort === running && a.status === "refunded").map((a) => a.id);
+  await setSetting(`chat_kicked:${running}`, ids.join(","));
+  revalidatePath("/admin");
+}
+
 export async function saveSettings(fd: FormData) {
   if (!(await isAdmin())) return;
   await setSetting("bank_account", clean(fd.get("bank_account")));
   const c = clean(fd.get("current_cohort"));
-  if (/^\d{4}-\d{2}$/.test(c)) await setSetting("current_cohort", c);
+  // 현재 모집 기수: 관리 화면 기본 표시용. 비우면 신청서 수강 월 규칙대로 자동
+  if (/^\d{4}-\d{2}$/.test(c) || (fd.has("current_cohort") && c === "")) await setSetting("current_cohort", c);
+  // 강의실 단톡방 (오픈채팅 링크·참여코드). 참여코드를 바꾸면 바꾼 날을 남겨 '이번 달 할 일'에서 확인해요.
+  if (fd.has("chat_url")) {
+    const chatUrl = clean(fd.get("chat_url"));
+    if (!chatUrl || /^https:\/\//.test(chatUrl)) await setSetting("chat_url", chatUrl);
+    const code = clean(fd.get("chat_code")).slice(0, 20);
+    if (code !== (await getSetting("chat_code"))) {
+      await setSetting("chat_code", code);
+      await setSetting("chat_code_changed_on", todayKST());
+    }
+  }
   // 교재 회차는 자동으로 번갈아 정해지고, 필요할 때만 여기서 바꿔요
   const round = clean(fd.get("round"));
-  if (/^\d{4}-\d{2}$/.test(c) && (round === "1" || round === "2")) await setSetting(`round_${c}`, round);
+  const roundCohort = c || (await currentCohort()); // 모집 기수를 비우면 자동 기수에 적용
+  if (/^\d{4}-\d{2}$/.test(roundCohort) && (round === "1" || round === "2")) await setSetting(`round_${roundCohort}`, round);
   const cafeLink = clean(fd.get("cafe_homework_url"));
   if (!cafeLink) await setSetting("cafe_homework_url", "");
   else {
@@ -334,6 +370,7 @@ export async function finishAudioUpload(input: { cohort: string; book: string; p
     size_bytes: size || input.size,
     sort_order: same.reduce((max, a) => Math.max(max, a.sort_order), 0) + 1,
   });
+  await autoCleanupAudios(); // 기간이 끝나고 7일 지난 기수 음원은 새로 올릴 때 자동으로 지워요
   revalidatePath("/admin/audio");
   return {};
 }
@@ -358,6 +395,16 @@ export async function removeAudio(fd: FormData) {
   const audio = await getAudio(clean(fd.get("id")));
   if (audio) await deleteAudios([audio]);
   revalidatePath("/admin/audio");
+  revalidatePath("/class");
+}
+
+// 관리자: 학생 한 명의 LC 음원 기간을 오늘부터 7일 다시 열어요.
+export async function extendAudio(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const id = clean(fd.get("id"));
+  const d = new Date(Date.parse(`${todayKST()}T00:00:00Z`) + 6 * 86400000).toISOString().slice(0, 10);
+  await updateApplication(id, { audio_extended_until: d });
+  revalidatePath(`/admin/students/${id}`);
   revalidatePath("/class");
 }
 
@@ -391,6 +438,7 @@ export async function createYbmOrderAction(_: FormState, fd: FormData): Promise<
   const existing = (await listYbmOrders()).find((o) => o.status !== "shipped" && o.name === name && o.phone === phone);
   if (existing) redirect(`/ybm/${existing.id}?again=1`);
   const id = await createYbmOrder({ name, phone, address, depositor, amount: YBM_ORDER_AMOUNT }, { data: Buffer.from(await proof.arrayBuffer()), type: proof.type });
+  await linkWaitingDeposit({ kind: "ybm", id, depositor, amount: YBM_ORDER_AMOUNT }); // 주문보다 먼저 온 입금 연결
   revalidatePath("/admin/delivery");
   redirect(`/ybm/${id}`);
 }
@@ -408,7 +456,7 @@ export async function confirmYbmPayments(fd: FormData) {
 // 학생: [확인했어요] → 이번 기수 본인 신청 모두에 확인 기록 (다시 안 떠요)
 export async function readNotice(fd: FormData) {
   const { apps } = await noticeIdentity();
-  await markNoticeRead(clean(fd.get("id")), apps.map((a) => a.id));
+  await markNoticeRead(clean(fd.get("id")), apps.map((a) => ({ id: a.id, cohort: a.cohort })));
   revalidatePath("/", "layout");
 }
 
@@ -433,7 +481,10 @@ export async function saveNoticeAction(fd: FormData) {
   })).slice(0, 10);
   const title = clean(fd.get("title"));
   const starts_on = clean(fd.get("starts_on"));
-  const ends_on = clean(fd.get("ends_on"));
+  // 매달 반복 공지는 게시 종료일 대신 '개강일부터 n일'
+  const repeat_monthly = !!fd.get("repeat_monthly");
+  const repeat_days = repeat_monthly ? Math.min(31, Math.max(1, Number(clean(fd.get("repeat_days"))) || 7)) : null;
+  const ends_on = repeat_monthly ? "2099-12-31" : clean(fd.get("ends_on"));
   if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(starts_on) || !/^\d{4}-\d{2}-\d{2}$/.test(ends_on) || ends_on < starts_on) return;
   const useStudy = !!fd.get("link_study");
   const linkUrl = clean(fd.get("link_url"));
@@ -449,6 +500,8 @@ export async function saveNoticeAction(fd: FormData) {
     ends_on,
     popup: !!fd.get("popup"),
     pinned: !!fd.get("pinned"),
+    repeat_monthly,
+    repeat_days,
   };
   const id = clean(fd.get("id"));
   if (id) await updateNotice(id, fields);

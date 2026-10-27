@@ -24,6 +24,8 @@ export type Application = {
   status: Status;
   pin_hash: string | null;
   created_at: string;
+  paid_at?: string | null; // 납부 확인 시각 (LC 음원 기간 시작에 써요)
+  audio_extended_until?: string | null; // 관리자가 음원 기간을 다시 열어준 마지막 날
 };
 
 export type NewApplication = Omit<Application, "id" | "status" | "created_at">;
@@ -274,16 +276,10 @@ export async function listApplications(): Promise<Application[]> {
   return mem.apps;
 }
 
-type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "continuing" | "slot" | "books" | "amount" | "cohort">>;
+type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "continuing" | "slot" | "books" | "amount" | "cohort" | "audio_extended_until">>;
 
 export async function updateApplication(id: string, patch: ApplicationPatch) {
-  if (sb) {
-    const { error } = await sb.from("applications").update(patch).eq("id", id);
-    if (error) throw error;
-    return;
-  }
-  const a = mem.apps.find((x) => x.id === id);
-  if (a) Object.assign(a, patch);
+  await updateApplications([id], patch);
 }
 
 export async function deleteApplication(id: string) {
@@ -305,11 +301,19 @@ export async function updateApplications(ids: string[], patch: ApplicationPatch)
     await inChunks(ok, async (chunk) => {
       const { error } = await db.from("applications").update(patch).in("id", chunk);
       if (error) throw error;
+      // 처음 납부 확인된 시각을 남겨요 (되돌렸다가 다시 확인해도 처음 시각 유지)
+      if (patch.status === "paid") {
+        const r = await db.from("applications").update({ paid_at: new Date().toISOString() }).in("id", chunk).is("paid_at", null);
+        if (r.error) throw r.error;
+      }
       return [];
     });
     return;
   }
-  for (const a of mem.apps) if (ok.includes(a.id)) Object.assign(a, patch);
+  for (const a of mem.apps) if (ok.includes(a.id)) {
+    Object.assign(a, patch);
+    if (patch.status === "paid" && !a.paid_at) a.paid_at = new Date().toISOString();
+  }
 }
 
 export async function deleteApplications(ids: string[]) {
@@ -467,7 +471,7 @@ export async function cleanupYbmOrders(days = 90) {
 }
 
 // ── 공지 ───────────────────────────────────────
-export type NoticeRead = { notice_id: string; app_id: string; read_at: string };
+export type NoticeRead = { notice_id: string; app_id: string; read_at: string; cohort?: string | null };
 export type NoticeFields = Omit<Notice, "id" | "created_at">;
 
 export async function listNotices(): Promise<Notice[]> {
@@ -525,16 +529,21 @@ export async function listNoticeReads(filter: { appIds?: string[] } = {}): Promi
   return mem.noticeReads.filter((r) => !ids || ids.includes(r.app_id));
 }
 
-export async function markNoticeRead(noticeId: string, appIds: string[]) {
-  const ids = appIds.filter(isUuid);
-  if (!isUuid(noticeId) || ids.length === 0) return;
-  const rows = ids.map((app_id) => ({ notice_id: noticeId, app_id }));
+// [확인했어요] 기록. 기수도 함께 남겨서 매달 반복 공지는 기수마다 다시 떠요.
+export async function markNoticeRead(noticeId: string, apps: { id: string; cohort: string }[]) {
+  const ok = apps.filter((a) => isUuid(a.id));
+  if (!isUuid(noticeId) || ok.length === 0) return;
+  const rows = ok.map((a) => ({ notice_id: noticeId, app_id: a.id, cohort: a.cohort, read_at: new Date().toISOString() }));
   if (sb) {
-    const { error } = await sb.from("site_notice_reads").upsert(rows, { onConflict: "notice_id,app_id", ignoreDuplicates: true });
+    const { error } = await sb.from("site_notice_reads").upsert(rows, { onConflict: "notice_id,app_id" });
     if (error) throw error;
     return;
   }
-  for (const r of rows) if (!mem.noticeReads.some((x) => x.notice_id === r.notice_id && x.app_id === r.app_id)) mem.noticeReads.push({ ...r, read_at: new Date().toISOString() });
+  for (const r of rows) {
+    const old = mem.noticeReads.find((x) => x.notice_id === r.notice_id && x.app_id === r.app_id);
+    if (old) Object.assign(old, r);
+    else mem.noticeReads.push(r);
+  }
 }
 
 // ── 문풀반 데일리 테스트 ───────────────────────
@@ -942,7 +951,7 @@ export type DepositEvent = {
   name: string;
   amount: number;
   received_at: string;
-  result: "matched" | "review" | "unmatched" | "resolved" | "dismissed";
+  result: "matched" | "review" | "unmatched" | "resolved" | "dismissed" | "waiting"; // waiting = 신청서보다 먼저 온 교재비 입금
   registration_id: string | null; // 특강 보증금이면 특강 신청
   application_id: string | null; // 교재비면 수강 신청
   ybm_order_id?: string | null; // YBM 인강 교재 주문
@@ -964,6 +973,17 @@ export async function listDepositEvents(limit = 50): Promise<DepositEvent[]> {
     return data as DepositEvent[];
   }
   return [...mem.depositEvents].sort((a, b) => b.received_at.localeCompare(a.received_at)).slice(0, limit);
+}
+
+// 신청서를 기다리는 입금 (최근 n일)
+export async function listWaitingDepositEvents(days = 14): Promise<DepositEvent[]> {
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  if (sb) {
+    const { data, error } = await sb.from("deposit_events").select("*").eq("result", "waiting").gte("received_at", since).order("received_at", { ascending: false });
+    if (error) throw error;
+    return data as DepositEvent[];
+  }
+  return mem.depositEvents.filter((e) => e.result === "waiting" && e.received_at >= since).sort((a, b) => b.received_at.localeCompare(a.received_at));
 }
 
 export async function updateDepositEvent(id: string, patch: Partial<Pick<DepositEvent, "result" | "registration_id" | "application_id" | "ybm_order_id">>) {
@@ -1074,9 +1094,17 @@ export async function setSetting(k: string, v: string) {
   mem.settings[k] = v;
 }
 
-// 현재 모집 기수 (관리 페이지에서 설정, 없으면 이번 달)
+// 현재 모집 기수: 관리 화면 기본 표시용. 관리 페이지에서 정한 값, 비우면 신청서 수강 월 규칙대로 자동.
+// (새 신청은 학생이 신청서에서 고른 달로 저장돼요)
 export async function currentCohort() {
-  return (await getSetting("current_cohort")) || thisMonthKST();
+  const set = await getSetting("current_cohort");
+  if (set) return set;
+  try {
+    const { autoRecruitCohort } = await import("./signupMonthsServer");
+    return await autoRecruitCohort();
+  } catch {
+    return thisMonthKST();
+  }
 }
 
 // 그 기수의 교재 회차. 관리 페이지에서 바꿨으면 그 값, 없으면 달마다 번갈아 자동 계산.

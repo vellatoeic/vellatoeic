@@ -34,8 +34,14 @@ const POSTCODE_SRC = "https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/post
 const choice = (on: boolean) =>
   `rounded-2xl border-2 p-4 text-left transition ${on ? "border-sky-deep bg-sky-soft" : "border-sky-main/50 bg-white"}`;
 
-export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 }) {
+type MonthOption = { cohort: string; label: string; range: string; round: 1 | 2 };
+
+export default function ApplyForm({ kind, months }: { kind: Kind; months: MonthOption[] }) {
   const [state, action, pending] = useActionState<FormState, FormData>(submitApplication, {});
+  // 수강 월: 하나뿐이면 자동, 둘이면 기본 선택 없이 꼭 고르기
+  const [month, setMonth] = useState<string | null>(months.length === 1 ? months[0].cohort : null);
+  const chosen = months.find((m) => m.cohort === month) ?? null;
+  const round = chosen?.round ?? months[0]?.round ?? 1;
   const [course, setCourse] = useState<CourseId | null>(null);
   const [track, setTrack] = useState<Track>("all");
   const [continuing, setContinuing] = useState<boolean | null>(null);
@@ -54,7 +60,7 @@ export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 })
   const books = course ? booksFor(course, track, round, askContinuing && continuing === true) : [];
   const amount = calcAmount(books, pickup);
   const online = kind === "online";
-  const blocked = !course || !slot || (askContinuing && continuing === null);
+  const blocked = !month || !course || !slot || (askContinuing && continuing === null);
 
   // 카카오 우편번호 검색 (불러오지 못하면 직접 입력으로 바꿔요)
   function searchAddress() {
@@ -87,6 +93,7 @@ export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 })
     else if (pickup === "delivery" && get("address_detail").length < 1) error = "동·호수 등 상세 주소를 입력해 주세요. (단독주택이면 '단독주택'이라고 적어 주세요)";
     else if (pickup === "delivery" && manualAddress && get("address_manual").length < 10) error = "택배 받을 주소를 정확히 입력해 주세요.";
     else if (!/^\d{4}$/.test(get("pin"))) error = "강의실 비밀번호를 숫자 4자리로 정해 주세요.";
+    else if (!month) error = "몇 월 수업인지 골라 주세요.";
     else if (get("pin") !== get("pin2")) error = "비밀번호 확인이 맞지 않아요. 같은 숫자 4자리를 두 번 입력해 주세요.";
     else if (!fd.get("ybm_registered")) error = "YBM 학원 수강 등록을 먼저 마쳐 주세요. (등록했다면 체크)";
     else if (!fd.get("agree")) error = "필독 사항 확인에 체크해 주세요.";
@@ -119,6 +126,24 @@ export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 })
       {course && <input type="hidden" name="course" value={course} />}
       {askContinuing && continuing === true && <input type="hidden" name="continuing" value="1" />}
       {slot && <input type="hidden" name="slot" value={slot} />}
+      {month && <input type="hidden" name="cohort" value={month} />}
+
+      <div>
+        <p className="label">수강 월</p>
+        {months.length === 1 ? (
+          <p className="rounded-2xl border-2 border-sky-deep bg-sky-soft p-4 font-jua text-xl text-sky-ink">{months[0].label} <span className="font-body text-sm text-slate-500">· {months[0].range}</span></p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {months.map((m) => (
+              <button type="button" key={m.cohort} onClick={() => setMonth(m.cohort)} aria-pressed={month === m.cohort} className={`${choice(month === m.cohort)} text-center`}>
+                <span className="block font-jua text-xl text-sky-ink">{m.label}</span>
+                <span className="text-xs text-slate-500">{m.range}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {months.length > 1 && !month && <p className="mt-1 text-xs text-amber-700">수강할 달을 꼭 골라 주세요.</p>}
+      </div>
 
       <div>
         <p className="label">1. 수강 신청한 반</p>
@@ -224,7 +249,7 @@ export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 })
             <input name="pin" className="input tracking-[0.4em]" placeholder="숫자 4자리" inputMode="numeric" maxLength={4} type="password" />
             <input name="pin2" className="input tracking-[0.4em]" placeholder="한 번 더" inputMode="numeric" maxLength={4} type="password" />
           </div>
-          <span className="mt-1 block text-xs text-slate-500">강의실·특강 신청에 계속 쓰니 꼭 기억해 주세요.</span>
+          <span className="mt-1 block text-xs text-slate-500">강의실·특강 신청에 계속 쓰니 꼭 기억해 주세요. <b className="text-sky-deep">지난달에 신청했다면 같은 비밀번호를 써 주세요.</b></span>
         </label>
         {online && pickup === "classroom" && (
           <div className="space-y-2 sm:col-span-2">
@@ -299,6 +324,7 @@ export default function ApplyForm({ kind, round }: { kind: Kind; round: 1 | 2 })
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center" role="dialog" aria-modal="true">
           <div className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
             <p className="font-jua text-center text-2xl text-sky-ink">입력한 내용이 맞나요?</p>
+            {chosen && <p className="rounded-2xl bg-sky-deep py-2 text-center font-jua text-3xl text-white">{chosen.label} <span className="text-base opacity-90">· {chosen.range}</span></p>}
             <div className="rounded-2xl bg-sky-soft p-4 text-center">
               <p className="text-sm text-slate-500">{KINDS[kind].label}</p>
               <p className="font-jua text-2xl text-sky-ink">{COURSES[course].label} {TRACKS[track]}</p>

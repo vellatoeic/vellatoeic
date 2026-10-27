@@ -59,7 +59,7 @@ test("맞은 개수와 틀린 번호 확인", () => {
 });
 
 // ── 학생별 통계 (임시 저장소의 가짜 학생으로) ──
-import { createApplication, isPreview, saveTestResult, updateApplications } from "@/lib/db";
+import { createApplication, getApplication, isPreview, saveTestResult, updateApplications } from "@/lib/db";
 import { cohortTestStats, takesTests } from "@/lib/dailyTests";
 import { hashPin } from "@/lib/auth";
 import type { CourseId, Track } from "@/lib/config";
@@ -70,6 +70,7 @@ async function student(name: string, course: CourseId, track: Track, paid = true
     books: [], pickup: "classroom", name, phone: "01000000000", depositor: name, address: null, amount: 0, pin_hash: hashPin("1234"),
   });
   if (paid) await updateApplications([id], { status: "paid" });
+  (await getApplication(id))!.created_at = "2026-09-28T00:00:00Z"; // 개강 전 신청 (임시 저장소라 직접 바꿔요)
   return id;
 }
 

@@ -22,6 +22,10 @@ import StudentLogin from "./StudentLogin";
 import StickerBoard from "./StickerBoard";
 import { defaultHolidays, holidayKey, parseHolidays, schoolDaysFor, scheduleClassFor, scheduleKey } from "@/lib/schedule";
 import { classAppsFor } from "@/lib/classCohort";
+import { studentDays } from "@/lib/studentDays";
+import { shiftMonth } from "@/lib/signupMonths";
+
+const nextMonthOf = (today: string) => shiftMonth(today.slice(0, 7), 1);
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "강의실 · vella_toeic", robots: { index: false } };
@@ -49,7 +53,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
   // 스티커판: 같은 기수·같은 수업 학생들의 출석 날짜 = 수업일
   // 수업 기수(날짜 기준): 모집 기수를 다음 달로 바꿔도 이번 달 라이브·테스트는 그대로 열려요
   const { cohort } = await classAppsFor(paid);
-  const [cafeUrl, account] = await Promise.all([getSetting("cafe_homework_url"), getSetting("bank_account")]);
+  const [cafeUrl, account, chatUrl, chatCode] = await Promise.all([getSetting("cafe_homework_url"), getSetting("bank_account"), getSetting("chat_url"), getSetting("chat_code")]);
   const pending = apps.filter((a) => a.status === "pending");
   const today = todayKST();
   const stamps = await listStamps(paid.map((a) => a.id));
@@ -242,6 +246,16 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
       <p className="rounded-2xl bg-sky-soft px-4 py-3 text-sm text-sky-deep">강의 영상은 개강일 이후부터 열람할 수 있어요.</p>
 
+      {/* 단톡방: 이번 달 또는 다음 달 신청이 납부 완료된 학생에게만 (링크가 비어 있으면 숨김) */}
+      {chatUrl && paid.some((a) => a.cohort === today.slice(0, 7) || a.cohort === nextMonthOf(today)) && (
+        <a href={chatUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-2xl border-2 border-[#ffe58a] bg-[#fff9e0] px-4 py-3">
+          <span>
+            <span className="block font-jua text-lg text-[#7d6728]">💬 벨라토익 단톡방</span>
+            {chatCode && <span className="text-sm text-[#a7741a]">참여코드 <b className="font-jua text-lg tracking-widest">{chatCode}</b></span>}
+          </span>
+          <span className="shrink-0 text-sm font-bold text-[#a7741a]">들어가기 ↗</span>
+        </a>
+      )}
 
       {paid.map((a) => {
         // 강의 목록은 고른 시간대(☀️/🌙) 강의만 보여요. 구분 없는 예전 강의는 둘 다에 보여요.
@@ -261,7 +275,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
               const left = dayDiff(today, box.period.end);
               if (today < box.period.start) {
                 const [, sm, sd] = box.period.start.split("-").map(Number);
-                return <p className="mt-4 rounded-2xl bg-sky-soft p-4 text-sm text-slate-600">🎧 LC 음원은 첫 수업일({sm}/{sd})부터 14일 동안 받을 수 있어요.</p>;
+                return <p className="mt-4 rounded-2xl bg-sky-soft p-4 text-sm text-slate-600">🎧 LC 음원은 {sm}/{sd}부터 14일 동안 받을 수 있어요.</p>;
               }
               return (
                 // 다운로드 기간에는 항상 펼쳐 둬요. 누른 파일은 '받음 ✓' (이 기기에 기록)
@@ -284,7 +298,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
                 cohort={a.cohort}
                 className={`${COURSES[a.course].label} ${TRACKS[a.track]}`}
                 klass={klass}
-                scheduleDays={schedule.days}
+                scheduleDays={studentDays(schedule.days, a.created_at)}
                 holidays={schedule.holidays}
                 attendance={stamps.attendance.filter((stamp) => stamp.app_id === a.id)}
                 homework={stamps.homework.filter((stamp) => stamp.app_id === a.id).map(({ day, created_at }) => ({ day, created_at }))}

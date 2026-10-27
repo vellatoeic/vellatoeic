@@ -3,6 +3,7 @@ import { listStamps, type Application } from "./db";
 import { canWatch } from "./access";
 import { classDaysOf, holidaysOf } from "./classCalendar";
 import { watchSummary, type WatchSummary } from "./watchlist";
+import { studentDays } from "./studentDays";
 
 // 여러 학생의 출석·숙제 요약을 한 번에 (신청 관리 줄 요약·학생 검색에 써요). 납부 완료 학생만 계산해요.
 export async function summariesFor(apps: Application[]): Promise<Map<string, WatchSummary>> {
@@ -20,7 +21,7 @@ export async function summariesFor(apps: Application[]): Promise<Map<string, Wat
     return daysCache.get(key)!;
   };
   for (const a of targets) {
-    out.set(a.id, watchSummary(await daysOf(a), attendance.filter((x) => x.app_id === a.id), homework.filter((x) => x.app_id === a.id).map((x) => x.day), today));
+    out.set(a.id, watchSummary(studentDays(await daysOf(a), a.created_at), attendance.filter((x) => x.app_id === a.id), homework.filter((x) => x.app_id === a.id).map((x) => x.day), today));
   }
   return out;
 }

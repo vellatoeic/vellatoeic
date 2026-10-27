@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { CLASSROOM, KINDS, type Kind } from "@/lib/config";
-import { currentCohort, roundFor } from "@/lib/db";
+import { roundFor } from "@/lib/db";
+import { signupMonths } from "@/lib/signupMonthsServer";
 import ApplyForm from "./ApplyForm";
 import HowToWatch from "@/components/HowToWatch";
 import Timetable from "@/components/Timetable";
@@ -27,7 +28,8 @@ const NOTICE: Record<Kind, string[]> = {
 export default async function KindGuide({ params }: { params: Promise<{ kind: string }> }) {
   const { kind } = await params;
   if (kind !== "onsite" && kind !== "online") notFound();
-  const round = await roundFor(await currentCohort());
+  // 신청서에서 고를 수 있는 수강 월 (이번 달: 2주차 마지막 수업일까지 / 다음 달: 15일부터)
+  const months = await Promise.all((await signupMonths()).map(async (m) => ({ ...m, round: await roundFor(m.cohort) })));
 
   return (
     <div className="space-y-6 pt-8">
@@ -61,7 +63,7 @@ export default async function KindGuide({ params }: { params: Promise<{ kind: st
 
       {kind === "online" && <HowToWatch beforeApply />}
 
-      <ApplyForm kind={kind} round={round} />
+      <ApplyForm kind={kind} months={months} />
     </div>
   );
 }

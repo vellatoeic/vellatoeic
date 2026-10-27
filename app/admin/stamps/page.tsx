@@ -12,6 +12,7 @@ import SelectAll from "../SelectAll";
 import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
 import { classCohortNow } from "@/lib/classCohort";
+import { studentDays, studentStartDay } from "@/lib/studentDays";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "출결 · vella_toeic", robots: { index: false } };
@@ -57,7 +58,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
   // 학생마다 출석·숙제 요약 (검색 결과·관리 필요 학생에 써요)
   const summaryOf = new Map<string, WatchSummary>();
   for (const c of classTabs) for (const a of c.students) {
-    summaryOf.set(a.id, watchSummary(c.days, attendance.filter((x) => x.app_id === a.id), homework.filter((x) => x.app_id === a.id).map((x) => x.day), today));
+    summaryOf.set(a.id, watchSummary(studentDays(c.days, a.created_at), attendance.filter((x) => x.app_id === a.id), homework.filter((x) => x.app_id === a.id).map((x) => x.day), today));
   }
   const q = (sp.q ?? "").replace(/\s/g, "");
   const found = q ? everyone.filter((a) => `${a.name}${a.depositor}`.replace(/\s/g, "").includes(q)).sort((a, b) => a.name.localeCompare(b.name, "ko")) : [];
@@ -135,7 +136,8 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
         <p className="text-xs text-slate-500">이름을 누르면 출석 처리돼요 (한 번 더 누르면 ◐ 지각, 또 누르면 결석으로 돌아가요).</p>
         <div className="grid gap-4 lg:grid-cols-2">
           {classTabs.filter((c) => c.days.includes(d)).flatMap((c) => slotsOf(c.students).map((sl) => {
-            const group = c.students.filter((a) => (a.slot ?? null) === sl);
+            // 중간 등록생은 첫 수업일 전 날짜 보드에 나오지 않아요
+            const group = c.students.filter((a) => (a.slot ?? null) === sl && (studentStartDay(c.days, a.created_at) ?? "9999") <= d);
             if (group.length === 0) return null;
             const came = group.filter((a) => rec(a.id, d));
             const notYet = group.filter((a) => !rec(a.id, d));

@@ -20,10 +20,18 @@ export type Notice = {
   ends_on: string;
   popup: boolean;
   pinned: boolean;
+  repeat_monthly?: boolean; // 매달 반복: 학생 반 개강일(중간 등록생은 첫 수업일)부터 repeat_days일 동안
+  repeat_days?: number | null;
   created_at: string;
 };
 
-type Student = { course: CourseId; track: Track; kind: Kind; slot: TimeSlot | null };
+// start = 학생 첫 수업일(반복 공지용), cohort = 수업 기수(반복 공지 '확인했어요'는 기수마다 따로)
+type Student = { course: CourseId; track: Track; kind: Kind; slot: TimeSlot | null; cohort?: string; start?: string | null };
+
+const addDays = (day: string, n: number) => new Date(Date.parse(`${day}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
+
+// '확인했어요' 기록 열쇠: 반복 공지는 공지id+기수, 일반 공지는 공지id
+export const readKey = (n: Pick<Notice, "id" | "repeat_monthly">, cohort?: string) => (n.repeat_monthly ? `${n.id}:${cohort ?? ""}` : n.id);
 
 export const TRACK_GROUP_LABEL: Record<TrackGroup, string> = { all: "종합(격일 포함)", alt: "격일", rc: "RC 단과", lc: "LC 단과" };
 
@@ -51,9 +59,18 @@ export function noticeMatches(n: Pick<Notice, "targets">, students: Student[]) {
 
 export const isLive = (n: Pick<Notice, "starts_on" | "ends_on">, today: string) => n.starts_on <= today && today <= n.ends_on;
 
+// 이 학생에게 지금 게시 중인지: 반복 공지는 학생 개강일부터 n일 동안, 일반 공지는 게시 기간
+export function liveFor(n: Notice, students: Student[], today: string) {
+  if (!n.repeat_monthly) return isLive(n, today);
+  if (n.starts_on > today) return false;
+  const days = Math.max(1, n.repeat_days ?? 7);
+  return students.some((s) => !!s.start && s.start <= today && today <= addDays(s.start, days - 1));
+}
+
 // 지금 띄울 팝업: 게시 중 · 팝업 · 대상 · 아직 확인 안 함. 최신순 (상단 고정 먼저)
 export function popupNotices<N extends Notice>(all: N[], students: Student[], readIds: Set<string>, today: string) {
-  return sortNotices(all.filter((n) => n.popup && isLive(n, today) && noticeMatches(n, students) && !readIds.has(n.id)));
+  const cohort = students[0]?.cohort;
+  return sortNotices(all.filter((n) => n.popup && liveFor(n, students, today) && noticeMatches(n, students) && !readIds.has(readKey(n, cohort))));
 }
 
 export function sortNotices<N extends Notice>(list: N[]) {

@@ -1,17 +1,19 @@
 import { adminAlerts } from "@/lib/adminAlerts";
 import { BOOKS, COURSES, KINDS, TRACKS, TIME_SLOTS, bookStatusLabel, cohortLabel, thisMonthKST, won, type CourseId, type TimeSlot, type Track } from "@/lib/config";
-import { listApplications, listDepositEvents, listYbmOrders, listMissions, getSetting, currentCohort, roundFor, isPreview, type Application, type Mission } from "@/lib/db";
+import { listApplications, listDepositEvents, listWaitingDepositEvents, listYbmOrders, listMissions, getSetting, currentCohort, roundFor, isPreview, type Application, type Mission } from "@/lib/db";
 import { missionCount } from "@/lib/mission";
 import { summariesFor } from "@/lib/studentSummary";
 import { movableCohorts } from "@/lib/cohortMove";
 import { WATCH_RULES, type WatchSummary } from "@/lib/watchlist";
 import Link from "next/link";
 import { isAdmin } from "@/lib/auth";
-import { changeCohort, bulkChangeCohort, changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove, resolveBookDepositEvent } from "@/app/actions";
+import { changeCohort, bulkChangeCohort, markChatKicked, changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove, resolveBookDepositEvent } from "@/app/actions";
 import LoginForm from "./LoginForm";
 import AdminTabs from "./AdminTabs";
 import CloseOnSubmitForm from "./CloseOnSubmitForm";
 import SelectAll from "./SelectAll";
+import { autoCleanupAudios } from "@/lib/audio";
+import { md, monthlyChecklist } from "@/lib/monthlyChecklist";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
@@ -167,23 +169,29 @@ function Row({ a, group, mission, fresh, sum, back }: { a: Application; group: s
 
 export default async function Admin({ searchParams }: { searchParams: Promise<Partial<Filters>> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
+  await autoCleanupAudios().catch(() => 0); // 기간이 끝나고 7일 지난 LC 음원 자동 정리
 
   const now = await currentCohort();
   const { k = "all", p = "all", b = "all", t = "all", q = "", c = now, ra = "", mv = "" } = await searchParams;
   const everything = await listApplications();
-  const [account, cafeHomeworkUrl, cafeUrl, blogUrl, studyBoardUrl] = await Promise.all([
+  const [account, cafeHomeworkUrl, cafeUrl, blogUrl, studyBoardUrl, chatUrl, chatCode, rawCohort] = await Promise.all([
     getSetting("bank_account"),
     getSetting("cafe_homework_url"),
     getSetting("cafe_url"),
     getSetting("blog_url"),
     getSetting("study_board_url"),
+    getSetting("chat_url"),
+    getSetting("chat_code"),
+    getSetting("current_cohort"),
   ]);
   const round = await roundFor(now);
+  const checklist = await monthlyChecklist();
   const alerts = await adminAlerts();
   // 이번 모집 기수에서 아직 입금 확인이 안 된 학생 (수업 전에 확인해야 라이브·강의가 열려요)
   const waiting = everything.filter((a) => a.cohort === now && a.status === "pending").sort((a, b) => b.created_at.localeCompare(a.created_at));
   // 자동으로 확정하지 못한 교재비 입금 문자 (같은 입금자명이 여러 명이거나 금액이 다를 때)
   const ybmPending = (await listYbmOrders()).filter((o) => o.status === "pending");
+  const waitingDeposits = await listWaitingDepositEvents(60); // 신청서보다 먼저 온 교재비 입금
   const bookChecks = (await listDepositEvents(50)).filter((e) => e.target === "book" && (e.result === "review" || e.result === "unmatched"));
   const pendingAll = everything.filter((a) => a.status === "pending");
   // 수강 시간이 아직 비어 있는 학생 (예전 신청). 오전/저녁을 정해 주세요.
@@ -231,6 +239,26 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   return (
     <div className="space-y-5 pt-8">
       <AdminTabs active="apps" />
+      <section className="card space-y-2 !p-4">
+        <p className="font-jua text-xl text-sky-ink">📅 이번 달 할 일 <span className="text-sm text-slate-500">· {cohortLabel(checklist.cohort)} 개강 {md(checklist.first)} 준비</span></p>
+        <ul className="grid gap-1.5 sm:grid-cols-2">
+          {checklist.items.map((it) => (
+            <li key={it.key} className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-xl px-3 py-2 text-sm ${it.state === "todo" ? "bg-amber-50" : it.state === "done" ? "bg-emerald-50/60" : "bg-slate-50 text-slate-400"}`}>
+              <span>{it.state === "done" ? "✅" : it.state === "todo" ? "⚠️" : "○"}</span>
+              <b className={it.state === "later" ? "font-normal" : "text-sky-ink"}>{it.title}</b>
+              {it.state === "later" && it.from && <span className="text-xs">{md(it.from)}부터</span>}
+              {it.state !== "later" && it.detail && <span className="text-xs text-slate-500">{it.detail}</span>}
+              {it.warn && it.state !== "done" && <span className="w-full text-xs font-bold text-red-600">{it.warn}</span>}
+              <span className="ml-auto flex items-center gap-2">
+                {it.state === "todo" && it.action === "kick" && (
+                  <form action={markChatKicked}><button className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-sky-deep">내보냈어요 ✓</button></form>
+                )}
+                {it.state === "todo" && it.href && <a href={it.href} className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-sky-deep">바로가기 →</a>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
       {mv && (() => {
         const [target, n, changed, errors] = mv.split("|");
         return (
@@ -261,6 +289,26 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
           </ul>
           <button className="btn mt-3 w-full !py-3 !text-base">체크한 학생 납부 확인</button>
         </CloseOnSubmitForm>
+      )}
+
+      {waitingDeposits.length > 0 && (
+        <section className="rounded-3xl border-2 border-amber-200 bg-amber-50 p-5">
+          <p className="font-jua text-xl text-amber-700">📥 신청서 없는 입금 {waitingDeposits.length}건</p>
+          <p className="mt-1 text-sm text-slate-600">교재비로 보이는 입금이 먼저 왔어요. 14일 안에 입금자명·금액이 같은 신청서(또는 인강 주문)가 들어오면 자동으로 납부 확인되고 여기서 빠져요.</p>
+          <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
+            {waitingDeposits.map((e) => (
+              <li key={e.id} className="flex items-center gap-2 rounded-xl bg-white p-2.5 text-sm">
+                <b className="text-sky-ink">{e.name}</b> · {won(e.amount)}
+                <span className="text-xs text-slate-400">{new Date(e.received_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                <CloseOnSubmitForm action={resolveBookDepositEvent} className="ml-auto">
+                  <input type="hidden" name="event_id" value={e.id} />
+                  <input type="hidden" name="application_id" value="" />
+                  <button className="text-xs text-slate-400 underline">관계없는 입금 (지우기)</button>
+                </CloseOnSubmitForm>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {bookChecks.length > 0 && (
@@ -333,13 +381,13 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
         {!ra && alerts.recent.length > 30 && <a href={`${link({ ra: "1" })}#recent`} className="mt-2 block text-center text-sm text-sky-deep underline">더 보기 (최근 300건)</a>}
       </details>
 
-      <details className="card !p-4">
+      <details id="settings" className="card !p-4">
         <summary className="font-jua cursor-pointer text-lg text-sky-ink">⚙️ 기본 설정 (모집 기수 · 계좌 · 카페·블로그 주소)</summary>
         <div className="mt-4">
           <CloseOnSubmitForm action={saveSettings} className="card grid gap-4 sm:grid-cols-[10rem_7rem_1fr_auto] sm:items-end">
           <label>
-            <span className="label">현재 모집 기수</span>
-            <input type="month" name="current_cohort" defaultValue={now} className="input" />
+            <span className="label">현재 모집 기수 <span className="font-normal text-slate-400">(비우면 자동: {cohortLabel(now)})</span></span>
+            <input type="month" name="current_cohort" defaultValue={rawCohort} className="input" />
           </label>
           <label>
             <span className="label">교재 회차</span>
@@ -367,6 +415,14 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
           <label className="sm:col-span-3">
             <span className="label">네이버 카페 숙제 게시판 주소</span>
             <input type="url" name="cafe_homework_url" defaultValue={cafeHomeworkUrl} className="input" placeholder="https://cafe.naver.com/..." />
+          </label>
+          <label className="sm:col-span-3">
+            <span className="label">💬 단톡방 오픈채팅 링크 <span className="font-normal text-slate-400">(비우면 강의실에서 숨겨요)</span></span>
+            <input type="url" name="chat_url" defaultValue={chatUrl} className="input" placeholder="https://open.kakao.com/..." />
+          </label>
+          <label>
+            <span className="label">단톡방 참여코드</span>
+            <input name="chat_code" defaultValue={chatCode} className="input" placeholder="예: 1234" />
           </label>
           <button className="btn !py-3">저장</button>
           <p className="text-xs text-slate-500 sm:col-span-3">

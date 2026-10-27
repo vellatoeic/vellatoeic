@@ -90,6 +90,13 @@ export default function NoticeEditor({ notice, today, monthEnd }: Props) {
           <label><span className="label">게시 시작</span><input type="date" name="starts_on" defaultValue={notice?.starts_on ?? today} required className="input !py-2" /></label>
           <label><span className="label">게시 종료</span><input type="date" name="ends_on" defaultValue={notice?.ends_on ?? monthEnd} required className="input !py-2" /></label>
         </div>
+        <div className="space-y-1.5 rounded-2xl bg-sky-soft p-3 text-sm">
+          <label className="flex flex-wrap items-center gap-1.5">
+            <input type="checkbox" name="repeat_monthly" defaultChecked={notice?.repeat_monthly ?? false} className="accent-sky-deep" /> 🔁 매달 반복 · 개강일부터
+            <input type="number" name="repeat_days" min={1} max={31} defaultValue={notice?.repeat_days ?? 7} className="input !w-16 !py-1" />일 동안
+          </label>
+          <p className="text-xs text-slate-500">반복 공지는 학생 반 개강일(화목반은 화요일, 중간 등록생은 신청 후 첫 수업일)부터 매달 다시 떠요. 게시 종료일은 쓰지 않아요.<br /><b className="text-amber-700">본문에 날짜(예: 10/6)를 직접 쓰지 마세요.</b> &apos;첫 수업&apos;, &apos;다음 수업&apos;처럼 써야 매달 맞는 문장이 돼요.</p>
+        </div>
         <div className="flex gap-4">
           <label className="flex items-center gap-1.5"><input type="checkbox" name="popup" defaultChecked={notice?.popup ?? true} className="accent-sky-deep" /> 팝업으로 띄우기</label>
           <label className="flex items-center gap-1.5"><input type="checkbox" name="pinned" defaultChecked={notice?.pinned ?? false} className="accent-sky-deep" /> 📌 상단 고정</label>

@@ -3,6 +3,7 @@ import { getSetting, listApplications, listTestDoubles, listTestOverrides, listT
 import { canWatch } from "./access";
 import { scheduleClassFor, scheduleKey, schoolDaysFor, type ScheduleClass } from "./schedule";
 import { earlyTestDay, testPlan, testsForClassDay, type TestSpec } from "./tests";
+import { studentDays } from "./studentDays";
 
 // 문풀반·속성반(속성반도 문풀반 수업을 들어요) 납부 완료 학생만 테스트를 봐요. 시작반은 X
 export const takesTests = (a: Application) => canWatch(a) && (a.course === "solve" || a.course === "intensive");
@@ -23,7 +24,8 @@ export type TestSlotView = { day: string; spec: TestSpec; result: TestResult | n
 
 // 학생 한 명의 오늘 테스트와 밀린 테스트(같은 달, 오늘 이전, 미제출)
 export async function studentTests(a: Application, today: string) {
-  const [{ plan }, classDays, results] = await Promise.all([planFor(a.cohort), classDaysOf(a), listTestResults({ appIds: [a.id] })]);
+  const [{ plan }, allDays, results] = await Promise.all([planFor(a.cohort), classDaysOf(a), listTestResults({ appIds: [a.id] })]);
+  const classDays = studentDays(allDays, a.created_at); // 중간 등록생은 첫 수업일부터
   const find = (day: string, spec: TestSpec) => results.find((r) => r.day === day && r.kind === spec.kind && r.test_no === spec.no) ?? null;
   const all: TestSlotView[] = classDays
     .filter((d) => d <= today)
@@ -65,7 +67,7 @@ export async function cohortTestStats(cohort: string, today: string): Promise<{ 
   }
   const stats = targets.map((app) => {
     const klass = scheduleClassFor(app.course, app.track);
-    const days = classDays.get(klass) ?? [];
+    const days = studentDays(classDays.get(klass) ?? [], app.created_at); // 중간 등록생은 첫 수업일부터
     const expected = days.filter((d) => d <= today).flatMap((d) => testsForClassDay(plan, days, d).map((spec) => ({ day: d, spec })));
     const mine = results.filter((r) => r.app_id === app.id);
     const avgOf = (kind: "word" | "rc") => {

@@ -49,7 +49,8 @@ export default async function NoticesAdmin() {
 
       {sortNotices(notices).map((n) => {
         const audience = people.filter((a) => noticeMatches(n, [a]));
-        const readSet = new Set(reads.filter((r) => r.notice_id === n.id).map((r) => r.app_id));
+        // 매달 반복 공지는 이번 기수에 확인한 기록만 세요
+        const readSet = new Set(reads.filter((r) => r.notice_id === n.id && (!n.repeat_monthly || r.cohort === cohort)).map((r) => r.app_id));
         const unread = audience.filter((a) => !readSet.has(a.id));
         return (
           <section key={n.id} className="card space-y-3">
@@ -57,7 +58,9 @@ export default async function NoticesAdmin() {
               <div>
                 <p className="font-jua text-xl text-sky-ink">{n.pinned && "📌 "}{n.title}</p>
                 <p className="text-sm text-slate-500">
-                  {specialDay(n.starts_on)} ~ {specialDay(n.ends_on)} · {isLive(n, today) ? "게시 중" : n.starts_on > today ? "게시 예정" : "게시 끝"} · {n.popup ? "팝업 O" : "팝업 X"}
+                  {n.repeat_monthly
+                    ? <>🔁 매달 반복 · 개강일부터 {n.repeat_days ?? 7}일 · {specialDay(n.starts_on)}부터</>
+                    : <>{specialDay(n.starts_on)} ~ {specialDay(n.ends_on)} · {isLive(n, today) ? "게시 중" : n.starts_on > today ? "게시 예정" : "게시 끝"}</>} · {n.popup ? "팝업 O" : "팝업 X"}
                 </p>
                 <p className="text-sm text-slate-500">대상: {describe(n.targets)}</p>
               </div>

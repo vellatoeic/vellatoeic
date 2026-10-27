@@ -32,16 +32,16 @@ test("같은 이름 대기 신청이 2건이면 확정하지 않고 기록만 '�
   assert.equal((await find(b)).deposit, "pending");
 });
 
-test("맞는 신청이 없으면 '확인 필요'로 기록만", async () => {
+test("맞는 신청이 없고 교재비로 가능한 금액이면 '신청서 대기'로 기록 (특강 신청도 없음)", async () => {
   await setup();
-  assert.equal((await handleBankSms("[우리은행] 입금 10,000원 10/07 1002***1 없는사람 잔액 1원")).result, "unmatched");
+  assert.equal((await handleBankSms("[우리은행] 입금 10,000원 10/07 1002***1 없는사람 잔액 1원")).result, "waiting");
 });
 
-test("금액이 1만 원이 아니면 무시하고 기록도 남기지 않아요", async () => {
+test("교재비로도 불가능한 금액이면 무시하고 기록도 남기지 않아요", async () => {
   const { add, find } = await setup();
   const id = await add("박세나");
   const before = (await listDepositEvents(1000)).length;
-  assert.equal((await handleBankSms("[신한은행] 입금 20,000원 박세나")).result, "ignored");
+  assert.equal((await handleBankSms("[신한은행] 입금 25,000원 박세나")).result, "ignored");
   assert.equal((await find(id)).deposit, "pending");
   assert.equal((await listDepositEvents(1000)).length, before);
 });
@@ -49,7 +49,8 @@ test("금액이 1만 원이 아니면 무시하고 기록도 남기지 않아요
 test("불라방 신청은 보증금 대상이 아니에요", async () => {
   const { add, find } = await setup();
   const id = await add("최온라", "online");
-  assert.equal((await handleBankSms("[신한은행] 입금 10,000원 최온라")).result, "unmatched");
+  // 불라방은 보증금이 없어서 특강 입금으로 보지 않아요 → 교재비일 수 있어 '신청서 대기'
+  assert.equal((await handleBankSms("[신한은행] 입금 10,000원 최온라")).result, "waiting");
   assert.equal((await find(id)).deposit, null);
 });
 
@@ -131,7 +132,7 @@ test("우리 학생과 관계없는 입금은 기록하지 않아요", async () 
 test("이미 납부 확인된 신청은 다시 바꾸지 않아요", async () => {
   const id = await newApp("이미납부", 10000);
   assert.equal((await handleBankSms("[신한은행] 입금 10,000원 이미납부")).result, "matched");
-  assert.equal((await handleBankSms("[신한은행] 입금 10,000원 이미납부")).result, "unmatched");
+  assert.equal((await handleBankSms("[신한은행] 입금 10,000원 이미납부")).result, "waiting");
   assert.equal((await getApplication(id))?.status, "paid");
 });
 
@@ -173,4 +174,43 @@ test("YBM 인강: 발송 3개월 지난 주문은 개인정보째 지우고, 그
   await cleanupYbmOrders();
   assert.equal(await getYbmOrder(old), null);
   assert.equal((await getYbmOrder(recent))?.name, "최근주문");
+});
+
+// ── 신청서보다 먼저 온 입금 (G) ──
+import { isBookAmount, linkWaitingDeposit } from "@/lib/deposits";
+
+test("교재비로 가능한 금액: 1~4권 ± 택배비, 인강 주문 1만 4천 원", () => {
+  for (const n of [10000, 14000, 20000, 24000, 30000, 34000, 40000, 44000]) assert.equal(isBookAmount(n), true, String(n));
+  for (const n of [5000, 25000, 50000, 55000, 13000]) assert.equal(isBookAmount(n), false, String(n));
+});
+
+test("입금이 먼저 오고 신청서가 나중에 오면 자동으로 납부 확인", async () => {
+  assert.equal((await handleBankSms("[신한은행] 입금 30,000원 선입금")).result, "waiting");
+  const id = await newApp("선입금", 30000);
+  assert.equal(await linkWaitingDeposit({ kind: "app", id, depositor: "선입금", amount: 30000 }), "linked");
+  assert.equal((await getApplication(id))?.status, "paid");
+  const ev = (await listDepositEvents(1000)).find((e) => e.application_id === id);
+  assert.equal(ev?.result, "resolved");
+});
+
+test("금액이 다르면 연결하지 않아요", async () => {
+  await handleBankSms("[신한은행] 입금 20,000원 금액틀림");
+  const id = await newApp("금액틀림", 30000);
+  assert.equal(await linkWaitingDeposit({ kind: "app", id, depositor: "금액틀림", amount: 30000 }), "none");
+  assert.equal((await getApplication(id))?.status, "pending");
+});
+
+test("같은 이름·금액 대기 입금이 여러 건이면 확정하지 않고 '확인 필요'", async () => {
+  await handleBankSms("[신한은행] 입금 20,000원 두번입금");
+  await handleBankSms("[신한은행] 입금 20,000원 두번입금");
+  const id = await newApp("두번입금", 20000);
+  assert.equal(await linkWaitingDeposit({ kind: "app", id, depositor: "두번입금", amount: 20000 }), "review");
+  assert.equal((await getApplication(id))?.status, "pending");
+});
+
+test("인강 주문보다 먼저 온 1만 4천 원도 주문이 들어오면 연결", async () => {
+  await handleBankSms("[농협] 입금 14,000원 인강먼저");
+  const id = await newYbm("인강먼저");
+  assert.equal(await linkWaitingDeposit({ kind: "ybm", id, depositor: "인강먼저", amount: 14000 }), "linked");
+  assert.equal((await getYbmOrder(id))?.status, "paid");
 });

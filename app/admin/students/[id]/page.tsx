@@ -9,7 +9,7 @@ import { specialDay } from "@/lib/special";
 import { TEST_LABEL } from "@/lib/tests";
 import { missionCount } from "@/lib/mission";
 import { watchSummary } from "@/lib/watchlist";
-import { cancelHomeworkSticker, changeCohort, cycleAttendance } from "@/app/actions";
+import { cancelHomeworkSticker, changeCohort, cycleAttendance, extendAudio } from "@/app/actions";
 import { movableCohorts } from "@/lib/cohortMove";
 import { thisMonthKST } from "@/lib/config";
 import CloseOnSubmitForm from "../../CloseOnSubmitForm";
@@ -18,6 +18,8 @@ import { defaultHolidays, holidayKey, parseHolidays, schoolDaysFor, scheduleClas
 import StickerBoard from "@/app/class/StickerBoard";
 import AdminTabs from "../../AdminTabs";
 import LoginForm from "../../LoginForm";
+import { studentDays } from "@/lib/studentDays";
+import { audioBooksFor, studentAudioWindow } from "@/lib/audio";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "학생 정보 · vella_toeic", robots: { index: false } };
@@ -43,13 +45,14 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
   const [rawDays, rawHolidays, cafeUrl] = await Promise.all([getSetting(scheduleKey(a.cohort, klass)), getSetting(holidayKey(a.cohort)), getSetting("cafe_homework_url")]);
   const offDays = attendance.map((x) => x.day).filter((d) => !classDays.includes(d));
   const all = [...new Set([...classDays, ...offDays])].sort();
-  const s = watchSummary(classDays, attendance, homework.map((h) => h.day), today);
+  const s = watchSummary(studentDays(classDays, a.created_at), attendance, homework.map((h) => h.day), today);
   const testsOf = (d: string) => tests.filter((t) => t.day === d).sort((x, y) => x.kind.localeCompare(y.kind) || x.test_no - y.test_no);
   const pct = (kind: "word" | "rc") => {
     const list = tests.filter((t) => t.kind === kind);
     return list.length ? Math.round((list.reduce((sum, t) => sum + t.score / t.questions, 0) / list.length) * 100) : null;
   };
   const eventById = new Map(events.map((e) => [e.id, e]));
+  const audioWin = audioBooksFor(a).length > 0 ? await studentAudioWindow(a) : null;
   // 같은 이름의 다른 달 신청 (수강 이력) — 최신 달이 위
   const history = apps.filter((x) => x.name === a.name).sort((x, y) => y.cohort.localeCompare(x.cohort) || y.created_at.localeCompare(x.created_at));
   const phone = a.phone?.replace(/(\d{3})(\d{3,4})(\d{4})/, "$1-$2-$3");
@@ -103,6 +106,15 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
           {a.address && <><dt className="text-slate-500">주소</dt><dd>{a.address}</dd></>}
           <dt className="text-slate-500">신청</dt><dd>{new Date(a.created_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</dd>
         </dl>
+        {audioWin && (
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-sky-soft p-3 text-sm">
+            <span>🎧 LC 음원 기간 <b className="text-sky-ink">{specialDay(audioWin.start)} ~ {specialDay(audioWin.end)}</b>{audioWin.end < today ? " (지남)" : ""}{a.audio_extended_until ? " · 다시 열어 줌" : ""}</span>
+            <form action={extendAudio} className="ml-auto">
+              <input type="hidden" name="id" value={a.id} />
+              <button className="btn-ghost !py-1.5 text-sm">음원 7일 다시 열기</button>
+            </form>
+          </div>
+        )}
         {mission?.intro_at && (
           <p className="rounded-2xl bg-sky-soft p-3 text-sm text-slate-600">
             📝 {mission.prev_score} → 목표 {mission.target_score} · 시험 {mission.exam_month}
@@ -175,7 +187,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
           cohort={a.cohort}
           className={`${COURSES[a.course].label} ${TRACKS[a.track]}`}
           klass={klass}
-          scheduleDays={schoolDaysFor(rawDays, a.cohort, klass)}
+          scheduleDays={studentDays(schoolDaysFor(rawDays, a.cohort, klass), a.created_at)}
           holidays={rawHolidays ? parseHolidays(rawHolidays, a.cohort) : defaultHolidays(a.cohort)}
           attendance={attendance}
           homework={homework.map(({ day, created_at }) => ({ day, created_at }))}

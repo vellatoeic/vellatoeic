@@ -40,6 +40,7 @@ export default async function MyPage({ params, searchParams }: { params: Promise
   return (
     <div className="space-y-6 pt-8">
       <div className="text-center">
+        <p className="mb-2 inline-block rounded-full bg-sky-deep px-5 py-1.5 font-jua text-2xl text-white">{Number(a.cohort.slice(5, 7))}월 수업</p>
         <h1 className="font-jua text-4xl text-sky-ink">
           {a.status === "pending" ? "아직 납부 전이에요" : online && a.status === "paid" ? "납부 확인 완료!" : "모든 준비 완료!"}
         </h1>

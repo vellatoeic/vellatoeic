@@ -1,7 +1,9 @@
 import "server-only";
 import { getSetting, listNoticeReads, listNotices, type Application } from "./db";
 import { activeStudentApps } from "./student";
-import { isForEveryone, isLive, myNotices, popupNotices, type Notice } from "./notices";
+import { isForEveryone, isLive, liveFor, myNotices, popupNotices, readKey, type Notice } from "./notices";
+import { classDaysOf } from "./classCalendar";
+import { studentStartDay } from "./studentDays";
 import { todayKST } from "./config";
 import { classAppsFor } from "./classCohort";
 
@@ -25,15 +27,18 @@ export async function noticeSummary() {
   const [{ loggedIn, apps }, all] = await Promise.all([noticeIdentity(), listNotices()]);
   if (!loggedIn || apps.length === 0) {
     // 로그인 안 한 방문자: '전체' 공지만, 기기당 한 번 (확인 여부는 브라우저에 저장)
-    const everyone = all.filter((n) => isForEveryone(n) && isLive(n, today));
+    const everyone = all.filter((n) => isForEveryone(n) && !n.repeat_monthly && isLive(n, today));
     return { loggedIn: false, popups: await withLinks(everyone.filter((n) => n.popup)), unread: 0, visitorIds: everyone.map((n) => n.id) };
   }
-  const reads = new Set((await listNoticeReads({ appIds: apps.map((a) => a.id) })).map((r) => r.notice_id));
-  const mine = myNotices(all, apps, today);
+  // 반복 공지용: 학생 첫 수업일(반 개강일, 중간 등록생은 신청 후 첫 수업일)
+  const students = await Promise.all(apps.map(async (a) => ({ ...a, start: studentStartDay(await classDaysOf(a), a.created_at) })));
+  const cohort = apps[0].cohort;
+  const reads = new Set((await listNoticeReads({ appIds: apps.map((a) => a.id) })).flatMap((r) => (r.cohort ? [r.notice_id, `${r.notice_id}:${r.cohort}`] : [r.notice_id])));
+  const mine = myNotices(all, students, today);
   return {
     loggedIn: true,
-    popups: await withLinks(popupNotices(all, apps, reads, today)),
-    unread: mine.filter((n) => isLive(n, today) && !reads.has(n.id)).length,
+    popups: await withLinks(popupNotices(all, students, reads, today)),
+    unread: mine.filter((n) => liveFor(n, students, today) && !reads.has(readKey(n, cohort))).length,
     visitorIds: [] as string[],
   };
 }

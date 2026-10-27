@@ -5,6 +5,9 @@ import { missionCount, studentMission, type MissionStep } from "@/lib/mission";
 import StudentLogin from "@/app/class/StudentLogin";
 import { activeStudentApps } from "@/lib/student";
 import IntroForm from "./IntroForm";
+import { studentStartDay } from "@/lib/studentDays";
+import { classDaysOf } from "@/lib/classCalendar";
+import { specialDay } from "@/lib/special";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "첫 수업 미션 · vella_toeic", robots: { index: false } };
@@ -32,6 +35,8 @@ export default async function MissionPage() {
   const { app, mission } = current;
   const [cafeUrl, cafeHomeworkUrl, blogUrl] = await Promise.all([getSetting("cafe_url"), getSetting("cafe_homework_url"), getSetting("blog_url")]);
   const count = missionCount(mission);
+  // 첫 수업 미션: 학생 첫 수업일 기준 (중간 등록생은 신청 후 첫 수업일)
+  const start = studentStartDay(await classDaysOf(app), app.created_at);
   const firstName = app.name.length > 1 ? app.name.slice(1) : app.name;
 
   const links: { step: MissionStep; n: number; title: string; sub: string; href: string; go: string; did: string }[] = [
@@ -44,7 +49,7 @@ export default async function MissionPage() {
   return (
     <div className="mx-auto max-w-md space-y-2.5 pt-8">
       <h1 className="text-center font-jua text-[26px] text-sky-ink">첫 수업 미션 ✅</h1>
-      <p className="text-center text-sm text-[#6b93ad]">{firstName}님, 4개만 하면 웰컴 배지를 받아요!<br />첫 수업 시간에 다 같이 해요 :)</p>
+      <p className="text-center text-sm text-[#6b93ad]">{firstName}님, 4개만 하면 웰컴 배지를 받아요!<br />{start ? `첫 수업(${specialDay(start)}) 시간에 다 같이 해요 :)` : "첫 수업 시간에 다 같이 해요 :)"}</p>
 
       <section className="mt-3 rounded-[20px] bg-white px-4 py-3.5 shadow-[0_2px_0_#d5ecf9]">
         <div className="flex items-center justify-between font-jua text-base text-sky-ink"><span>미션 진행</span><span>{count} / 4</span></div>

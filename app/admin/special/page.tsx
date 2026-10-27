@@ -177,6 +177,7 @@ export default async function SpecialAdminPage() {
                     matched: { label: "자동 확정", tone: "bg-emerald-100 text-emerald-700" },
                     resolved: { label: "직접 확정", tone: "bg-emerald-100 text-emerald-700" },
                     review: { label: "확인 필요 · 같은 이름 여러 건", tone: "bg-red-100 text-red-600" },
+                    waiting: { label: "신청서 기다리는 중", tone: "bg-amber-100 text-amber-700" },
                     unmatched: { label: !e.name ? "확인 필요 · 문자를 못 읽음" : "확인 필요 · 맞는 신청 없음", tone: "bg-red-100 text-red-600" },
                     dismissed: { label: "무시", tone: "bg-slate-100 text-slate-500" },
                   }[e.result];
