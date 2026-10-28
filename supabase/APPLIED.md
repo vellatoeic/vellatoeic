@@ -29,6 +29,7 @@ Vella가 Supabase SQL Editor에서 실행했다고 확인한 SQL 파일만 기�
 | `23_faq_update.sql` | 완료 | FAQ 답 2개 수정(불라방 특강 듣는 법, 입금 확인 중), 🎤 특강 질문 3개·📝 데일리 테스트 카테고리 질문 3개 추가 |
 | `24_monthly_ops.sql` | 완료 | 신청 납부 확인 시각(paid_at)·음원 연장일(audio_extended_until), 공지 매달 반복(repeat_monthly·repeat_days), 공지 확인 기록 기수(cohort) 추가, 입금 기록 결과에 'waiting' 허용(결과 규칙 교체, 데이터 그대로) |
 | `25_sticker_gifts.sql` | 완료 | 스티커판 완성 선물 표(gift_items·gift_draws) 생성, 수량을 넘지 않는 뽑기 함수(draw_gift) 생성 |
+| `26_delete_student_question.sql` | 완료 | 지난 질문함의 학생 질문 1개 삭제(질문이 정확히 1개일 때만, 표·FAQ는 그대로) |
 
 ## 기록 갱신 규칙
 
