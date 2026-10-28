@@ -7,7 +7,7 @@ import {
   type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
 } from "@/lib/config";
 import {
-  createApplication, listApplications, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
+  createApplication, listApplications, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, setHomeworkStar, drawGift, getGiftDraw, saveGiftItem, deleteGiftItem, setGiftSent, type GiftDraw, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
   saveMission, type Mission, createYbmOrder, listYbmOrders, updateYbmOrders, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, setTestDouble, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
 } from "@/lib/db";
 import { canWatch, isActive, loginApps } from "@/lib/access";
@@ -17,11 +17,13 @@ import { classDaysOf, planFor, takesTests } from "@/lib/dailyTests";
 import { noticeIdentity } from "@/lib/noticeView";
 import type { NoticeSection, NoticeTarget } from "@/lib/notices";
 import { activeStudentApps } from "@/lib/student";
-import { SCHEDULE_CLASSES, holidayKey, homeworkAssignmentDays, parseHolidays, parseSchoolDays, previousMonth, scheduleKey, scheduleClassFor, schoolDaysFor, shiftSchoolDays, type ScheduleClass } from "@/lib/schedule";
+import { SCHEDULE_CLASSES, holidayKey, homeworkAssignmentDays, isHomeworkStickerEligible, parseHolidays, parseSchoolDays, previousMonth, scheduleKey, scheduleClassFor, schoolDaysFor, shiftSchoolDays, type ScheduleClass } from "@/lib/schedule";
 import { specialRegistrationOpen } from "@/lib/special";
 import { MISSION_STEPS, studentMission, type MissionStep } from "@/lib/mission";
 import { AUDIO_MAX_BYTES, audioExpiresOn, autoCleanupAudios, isAudioBook } from "@/lib/audio";
-import { classCohortNow } from "@/lib/classCohort";
+import { classAppsFor, classCohortNow } from "@/lib/classCohort";
+import { boardsFor, giftCode, kindText, klassText, studentKeyOf } from "@/lib/gifts";
+import { giftWindowOpen } from "@/lib/stickerComplete";
 import { planCohortMove } from "@/lib/cohortMove";
 import { linkWaitingDeposit } from "@/lib/deposits";
 import { signupMonths } from "@/lib/signupMonthsServer";
@@ -229,6 +231,11 @@ export async function saveSettings(fd: FormData) {
   // 현재 모집 기수: 관리 화면 기본 표시용. 비우면 신청서 수강 월 규칙대로 자동
   if (/^\d{4}-\d{2}$/.test(c) || (fd.has("current_cohort") && c === "")) await setSetting("current_cohort", c);
   // 강의실 단톡방 (오픈채팅 링크·참여코드). 참여코드를 바꾸면 바꾼 날을 남겨 '이번 달 할 일'에서 확인해요.
+  // 벨라토익 카톡 채널 주소 (선물 결과 카드의 [카톡 채널 열기] 버튼)
+  if (fd.has("kakao_channel_url")) {
+    const ch = clean(fd.get("kakao_channel_url"));
+    if (!ch || /^https:\/\//.test(ch)) await setSetting("kakao_channel_url", ch);
+  }
   if (fd.has("chat_url")) {
     const chatUrl = clean(fd.get("chat_url"));
     if (!chatUrl || /^https:\/\//.test(chatUrl)) await setSetting("chat_url", chatUrl);
@@ -1028,6 +1035,20 @@ export async function cancelHomeworkSticker(fd: FormData) {
   revalidatePath("/class");
 }
 
+// 관리자: 숙제 칸을 누를 때마다 [없음 → ⭐ 숙제 → 없음]. 늦은 숙제(✓)도 누르면 ⭐로 바뀌어요.
+// 관리자가 붙인 ⭐는 제출 시각과 상관없이 별로 인정돼요 (그 수업일 시각으로 기록).
+export async function cycleHomework(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const id = clean(fd.get("id"));
+  const day = clean(fd.get("day"));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+  const rec = (await listStamps([id])).homework.find((x) => x.day === day);
+  if (rec && isHomeworkStickerEligible(day, rec.created_at)) await deleteHomeworkSticker(id, day);
+  else await setHomeworkStar(id, day);
+  revalidatePath("/admin", "layout");
+  revalidatePath("/class");
+}
+
 // 예전에 저장한 숙제 사진을 지난 기수 기준으로 정리해요.
 export async function cleanupPhotos(): Promise<void> {
   if (!(await isAdmin())) return;
@@ -1136,4 +1157,53 @@ export async function bulkChangeClass(fd: FormData) {
     await updateApplication(a.id, { course, track, continuing, books, amount: calcAmount(books, a.pickup) });
   }
   revalidatePath("/admin");
+}
+
+// ── 스티커판 완성 선물 ───────────────────────────
+// 학생: 🎁 선물 뽑기. 수업 기수 신청 중 선물 대상(격일반 제외)이고 스티커판 완성, 마지막 수업일부터 7일 안.
+// 학생 1명(같은 로그인)당 기수마다 1번. 이미 뽑았으면 같은 결과를 돌려줘요.
+export async function drawMyGift(): Promise<{ draw?: GiftDraw; error?: string }> {
+  const { apps } = await activeStudentApps();
+  const { cohort, apps: mine } = await classAppsFor(apps.filter(canWatch));
+  if (!cohort || mine.length === 0) return { error: "강의실에 로그인해 주세요." };
+  const key = studentKeyOf(mine);
+  const already = await getGiftDraw(cohort, key);
+  if (already) return { draw: already };
+  const today = todayKST();
+  const done = (await boardsFor(mine, today)).find((b) => b.eligible && b.status.complete);
+  if (!done) return { error: "스티커판을 완성하면 선물을 뽑을 수 있어요." };
+  if (!giftWindowOpen(done.status.last, today)) return { error: "선물 뽑기 기간(마지막 수업일부터 7일)이 아니에요." };
+  const draw = await drawGift({ cohort, student_key: key, app_id: done.app.id, name: done.app.name, klass: klassText(done.app), kind: kindText(done.app), code: giftCode() });
+  revalidatePath("/admin/stamps");
+  return { draw };
+}
+
+// 관리자: 선물 추가·수정 (수량을 비우면 무제한 기본 선물)
+export async function saveGiftAction(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const cohort = clean(fd.get("cohort"));
+  const name = clean(fd.get("name")).slice(0, 60);
+  const q = clean(fd.get("quantity"));
+  if (!/^\d{4}-\d{2}$/.test(cohort) || !name) return;
+  const quantity = q === "" ? null : Math.max(0, Math.floor(Number(q)) || 0);
+  await saveGiftItem({ id: clean(fd.get("id")) || undefined, cohort, name, quantity });
+  revalidatePath("/admin/stamps");
+}
+
+export async function deleteGiftAction(fd: FormData) {
+  if (!(await isAdmin())) return;
+  await deleteGiftItem(clean(fd.get("id")));
+  revalidatePath("/admin/stamps");
+}
+
+// 관리자: 선물 보냄 체크 (개별·일괄). sent=0이면 되돌려요.
+export async function markGiftSent(fd: FormData) {
+  if (!(await isAdmin())) return;
+  // 한 줄의 [보냄] 버튼이면 그 한 명만, 아니면 체크한 사람 모두
+  const one = clean(fd.get("one"));
+  const [id, sent] = one ? one.split("|") : ["", ""];
+  if (one) await setGiftSent([id], sent !== "0");
+  else await setGiftSent(checkedIds(fd), clean(fd.get("sent")) !== "0");
+  revalidatePath("/admin/stamps");
+  revalidatePath("/class");
 }

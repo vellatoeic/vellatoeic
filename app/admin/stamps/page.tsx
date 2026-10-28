@@ -5,10 +5,12 @@ import { isAdmin } from "@/lib/auth";
 import { canWatch } from "@/lib/access";
 import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
 import { specialDay } from "@/lib/special";
+import { isHomeworkStickerEligible } from "@/lib/schedule";
 import { watchSummary, WATCH_CATEGORIES, WATCH_RULES, isWatchCategory, type WatchCategory, type WatchSummary } from "@/lib/watchlist";
 import CopyText from "../CopyText";
-import { bulkStamp, cleanupPhotos, cycleAttendance } from "@/app/actions";
+import { bulkStamp, cleanupPhotos, cycleAttendance, cycleHomework } from "@/app/actions";
 import SelectAll from "../SelectAll";
+import GiftAdmin from "./GiftAdmin";
 import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
 import { classCohortNow } from "@/lib/classCohort";
@@ -28,7 +30,7 @@ function mark(rec: Attendance | undefined, day: string, today: string) {
   return { t: "·", cls: "text-red-400", label: "결석" };
 }
 
-export default async function Stamps({ searchParams }: { searchParams: Promise<{ b?: string; d?: string; t?: string; q?: string; wc?: string; wb?: string; wt?: string }> }) {
+export default async function Stamps({ searchParams }: { searchParams: Promise<{ b?: string; d?: string; t?: string; q?: string; wc?: string; wb?: string; wt?: string; gc?: string; gq?: string }> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
   const sp = await searchParams;
   const cohort = await classCohortNow(); // 수업 기수(날짜 기준)
@@ -102,6 +104,9 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
     <div className="space-y-6 pt-8">
       <AdminTabs active="stamps" />
 
+      {/* 🎁 스티커판 완성 선물 (기본: 수업 기수) */}
+      <GiftAdmin cohort={/^\d{4}-\d{2}$/.test(sp.gc ?? "") ? sp.gc! : cohort} q={sp.gq ?? ""} />
+
       <div className="card flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="font-jua text-xl text-sky-ink">출석 QR</p>
@@ -173,11 +178,22 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
                   )}
                 </div>
                 <div className="border-t border-sky-soft pt-2">
-                  <p className="mb-1.5 text-sm font-bold text-amber-600">⭐ 숙제 {did.length} / {group.length}</p>
+                  <p className="mb-1.5 text-sm font-bold text-amber-600">⭐ 숙제 {did.length} / {group.length} <span className="font-normal text-slate-400">· 이름을 누르면 ⭐ 붙이기/떼기</span></p>
                   <div className="flex flex-wrap gap-1.5">
-                    {did.map((a) => <span key={a.id} className="rounded-full bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-700">{a.name}</span>)}
+                    {[...did, ...notDid].map((a) => {
+                      const h = hw(a.id, d);
+                      const star = !!h && isHomeworkStickerEligible(d, h.created_at);
+                      return (
+                        <form key={a.id} action={cycleHomework} className="inline">
+                          <input type="hidden" name="id" value={a.id} />
+                          <input type="hidden" name="day" value={d} />
+                          <button className={`rounded-full px-3 py-1.5 text-sm font-bold ${star ? "bg-amber-100 text-amber-700" : h ? "bg-amber-50 text-amber-600 ring-1 ring-amber-200" : "bg-white text-slate-400 ring-1 ring-slate-200"}`}>
+                            {star ? "⭐ " : h ? "✓ " : ""}{a.name}
+                          </button>
+                        </form>
+                      );
+                    })}
                   </div>
-                  {notDid.length > 0 && <p className="mt-2 text-sm text-slate-500">미제출 {notDid.length}: {notDid.map((a) => a.name).join(", ")}</p>}
                 </div>
               </article>
             );

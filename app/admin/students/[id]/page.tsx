@@ -9,7 +9,7 @@ import { specialDay } from "@/lib/special";
 import { TEST_LABEL } from "@/lib/tests";
 import { missionCount } from "@/lib/mission";
 import { watchSummary } from "@/lib/watchlist";
-import { cancelHomeworkSticker, changeCohort, cycleAttendance, extendAudio } from "@/app/actions";
+import { changeCohort, cycleAttendance, cycleHomework, extendAudio } from "@/app/actions";
 import { movableCohorts } from "@/lib/cohortMove";
 import { thisMonthKST } from "@/lib/config";
 import CloseOnSubmitForm from "../../CloseOnSubmitForm";
@@ -45,6 +45,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
   const [rawDays, rawHolidays, cafeUrl] = await Promise.all([getSetting(scheduleKey(a.cohort, klass)), getSetting(holidayKey(a.cohort)), getSetting("cafe_homework_url")]);
   const offDays = attendance.map((x) => x.day).filter((d) => !classDays.includes(d));
   const all = [...new Set([...classDays, ...offDays])].sort();
+  const lastDay = classDays.at(-1) ?? ""; // 마지막 수업일은 숙제 없이 출석만
   const s = watchSummary(studentDays(classDays, a.created_at), attendance, homework.map((h) => h.day), today);
   const testsOf = (d: string) => tests.filter((t) => t.day === d).sort((x, y) => x.kind.localeCompare(y.kind) || x.test_no - y.test_no);
   const pct = (kind: "word" | "rc") => {
@@ -218,13 +219,16 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
                     </button>
                   </form>
                 )}
-                {hw ? (
-                  <form action={cancelHomeworkSticker}>
+                {d === lastDay && !hw ? <span className="text-xs text-slate-400">마지막 날 · 출석만</span> : d > today && !hw ? null : (
+                  // 누를 때마다 없음 → ⭐ 숙제 → 없음 (늦은 숙제 ✓는 누르면 ⭐)
+                  <form action={cycleHomework}>
                     <input type="hidden" name="id" value={a.id} />
                     <input type="hidden" name="day" value={d} />
-                    <button className="rounded-full bg-amber-50 px-3 py-1" title="누르면 숙제 기록을 취소해요">{star ? "⭐ 숙제" : "✓ 숙제(늦음, 별 없음)"} · 취소</button>
+                    <button className={`rounded-full px-3 py-1 ${star ? "bg-amber-100 font-bold text-amber-700" : hw ? "bg-amber-50 text-amber-700" : "bg-slate-50 text-slate-400"}`} title="누르면 없음 → ⭐ 숙제 → 없음 순서로 바뀌어요">
+                      {star ? "⭐ 숙제" : hw ? "✓ 숙제(늦음) → 눌러서 ⭐" : "· 숙제 없음"}
+                    </button>
                   </form>
-                ) : <span className="text-slate-300">숙제 없음</span>}
+                )}
                 {testsOf(d).map((t) => (
                   <span key={t.id} className="rounded-full bg-white px-3 py-1 ring-1 ring-sky-main">📝 {TEST_LABEL[t.kind]} {t.test_no} · <b className="text-sky-ink">{t.score}/{t.questions}</b></span>
                 ))}

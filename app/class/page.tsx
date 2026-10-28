@@ -24,6 +24,10 @@ import { defaultHolidays, holidayKey, parseHolidays, schoolDaysFor, scheduleClas
 import { classAppsFor } from "@/lib/classCohort";
 import { studentDays } from "@/lib/studentDays";
 import { shiftMonth } from "@/lib/signupMonths";
+import { boardsFor, studentKeyOf } from "@/lib/gifts";
+import { giftWindowOpen } from "@/lib/stickerComplete";
+import { getGiftDraw } from "@/lib/db";
+import GiftDraw from "@/components/gift/GiftDraw";
 
 const nextMonthOf = (today: string) => shiftMonth(today.slice(0, 7), 1);
 
@@ -56,6 +60,12 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
   const [cafeUrl, account, chatUrl, chatCode] = await Promise.all([getSetting("cafe_homework_url"), getSetting("bank_account"), getSetting("chat_url"), getSetting("chat_code")]);
   const pending = apps.filter((a) => a.status === "pending");
   const today = todayKST();
+  // 🎁 스티커판 완성 선물: 수업 기수 신청 기준, 학생 1명당 기수마다 1번 (격일반은 선물 없이 축하만)
+  const giftApps = paid.filter((a) => a.cohort === cohort);
+  const [giftBoards, kakaoChannel] = await Promise.all([boardsFor(giftApps, today), getSetting("kakao_channel_url")]);
+  const myDraw = cohort && giftApps.length ? await getGiftDraw(cohort, studentKeyOf(giftApps)) : null;
+  const giftDone = giftBoards.find((b) => b.eligible && b.status.complete);
+  const showGift = !!myDraw || (!!giftDone && giftWindowOpen(giftDone.status.last, today));
   const stamps = await listStamps(paid.map((a) => a.id));
   const missions = await listMissions(apps.map((a) => a.id));
   // LC 음원: 본인 반 첫 수업일부터 14일 동안만 보여요.
@@ -245,6 +255,8 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
       )}
 
       <p className="rounded-2xl bg-sky-soft px-4 py-3 text-sm text-sky-deep">강의 영상은 개강일 이후부터 열람할 수 있어요.</p>
+
+      {showGift && cohort && <GiftDraw initial={myDraw} month={Number(cohort.slice(5, 7))} channelUrl={kakaoChannel} />}
 
       {/* 단톡방: 이번 달 또는 다음 달 신청이 납부 완료된 학생에게만 (링크가 비어 있으면 숨김) */}
       {chatUrl && paid.some((a) => a.cohort === today.slice(0, 7) || a.cohort === nextMonthOf(today)) && (

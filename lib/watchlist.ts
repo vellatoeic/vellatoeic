@@ -29,7 +29,8 @@ export function watchSummary(classDays: string[], attendance: { day: string; lat
   const absentDays = past.filter((d) => !came.has(d));
   let streak = 0;
   for (let i = past.length - 1; i >= 0 && !came.has(past[i]); i--) streak++;
-  const hwDueDays = days.slice(1).filter((d) => addDays(d, 1) < today);
+  // 첫 수업일과 마지막 수업일(출석만)은 숙제를 세지 않아요
+  const hwDueDays = days.slice(1).filter((d) => d !== days.at(-1) && addDays(d, 1) < today);
   const hw = new Set(homeworkDays);
   const hwMissing = hwDueDays.filter((d) => !hw.has(d)).length;
   const reasons: string[] = [];

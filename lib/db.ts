@@ -1152,6 +1152,19 @@ export async function addHomeworkSticker(app_id: string, day: string, createdAt?
   if (!mem.homework.some((x) => x.app_id === app_id && x.day === day)) mem.homework.push({ app_id, day, photo_path: null, created_at: createdAt ?? new Date().toISOString() });
 }
 
+// 관리자가 붙이는 ⭐: 제출 시각을 그 수업일 낮 12시(한국)로 기록해서 언제 붙여도 별로 인정돼요.
+export async function setHomeworkStar(app_id: string, day: string) {
+  const created_at = new Date(`${day}T12:00:00+09:00`).toISOString();
+  if (sb) {
+    const { error } = await sb.from("homework").upsert({ app_id, day, created_at }, { onConflict: "app_id,day" });
+    if (error) throw error;
+    return;
+  }
+  const old = mem.homework.find((x) => x.app_id === app_id && x.day === day);
+  if (old) old.created_at = created_at;
+  else mem.homework.push({ app_id, day, photo_path: null, created_at });
+}
+
 export async function deleteHomeworkSticker(app_id: string, day: string) {
   if (sb) {
     const { data, error: selectError } = await sb.from("homework").select("photo_path").eq("app_id", app_id).eq("day", day).maybeSingle();
@@ -1217,4 +1230,106 @@ export async function deletePhotosBefore(cohort: string): Promise<number> {
   }
   for (const k of Object.keys(mem.photos)) if (k.split("/")[0] < cohort) { delete mem.photos[k]; n++; }
   return n;
+}
+
+// ── 스티커판 완성 선물 ───────────────────────────
+export type GiftItem = { id: string; cohort: string; name: string; quantity: number | null; created_at: string };
+export type GiftDraw = {
+  id: string; cohort: string; student_key: string; app_id: string | null; name: string; klass: string; kind: string;
+  gift_id: string | null; gift_name: string; code: string; drawn_at: string; sent_at: string | null;
+};
+const memGifts: { items: GiftItem[]; draws: GiftDraw[] } = ((globalThis as { __vellaGifts?: { items: GiftItem[]; draws: GiftDraw[] } }).__vellaGifts ??= { items: [], draws: [] });
+
+export async function listGiftItems(cohort: string): Promise<GiftItem[]> {
+  if (sb) {
+    const { data, error } = await sb.from("gift_items").select("*").eq("cohort", cohort).order("created_at");
+    if (error) throw error;
+    return data as GiftItem[];
+  }
+  return memGifts.items.filter((g) => g.cohort === cohort);
+}
+
+export async function saveGiftItem(g: { id?: string; cohort: string; name: string; quantity: number | null }) {
+  if (sb) {
+    const { error } = g.id
+      ? await sb.from("gift_items").update({ name: g.name, quantity: g.quantity }).eq("id", g.id)
+      : await sb.from("gift_items").insert({ cohort: g.cohort, name: g.name, quantity: g.quantity });
+    if (error) throw error;
+    return;
+  }
+  const old = g.id ? memGifts.items.find((x) => x.id === g.id) : undefined;
+  if (old) Object.assign(old, { name: g.name, quantity: g.quantity });
+  else memGifts.items.push({ id: crypto.randomUUID(), cohort: g.cohort, name: g.name, quantity: g.quantity, created_at: new Date().toISOString() });
+}
+
+export async function deleteGiftItem(id: string) {
+  if (!isUuid(id)) return;
+  if (sb) {
+    const { error } = await sb.from("gift_items").delete().eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  memGifts.items = memGifts.items.filter((g) => g.id !== id);
+  for (const d of memGifts.draws) if (d.gift_id === id) d.gift_id = null;
+}
+
+export async function listGiftDraws(cohort: string): Promise<GiftDraw[]> {
+  if (sb) {
+    const db = sb;
+    return allRows<GiftDraw>((from, to) => db.from("gift_draws").select("*").eq("cohort", cohort).order("drawn_at", { ascending: false }).order("id").range(from, to));
+  }
+  return memGifts.draws.filter((d) => d.cohort === cohort).sort((a, b) => b.drawn_at.localeCompare(a.drawn_at));
+}
+
+export async function getGiftDraw(cohort: string, studentKey: string): Promise<GiftDraw | null> {
+  if (sb) {
+    const { data, error } = await sb.from("gift_draws").select("*").eq("cohort", cohort).eq("student_key", studentKey).maybeSingle();
+    if (error) throw error;
+    return (data as GiftDraw) ?? null;
+  }
+  return memGifts.draws.find((d) => d.cohort === cohort && d.student_key === studentKey) ?? null;
+}
+
+// 뽑기: DB 함수(draw_gift)가 잠금을 걸고 남은 수량 기준으로 정해요. 이미 뽑았으면 그 기록을 돌려줘요.
+export async function drawGift(p: { cohort: string; student_key: string; app_id: string; name: string; klass: string; kind: string; code: string }): Promise<GiftDraw> {
+  if (sb) {
+    const { data, error } = await sb.rpc("draw_gift", {
+      p_cohort: p.cohort, p_student_key: p.student_key, p_app_id: p.app_id, p_name: p.name, p_klass: p.klass, p_kind: p.kind, p_code: p.code,
+    });
+    if (error) throw error;
+    return (Array.isArray(data) ? data[0] : data) as GiftDraw;
+  }
+  const existing = memGifts.draws.find((d) => d.cohort === p.cohort && d.student_key === p.student_key);
+  if (existing) return existing;
+  const used = (id: string) => memGifts.draws.filter((d) => d.cohort === p.cohort && d.gift_id === id).length;
+  const items = memGifts.items.filter((g) => g.cohort === p.cohort);
+  const limited = items.filter((g) => g.quantity !== null && g.quantity - used(g.id) > 0);
+  let chosen: GiftItem | undefined;
+  if (limited.length) {
+    const total = limited.reduce((s, g) => s + (g.quantity! - used(g.id)), 0);
+    let r = Math.random() * total;
+    chosen = limited.find((g) => (r -= g.quantity! - used(g.id)) < 0) ?? limited.at(-1);
+  } else {
+    const unlimited = items.filter((g) => g.quantity === null);
+    chosen = unlimited[Math.floor(Math.random() * unlimited.length)];
+  }
+  const row: GiftDraw = { ...p, id: crypto.randomUUID(), gift_id: chosen?.id ?? null, gift_name: chosen?.name ?? "벨라토익 선물", drawn_at: new Date().toISOString(), sent_at: null };
+  memGifts.draws.push(row);
+  return row;
+}
+
+export async function setGiftSent(ids: string[], sent: boolean) {
+  const ok = ids.filter(isUuid);
+  if (ok.length === 0) return;
+  const sent_at = sent ? new Date().toISOString() : null;
+  if (sb) {
+    const db = sb;
+    await inChunks(ok, async (chunk) => {
+      const { error } = await db.from("gift_draws").update({ sent_at }).in("id", chunk);
+      if (error) throw error;
+      return [];
+    });
+    return;
+  }
+  for (const d of memGifts.draws) if (ok.includes(d.id)) d.sent_at = sent_at;
 }

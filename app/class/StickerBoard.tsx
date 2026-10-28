@@ -4,6 +4,7 @@ import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { cancelMyHomeworkDone, markHomeworkDone } from "@/app/actions";
 import { homeworkAssignmentDays, isHomeworkStickerEligible, weekDaysInMonth, type ScheduleClass } from "@/lib/schedule";
 import Cloud from "@/components/Cloud";
+import { boardStatus } from "@/lib/stickerComplete";
 
 type StampAttendance = { day: string };
 
@@ -42,7 +43,11 @@ export default function StickerBoard({
   const lessonDays = useMemo(() => new Set(scheduleDays), [scheduleDays]);
   const attendanceByDay = useMemo(() => new Map(attendance.map((item) => [item.day, item])), [attendance]);
   const homeworkByDay = useMemo(() => new Map(homework.map((item) => [item.day, item])), [homework]);
-  const homeworkAssignments = useMemo(() => homeworkAssignmentDays(scheduleDays).filter((day) => day <= today), [scheduleDays, today]);
+  // 마지막 수업일은 숙제 없이 출석만 해요
+  const homeworkAssignments = useMemo(() => {
+    const all = homeworkAssignmentDays(scheduleDays);
+    return all.filter((day) => day <= today && day !== all.at(-1));
+  }, [scheduleDays, today]);
   const [selectedHomeworkDay, setSelectedHomeworkDay] = useState("");
   const homeworkBox = useRef<HTMLDivElement>(null);
   // 달력에서 수업 날짜를 누르면 아래 숙제 칸에서 그 날짜를 골라요.
@@ -65,13 +70,17 @@ export default function StickerBoard({
   }
   const selectedHomeworkHasSticker = selectedHomework ? isHomeworkStickerEligible(homeworkTargetDay, selectedHomework.created_at) : false;
   const homeworkDays = useMemo(() => new Set(homework.filter((item) => isHomeworkStickerEligible(item.day, item.created_at)).map((item) => item.day)), [homework]);
-  const total = scheduleDays.length;
-  const attendanceCount = scheduleDays.filter((day) => attendanceByDay.has(day)).length;
-  const homeworkCount = scheduleDays.filter((day) => homeworkDays.has(day)).length;
+  // 완성 기준: 출석 전부(지각 포함) + 마지막 수업일을 뺀 숙제 전부 (lib/stickerComplete.ts)
+  const status = boardStatus(scheduleDays, attendance, homework, today);
+  const lastDay = status.last;
+  const total = status.total;
+  const homeworkTotal = status.hwTotal;
+  const attendanceCount = status.attended;
+  const homeworkCount = status.hw;
   const stickerCount = attendanceCount + homeworkCount;
   const alternating = klass.endsWith("-mw") || klass.endsWith("-tt");
   const stickerGoal = alternating ? 10 : 20;
-  const complete = total > 0 && attendanceCount === total && homeworkCount === total;
+  const complete = status.complete;
   const monthNumber = Number(cohort.slice(5));
   const monthName = `${monthNumber}월`;
   const firstName = name.length > 1 ? name.slice(1) : name;
@@ -87,7 +96,7 @@ export default function StickerBoard({
   const badgeStates = [
     { id: "welcome", title: "웰컴", count: welcome ? "미션 완료" : "첫 수업 미션", earned: welcome, icon: "welcome" as const, color: "#e8f8ef" },
     { id: "attendance", title: "출석", count: `${attendanceCount}/${total}`, earned: attendanceCount > 0, icon: "cloud" as const, color: "#d9f0fd" },
-    { id: "homework", title: "숙제", count: `${homeworkCount}/${total}`, earned: homeworkCount > 0, icon: "star" as const, color: "#fff3c4" },
+    { id: "homework", title: "숙제", count: `${homeworkCount}/${homeworkTotal}`, earned: homeworkCount > 0, icon: "star" as const, color: "#fff3c4" },
     { id: "stickers", title: `스티커 ${stickerGoal}개`, count: `${Math.min(stickerCount, stickerGoal)}/${stickerGoal}`, earned: stickerCount >= stickerGoal, icon: "medal" as const, color: "#ffe1ea" },
     { id: "course", title: `${monthNumber}월 강의`, count: `${attendanceCount}/${total}`, earned: complete, icon: "rainbow" as const, color: "linear-gradient(135deg,#ffd6e0,#fff1b8,#cdeffd,#d9d2ff)" },
   ];
@@ -226,7 +235,7 @@ export default function StickerBoard({
         {complete ? (
           <div className="sticker-complete mt-[14px] rounded-[22px] px-4 py-4 text-center">
             <b className="block font-jua text-2xl font-normal">🎉 {monthName} 스티커판 완성!</b>
-            <span className="mt-1 block text-[13.5px]">{total}회 강의 + 숙제 {total}개 완주<br />{firstName}님 정말 대단해요 🌈</span>
+            <span className="mt-1 block text-[13.5px]">{total}회 강의 + 숙제 {homeworkTotal}개 완주<br />{firstName}님 정말 대단해요 🌈</span>
           </div>
         ) : (
           <div className="mt-[14px] rounded-[22px] bg-white p-4 shadow-[0_2px_0_#d5ecf9]">
@@ -237,9 +246,10 @@ export default function StickerBoard({
             <Progress value={attendanceCount} total={total} color="#79c6ef" />
             <div className="mb-1.5 mt-3 flex items-baseline justify-between text-sm">
               <span>⭐ 숙제</span>
-              <span><b className="font-jua text-lg font-normal">{homeworkCount}</b> / {total}</span>
+              <span><b className="font-jua text-lg font-normal">{homeworkCount}</b> / {homeworkTotal}</span>
             </div>
-            <Progress value={homeworkCount} total={total} color="#ffd23f" />
+            <Progress value={homeworkCount} total={homeworkTotal} color="#ffd23f" />
+            {status.lastOnly && <p className="mt-2 text-center font-jua text-[15px] text-[#e5707e]">🎯 마지막 수업 출석만 하면 스티커판 완성!</p>}
             <p className="mt-3 rounded-[14px] bg-[#fff7d6] px-2 py-[9px] text-center font-jua text-base text-[#a7741a]">강의 완주까지 {Math.max(0, total - attendanceCount)}번 남았어요! 조금만 더 🔥</p>
           </div>
         )}
@@ -323,7 +333,7 @@ export default function StickerBoard({
                       {att ? <span className={cloudNew ? "mock-pop" : ""} style={{ display: "inline-block", transform: `rotate(${rotation}deg)`, ["--r" as string]: `${rotation}deg` } as React.CSSProperties}><CloudSticker fill="#79c6ef" size={27} /></span> : <EmptySlot />}
                     </div>
                     <div className="grid w-7 place-items-center">
-                      {didHomework ? <span className={starNew ? "mock-pop" : ""} style={{ display: "inline-block", transform: `rotate(${-rotation}deg)`, ["--r" as string]: `${-rotation}deg` } as React.CSSProperties}><StarSticker size={23} /></span> : future ? <EmptySlot /> : missed ? <EmptySlot /> : null}
+                      {day === lastDay ? <span className="text-center font-jua text-[9px] leading-tight text-[#79a9c6]">출석<br />만</span> : didHomework ?<span className={starNew ? "mock-pop" : ""} style={{ display: "inline-block", transform: `rotate(${-rotation}deg)`, ["--r" as string]: `${-rotation}deg` } as React.CSSProperties}><StarSticker size={23} /></span> : future ? <EmptySlot /> : missed ? <EmptySlot /> : null}
                     </div>
                   </div>}
                 </div>
