@@ -231,6 +231,12 @@ export async function saveSettings(fd: FormData) {
   // 현재 모집 기수: 관리 화면 기본 표시용. 비우면 신청서 수강 월 규칙대로 자동
   if (/^\d{4}-\d{2}$/.test(c) || (fd.has("current_cohort") && c === "")) await setSetting("current_cohort", c);
   // 강의실 단톡방 (오픈채팅 링크·참여코드). 참여코드를 바꾸면 바꾼 날을 남겨 '이번 달 할 일'에서 확인해요.
+  // 인스타 DM 주소 (FAQ 질문 안내 버튼). 비워 저장하면 '-'로 남겨 버튼을 숨겨요 (처음엔 기본 주소)
+  if (fd.has("instagram_dm_url")) {
+    const ig = clean(fd.get("instagram_dm_url"));
+    if (!ig) await setSetting("instagram_dm_url", "-");
+    else if (/^https:\/\//.test(ig)) await setSetting("instagram_dm_url", ig);
+  }
   // 벨라토익 카톡 채널 주소 (선물 결과 카드의 [카톡 채널 열기] 버튼)
   if (fd.has("kakao_channel_url")) {
     const ch = clean(fd.get("kakao_channel_url"));
@@ -592,17 +598,10 @@ export async function saveTestOverrideAction(fd: FormData) {
 }
 
 // ── 자주 묻는 질문 · 질문함 ─────────────────────
-// 학생: FAQ 아래 '여기 없는 질문 남기기' (로그인한 수강생만, 실명 저장, 알림 없음)
-export async function submitQuestion(_: FormState, fd: FormData): Promise<FormState> {
-  const { apps } = await activeStudentApps();
-  if (apps.length === 0) return { error: "강의실에 로그인한 수강생만 남길 수 있어요." };
-  const kind = clean(fd.get("kind"));
-  const content = String(fd.get("content") ?? "").trim().slice(0, 1000);
-  if (kind !== "question" && kind !== "suggestion") return { error: "질문 또는 제안을 골라 주세요." };
-  if (content.length < 2) return { error: "내용을 적어 주세요." };
-  await createQuestion({ app_id: apps[0].id, name: apps[0].name, kind, content });
-  revalidatePath("/admin/faq");
-  return { ok: "잘 받았어요! Vella쌤이 확인할게요." };
+// 학생 질문함은 닫았어요: 새 질문은 받지 않아요 (FAQ에서 카톡 채널·인스타 DM으로 안내)
+// 예전 화면이 열려 있어도 저장되지 않게 안내만 돌려줘요. 지난 질문은 관리자 [FAQ] 맨 아래 '지난 질문함'에 남아 있어요.
+export async function submitQuestion(_: FormState, _fd: FormData): Promise<FormState> {
+  return { error: "질문은 카톡 채널 또는 인스타 DM으로 보내 주세요." };
 }
 
 function faqFields(fd: FormData) {

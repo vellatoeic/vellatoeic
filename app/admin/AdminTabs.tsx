@@ -25,7 +25,7 @@ export default async function AdminTabs({ active }: { active: "apps" | "roster" 
           <Link href="/admin/lectures" className={tab(active === "lectures")}>강의 관리</Link>
           <Link href="/admin/audio" className={tab(active === "audio")}>LC 음원</Link>
           <Link href="/admin/notices" className={tab(active === "notices")}>공지</Link>
-          <Link href="/admin/faq" className={tab(active === "faq")}>FAQ·질문함</Link>
+          <Link href="/admin/faq" className={tab(active === "faq")}>FAQ</Link>
           <Link href="/admin/special" className={tab(active === "special")}>특강 관리{dot(refunds)}</Link>
         </div>
         <div className="flex items-center gap-3">

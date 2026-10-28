@@ -6,7 +6,7 @@ import LoginForm from "../LoginForm";
 import CloseOnSubmitForm from "../CloseOnSubmitForm";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "FAQ·질문함 · vella_toeic", robots: { index: false } };
+export const metadata = { title: "FAQ · vella_toeic", robots: { index: false } };
 
 function Fields({ item, categories }: { item?: FaqItem; categories: string[] }) {
   return (
@@ -36,36 +36,6 @@ export default async function FaqAdmin() {
   return (
     <div className="space-y-6 pt-8">
       <AdminTabs active="faq" />
-
-      <section className="card space-y-3">
-        <h2 className="font-jua text-2xl text-sky-ink">📮 질문함 <span className="text-base text-slate-400">· 확인 전 {unchecked}개</span></h2>
-        {questions.length === 0 ? <p className="text-sm text-slate-500">아직 남겨진 질문이 없어요.</p> : (
-          <ul className="space-y-2">
-            {questions.map((q) => (
-              <li key={q.id} className={`rounded-2xl p-3 ${q.checked ? "bg-slate-50 opacity-60" : "bg-sky-soft"}`}>
-                <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${q.kind === "question" ? "bg-white text-sky-deep" : "bg-amber-100 text-amber-700"}`}>{q.kind === "question" ? "❓ 질문" : "💡 제안"}</span>
-                  <b className="text-sky-ink">{q.name}</b>
-                  <span className="text-xs text-slate-400">{new Date(q.created_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-                </div>
-                <p className="mt-1.5 whitespace-pre-line text-[15px] text-slate-800">{q.content}</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <form action={toggleQuestionChecked}>
-                    <input type="hidden" name="id" value={q.id} />
-                    <button className="btn-ghost !py-1.5 text-sm">{q.checked ? "확인 취소" : "확인함 ✓"}</button>
-                  </form>
-                  {q.kind === "question" && (
-                    <form action={promoteQuestion}>
-                      <input type="hidden" name="id" value={q.id} />
-                      <button className="btn-ghost !py-1.5 text-sm">FAQ로 올리기 (숨김으로 추가)</button>
-                    </form>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
 
       <details className="card">
         <summary className="font-jua cursor-pointer text-lg text-sky-ink">+ FAQ 항목 추가하기</summary>
@@ -129,6 +99,37 @@ export default async function FaqAdmin() {
           </section>
         );
       })}
+
+      {/* 질문함은 닫았어요 (질문은 카톡 채널·인스타 DM으로). 지금까지 들어온 질문만 보관해요. */}
+      <details className="card space-y-3">
+        <summary className="font-jua cursor-pointer text-lg text-slate-500">📮 지난 질문함 <span className="text-sm text-slate-400">· {questions.length}개 (확인 전 {unchecked}개) · 새 질문은 더 받지 않아요</span></summary>
+        {questions.length === 0 ? <p className="text-sm text-slate-500">아직 남겨진 질문이 없어요.</p> : (
+          <ul className="space-y-2">
+            {questions.map((q) => (
+              <li key={q.id} className={`rounded-2xl p-3 ${q.checked ? "bg-slate-50 opacity-60" : "bg-sky-soft"}`}>
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${q.kind === "question" ? "bg-white text-sky-deep" : "bg-amber-100 text-amber-700"}`}>{q.kind === "question" ? "❓ 질문" : "💡 제안"}</span>
+                  <b className="text-sky-ink">{q.name}</b>
+                  <span className="text-xs text-slate-400">{new Date(q.created_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                </div>
+                <p className="mt-1.5 whitespace-pre-line text-[15px] text-slate-800">{q.content}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <form action={toggleQuestionChecked}>
+                    <input type="hidden" name="id" value={q.id} />
+                    <button className="btn-ghost !py-1.5 text-sm">{q.checked ? "확인 취소" : "확인함 ✓"}</button>
+                  </form>
+                  {q.kind === "question" && (
+                    <form action={promoteQuestion}>
+                      <input type="hidden" name="id" value={q.id} />
+                      <button className="btn-ghost !py-1.5 text-sm">FAQ로 올리기 (숨김으로 추가)</button>
+                    </form>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </details>
     </div>
   );
 }

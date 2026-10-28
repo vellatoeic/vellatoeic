@@ -174,7 +174,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   const now = await currentCohort();
   const { k = "all", p = "all", b = "all", t = "all", q = "", c = now, ra = "", mv = "" } = await searchParams;
   const everything = await listApplications();
-  const [account, cafeHomeworkUrl, cafeUrl, blogUrl, studyBoardUrl, chatUrl, chatCode, rawCohort, kakaoChannel] = await Promise.all([
+  const [account, cafeHomeworkUrl, cafeUrl, blogUrl, studyBoardUrl, chatUrl, chatCode, rawCohort, kakaoChannel, instaDm] = await Promise.all([
     getSetting("bank_account"),
     getSetting("cafe_homework_url"),
     getSetting("cafe_url"),
@@ -184,6 +184,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
     getSetting("chat_code"),
     getSetting("current_cohort"),
     getSetting("kakao_channel_url"),
+    getSetting("instagram_dm_url"),
   ]);
   const round = await roundFor(now);
   const checklist = await monthlyChecklist();
@@ -426,7 +427,11 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
             <input name="chat_code" defaultValue={chatCode} className="input" placeholder="예: 1234" />
           </label>
           <label className="sm:col-span-4">
-            <span className="label">🎁 벨라토익 카톡 채널 주소 <span className="font-normal text-slate-400">(선물 결과 카드의 [카톡 채널 열기] 버튼, 비우면 버튼 숨김)</span></span>
+            <span className="label">📷 인스타 DM 주소 <span className="font-normal text-slate-400">(FAQ 질문 안내의 [인스타 DM] 버튼, 비우면 버튼 숨김)</span></span>
+            <input type="url" name="instagram_dm_url" defaultValue={instaDm === "-" ? "" : instaDm || "https://ig.me/m/vella_toeic"} className="input" placeholder="https://ig.me/m/vella_toeic" />
+          </label>
+          <label className="sm:col-span-4">
+            <span className="label">🎁 벨라토익 카톡 채널 주소 <span className="font-normal text-slate-400">(선물 결과 카드·FAQ 질문 안내의 [카톡 채널] 버튼, 비우면 버튼 숨김)</span></span>
             <input type="url" name="kakao_channel_url" defaultValue={kakaoChannel} className="input" placeholder="https://pf.kakao.com/..." />
           </label>
           <button className="btn !py-3">저장</button>
