@@ -1,4 +1,4 @@
-import { getSetting, listFaq } from "@/lib/db";
+import { listFaq } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "자주 묻는 질문 · vella_toeic" };
@@ -21,9 +21,6 @@ export default async function FaqPage() {
       </div>
     );
   }
-  // 질문은 카톡 채널·인스타 DM으로 받아요 (질문함은 닫았어요). 주소가 비어 있으면 그 버튼은 숨겨요.
-  const [kakao, instaRaw] = await Promise.all([getSetting("kakao_channel_url"), getSetting("instagram_dm_url")]);
-  const insta = instaRaw === "-" ? "" : instaRaw || "https://ig.me/m/vella_toeic";
   const published = items.filter((f) => f.published);
   // 카테고리는 맨 앞 항목 순서대로 보여줘요.
   const categories = [...new Set(published.map((f) => f.category))];
@@ -58,16 +55,6 @@ export default async function FaqPage() {
         </details>
       ))}
 
-      {(kakao || insta) && (
-        <section className="card space-y-3 text-center">
-          <p className="font-jua text-xl text-sky-ink">💬 수업·문제 질문은 카톡 채널 또는 인스타 DM으로 보내 주세요</p>
-          <p className="text-sm text-slate-600">&apos;교재 · 페이지 · 문제 번호 + 헷갈린 부분&apos;을 함께 적어 주면 더 빨리 답해 드려요.</p>
-          <div className={`grid gap-2 ${kakao && insta ? "grid-cols-2" : "grid-cols-1"}`}>
-            {kakao && <a href={kakao} target="_blank" rel="noreferrer" className="rounded-2xl bg-[#fee500] py-3 font-jua text-lg text-[#3c1e1e]">카톡 채널 ↗</a>}
-            {insta && <a href={insta} target="_blank" rel="noreferrer" className="rounded-2xl bg-gradient-to-r from-[#f58529] via-[#dd2a7b] to-[#8134af] py-3 font-jua text-lg text-white">인스타 DM ↗</a>}
-          </div>
-        </section>
-      )}
     </div>
   );
 }

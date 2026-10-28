@@ -100,7 +100,7 @@ export default async function FaqAdmin() {
         );
       })}
 
-      {/* 질문함은 닫았어요 (질문은 카톡 채널·인스타 DM으로). 지금까지 들어온 질문만 보관해요. */}
+      {/* 질문함은 없앴어요. 지금까지 들어온 질문만 보관해요. */}
       <details className="card space-y-3">
         <summary className="font-jua cursor-pointer text-lg text-slate-500">📮 지난 질문함 <span className="text-sm text-slate-400">· {questions.length}개 (확인 전 {unchecked}개) · 새 질문은 더 받지 않아요</span></summary>
         {questions.length === 0 ? <p className="text-sm text-slate-500">아직 남겨진 질문이 없어요.</p> : (
