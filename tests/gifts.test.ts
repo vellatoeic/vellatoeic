@@ -55,11 +55,11 @@ test("선물 대상: 종합·속성·단과 O, 격일반 X", () => {
   assert.equal(giftEligibleTrack("alt_tt"), false);
 });
 
-test("뽑기 기간: 마지막 수업일부터 7일", () => {
+test("뽑기 버튼은 마지막 수업일 하루에만", () => {
   assert.equal(giftWindowOpen("2026-10-29", "2026-10-28"), false);
   assert.equal(giftWindowOpen("2026-10-29", "2026-10-29"), true);
-  assert.equal(giftWindowOpen("2026-10-29", "2026-11-04"), true);
-  assert.equal(giftWindowOpen("2026-10-29", "2026-11-05"), false);
+  assert.equal(giftWindowOpen("2026-10-29", "2026-10-30"), false);
+  assert.equal(giftWindowOpen(null, "2026-10-29"), false);
 });
 
 test("뽑기: 학생 1명당 기수마다 1번, 수량을 넘지 않고, 다 떨어지면 무제한 기본 선물", async () => {

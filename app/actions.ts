@@ -1160,7 +1160,7 @@ export async function bulkChangeClass(fd: FormData) {
 }
 
 // ── 스티커판 완성 선물 ───────────────────────────
-// 학생: 🎁 선물 뽑기. 수업 기수 신청 중 선물 대상(격일반 제외)이고 스티커판 완성, 마지막 수업일부터 7일 안.
+// 학생: 🎁 선물 뽑기. 수업 기수 신청 중 선물 대상(격일반 제외)이고 스티커판 완성, 마지막 수업일 당일만.
 // 학생 1명(같은 로그인)당 기수마다 1번. 이미 뽑았으면 같은 결과를 돌려줘요.
 export async function drawMyGift(): Promise<{ draw?: GiftDraw; error?: string }> {
   const { apps } = await activeStudentApps();
@@ -1172,7 +1172,7 @@ export async function drawMyGift(): Promise<{ draw?: GiftDraw; error?: string }>
   const today = todayKST();
   const done = (await boardsFor(mine, today)).find((b) => b.eligible && b.status.complete);
   if (!done) return { error: "스티커판을 완성하면 선물을 뽑을 수 있어요." };
-  if (!giftWindowOpen(done.status.last, today)) return { error: "선물 뽑기 기간(마지막 수업일부터 7일)이 아니에요." };
+  if (!giftWindowOpen(done.status.last, today)) return { error: "선물 뽑기는 마지막 수업일에만 할 수 있어요." };
   const draw = await drawGift({ cohort, student_key: key, app_id: done.app.id, name: done.app.name, klass: klassText(done.app), kind: kindText(done.app), code: giftCode() });
   revalidatePath("/admin/stamps");
   return { draw };

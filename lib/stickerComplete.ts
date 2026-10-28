@@ -32,9 +32,7 @@ export function boardStatus(days: string[], attendance: { day: string }[], homew
 // 선물 대상: 종합반·속성반·단과(RC/LC). 격일반은 제외
 export const giftEligibleTrack = (track: Track) => track === "all" || track === "rc" || track === "lc";
 
-// 선물 뽑기 가능 기간: 마지막 수업일부터 7일
+// 선물 뽑기 버튼은 학생 반 마지막 수업일 하루에만 떠요 (이미 뽑은 카드는 그 뒤에도 계속 보여요)
 export function giftWindowOpen(last: string | null, today: string) {
-  if (!last) return false;
-  const end = new Date(Date.parse(`${last}T00:00:00Z`) + 6 * 86400000).toISOString().slice(0, 10);
-  return last <= today && today <= end;
+  return !!last && today === last;
 }
