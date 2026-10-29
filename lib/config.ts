@@ -12,7 +12,7 @@ export type CourseId = "start" | "solve" | "intensive";
 export type Track = "all" | "rc" | "lc" | "alt_mw" | "alt_tt" | "alt";
 export type Kind = "onsite" | "online";
 export type Pickup = "classroom" | "delivery";
-export type Status = "pending" | "paid" | "shipped" | "refunded";
+export type Status = "pending" | "paid" | "shipped" | "refunded" | "cancelled"; // cancelled = 30분 안에 입금 미확인(timeout) 또는 관리자 취소(admin)
 export type TimeSlot = "am" | "pm";
 
 // 매달 같은 책: 개념집, 시작반 RC / 달마다 번갈아 바뀌는 책: 문풀반 RC 1·2, LC 1·2
@@ -109,6 +109,7 @@ export function bookStatusLabel(a: { kind: Kind; pickup: Pickup; status: Status 
   if (a.kind === "onsite") return "첫날 지급";
   const delivery = a.pickup === "delivery";
   if (a.status === "refunded") return "환불";
+  if (a.status === "cancelled") return "취소";
   if (a.status === "pending") return "납부 후 진행";
   if (a.status === "paid") return delivery ? "발송 대기" : "수령 대기";
   return delivery ? "발송 완료" : "수령 완료";
@@ -119,6 +120,7 @@ export const STATUS_LABEL: Record<Status, string> = {
   paid: "납부 완료",
   shipped: "교재 발송 완료",
   refunded: "환불",
+  cancelled: "취소",
 };
 
 export const INSTAGRAM_URL = "https://www.instagram.com/vella_toeic/";

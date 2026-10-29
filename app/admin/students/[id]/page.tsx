@@ -24,7 +24,7 @@ import { audioBooksFor, studentAudioWindow } from "@/lib/audio";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "학생 정보 · vella_toeic", robots: { index: false } };
 
-const STATUS = { pending: "미납", paid: "납부 완료", shipped: "납부 완료", refunded: "환불" } as const;
+const STATUS = { pending: "미납", paid: "납부 완료", shipped: "납부 완료", refunded: "환불", cancelled: "취소" } as const;
 const DEPOSIT = { pending: "보증금 대기", review: "입금 확인 중", paid: "보증금 확정", cancelled: "취소" } as const;
 
 // 학생 한 명의 모든 정보: 신청·납부·교재 / 출석·숙제·테스트 / 미션 / 특강 / 수강 이력

@@ -27,6 +27,7 @@ import { giftWindowOpen } from "@/lib/stickerComplete";
 import { planCohortMove } from "@/lib/cohortMove";
 import { linkWaitingDeposit } from "@/lib/deposits";
 import { signupMonths } from "@/lib/signupMonthsServer";
+import { expireUnpaid } from "@/lib/cancellations";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
 } from "@/lib/auth";
@@ -98,6 +99,7 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   if (!fd.get("ybm_registered")) return { error: "YBM 학원 수강 등록을 먼저 마쳐 주세요. (등록했다면 체크)" };
   if (!fd.get("agree")) return { error: "필독 사항 확인에 체크해 주세요." };
 
+  await expireUnpaid(); // 30분 지난 입금 대기는 취소돼서 아래 중복 검사에서 빠져요 (다시 신청 가능)
   // 같은 달에 같은 이름 + 같은 비밀번호로 이미 낸 신청이 있으면 새로 만들지 않고 그 신청 화면으로 보내요.
   // 이름이 같아도 비밀번호가 다르면 동명이인으로 보고 새로 받아요.
   const mine = (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash) && isActive(a));
@@ -137,7 +139,9 @@ export async function studentLogin(_: FormState, fd: FormData): Promise<FormStat
   const pin = clean(fd.get("pin"));
   if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 비밀번호 4자리를 입력해 주세요." };
   // 환불·삭제된 수강생은 로그인할 수 없어요.
+  await expireUnpaid(); // 30분 지난 입금 대기는 먼저 취소 처리
   const result = loginApps(await findByName(name), (a) => checkPin(pin, a.pin_hash));
+  if (result.cancelledId) redirect(`/my/${result.cancelledId}`); // 취소된 신청만 있으면 취소 안내 화면으로
   if (!result.apps) {
     await sleep(800);
     return { error: result.error };
@@ -442,7 +446,8 @@ export async function createYbmOrderAction(_: FormState, fd: FormData): Promise<
   if (!["image/jpeg", "image/png", "image/webp"].includes(proof.type)) return { error: "수강증은 사진(JPG·PNG) 파일로 올려 주세요." };
   if (proof.size > 4 * 1024 * 1024) return { error: "사진이 너무 커요. 다시 골라 주세요." };
   // 같은 이름·연락처로 아직 발송 전 주문이 있으면 새로 만들지 않고 그 주문으로 보내요.
-  const existing = (await listYbmOrders()).find((o) => o.status !== "shipped" && o.name === name && o.phone === phone);
+  await expireUnpaid();
+  const existing = (await listYbmOrders()).find((o) => o.status !== "shipped" && o.status !== "cancelled" && o.name === name && o.phone === phone);
   if (existing) redirect(`/ybm/${existing.id}?again=1`);
   const id = await createYbmOrder({ name, phone, address, depositor, amount: YBM_ORDER_AMOUNT }, { data: Buffer.from(await proof.arrayBuffer()), type: proof.type });
   await linkWaitingDeposit({ kind: "ybm", id, depositor, amount: YBM_ORDER_AMOUNT }); // 주문보다 먼저 온 입금 연결
@@ -774,7 +779,9 @@ export async function specialLogin(_: FormState, fd: FormData): Promise<FormStat
   const name = clean(fd.get("name"));
   const pin = clean(fd.get("pin"));
   if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 강의실 비밀번호 4자리를 입력해 주세요." };
+  await expireUnpaid(); // 30분 지난 입금 대기는 먼저 취소 처리
   const result = loginApps(await findByName(name), (a) => checkPin(pin, a.pin_hash));
+  if (result.cancelledId) redirect(`/my/${result.cancelledId}`); // 취소된 신청만 있으면 취소 안내 화면으로
   if (!result.apps) {
     await sleep(800);
     return { error: result.error };
@@ -1199,4 +1206,52 @@ export async function markGiftSent(fd: FormData) {
   else await setGiftSent(checkedIds(fd), clean(fd.get("sent")) !== "0");
   revalidatePath("/admin/stamps");
   revalidatePath("/class");
+}
+
+// ── 관리자 취소 처리 (기존 미입금자 정리용) ───────
+// [취소 처리]: 입금 대기 신청 → 취소(admin). 관리 화면 '취소' 필터에서만 보여요.
+export async function adminCancelApps(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const one = clean(fd.get("id"));
+  const ids = one ? [one] : checkedIds(fd);
+  const pending = (await getApplications(ids)).filter((a) => a.status === "pending").map((a) => a.id);
+  await updateApplications(pending, { status: "cancelled", cancelled_at: new Date().toISOString(), cancel_reason: "admin" });
+  revalidatePath("/admin", "layout");
+}
+
+// [되살리기]: 취소 → 입금 대기, 30분 입금 타이머를 지금부터 새로 시작해요.
+export async function adminReviveApps(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const one = clean(fd.get("id"));
+  const ids = one ? [one] : checkedIds(fd);
+  const cancelled = (await getApplications(ids)).filter((a) => a.status === "cancelled").map((a) => a.id);
+  await updateApplications(cancelled, { status: "pending", cancelled_at: null, cancel_reason: null, pending_from: new Date().toISOString() });
+  revalidatePath("/admin", "layout");
+}
+
+// [납부 확인]: 취소된 신청을 바로 납부 완료로
+export async function adminConfirmCancelledApps(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const one = clean(fd.get("id"));
+  const ids = one ? [one] : checkedIds(fd);
+  const cancelled = (await getApplications(ids)).filter((a) => a.status === "cancelled").map((a) => a.id);
+  await updateApplications(cancelled, { status: "paid", cancelled_at: null, cancel_reason: null });
+  revalidatePath("/admin", "layout");
+}
+
+// 인강 주문: [취소 처리] / [되살리기] (택배 발송 목록의 "ybm:" 체크값)
+export async function adminCancelYbm(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const ids = fd.getAll("ids").map(clean).filter((v) => v.startsWith("ybm:")).map((v) => v.slice(4));
+  const pending = (await listYbmOrders()).filter((o) => ids.includes(o.id) && o.status === "pending").map((o) => o.id);
+  await updateYbmOrders(pending, { status: "cancelled", cancelled_at: new Date().toISOString(), cancel_reason: "admin" });
+  revalidatePath("/admin", "layout");
+}
+
+export async function adminReviveYbm(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const id = clean(fd.get("id"));
+  const o = (await listYbmOrders()).find((x) => x.id === id && x.status === "cancelled");
+  if (o) await updateYbmOrders([o.id], { status: "pending", cancelled_at: null, cancel_reason: null, pending_from: new Date().toISOString() });
+  revalidatePath("/admin", "layout");
 }

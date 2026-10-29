@@ -7,13 +7,14 @@ import { movableCohorts } from "@/lib/cohortMove";
 import { WATCH_RULES, type WatchSummary } from "@/lib/watchlist";
 import Link from "next/link";
 import { isAdmin } from "@/lib/auth";
-import { changeCohort, bulkChangeCohort, markChatKicked, changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove, resolveBookDepositEvent } from "@/app/actions";
+import { adminCancelApps, adminConfirmCancelledApps, adminReviveApps, changeCohort, bulkChangeCohort, markChatKicked, changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove, resolveBookDepositEvent } from "@/app/actions";
 import LoginForm from "./LoginForm";
 import AdminTabs from "./AdminTabs";
 import CloseOnSubmitForm from "./CloseOnSubmitForm";
 import SelectAll from "./SelectAll";
 import { autoCleanupAudios } from "@/lib/audio";
 import { md, monthlyChecklist } from "@/lib/monthlyChecklist";
+import { visibleToAdmin } from "@/lib/cancellations";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
@@ -21,7 +22,7 @@ export const metadata = { robots: { index: false } };
 type Filters = { k: string; p: string; b: string; t: string; q: string; c: string; ra: string; mv: string };
 
 const KIND_FILTERS = [["all", "전체"], ["onsite", "현장"], ["online", "불라방"]] as const;
-const PAY_FILTERS = [["all", "전체"], ["pending", "미납"], ["paid", "납부 완료"], ["refunded", "환불"]] as const;
+const PAY_FILTERS = [["all", "전체"], ["pending", "미납"], ["paid", "납부 완료"], ["refunded", "환불"], ["cancelled", "취소"]] as const;
 const TIME_FILTERS = [["all", "전체"], ["am", "오전반"], ["pm", "저녁반"]] as const;
 const isPaid = (a: Application) => a.status === "paid" || a.status === "shipped";
 const SLOT_ORDER: (TimeSlot | null)[] = ["am", "pm", null];
@@ -50,7 +51,7 @@ function Row({ a, group, mission, fresh, sum, back }: { a: Application; group: s
             <Link href={`/admin/students/${a.id}`} className="font-bold text-sky-ink underline decoration-sky-main underline-offset-2">{a.name}</Link>
             {a.depositor !== a.name && <span className="text-sm text-slate-500">(입금자 {a.depositor})</span>}
             <Badge tone={a.kind === "onsite" ? "slate" : "sky"}>{KINDS[a.kind].short}{a.kind === "online" ? ` · ${a.pickup === "delivery" ? "택배" : "1층 데스크"}` : ""}</Badge>
-            <Badge tone={a.status === "pending" ? "amber" : a.status === "refunded" ? "slate" : "green"}>{a.status === "pending" ? "미납" : a.status === "refunded" ? "환불" : "납부 완료"}</Badge>
+            <Badge tone={a.status === "pending" ? "amber" : a.status === "refunded" || a.status === "cancelled" ? "slate" : "green"}>{a.status === "pending" ? "미납" : a.status === "refunded" ? "환불" : a.status === "cancelled" ? "취소" : "납부 완료"}</Badge>
             {a.kind === "online" && <Badge tone={a.status === "shipped" ? "green" : a.status === "paid" ? "amber" : "slate"}>교재 {book}</Badge>}
             {a.continuing && <Badge tone="slate">이어듣기</Badge>}
             <Badge tone={missionCount(mission) === 4 ? "green" : "slate"}>미션 {missionCount(mission)}/4</Badge>
@@ -81,6 +82,15 @@ function Row({ a, group, mission, fresh, sum, back }: { a: Application; group: s
         <details className="shrink-0 text-right text-sm">
           <summary className="cursor-pointer list-none rounded-full bg-sky-soft px-3 py-1 font-bold text-sky-ink">관리</summary>
           <div className="mt-2 flex flex-col items-end gap-2">
+            {a.status === "cancelled" && (
+              <div className="flex flex-wrap justify-end gap-2">
+                <CloseOnSubmitForm action={adminReviveApps}><input type="hidden" name="id" value={a.id} /><button className="btn-ghost !py-1.5 text-sm">되살리기 (입금 대기 · 30분 새로)</button></CloseOnSubmitForm>
+                <CloseOnSubmitForm action={adminConfirmCancelledApps}><input type="hidden" name="id" value={a.id} /><button className="btn !px-4 !py-1.5 !text-sm">납부 확인</button></CloseOnSubmitForm>
+              </div>
+            )}
+            {a.status === "pending" && (
+              <CloseOnSubmitForm action={adminCancelApps}><input type="hidden" name="id" value={a.id} /><button className="rounded-xl bg-slate-100 px-3 py-1.5 text-sm font-bold text-slate-600">취소 처리 (미입금)</button></CloseOnSubmitForm>
+            )}
             <CloseOnSubmitForm action={changeStatus} className="flex flex-wrap justify-end gap-2">
               <input type="hidden" name="id" value={a.id} />
               {a.status === "pending" && <button name="status" value="paid" className="btn !px-4 !py-1.5 !text-sm">납부 확인</button>}
@@ -94,7 +104,7 @@ function Row({ a, group, mission, fresh, sum, back }: { a: Application; group: s
               )}
               {a.status === "refunded" && <button name="status" value="paid" className="btn-ghost !py-1.5 text-sm">환불 취소 (납부 완료로)</button>}
             </CloseOnSubmitForm>
-            {a.status !== "refunded" && (
+            {a.status !== "refunded" && a.status !== "cancelled" && (
               <details className="text-sm">
                 <summary className="cursor-pointer text-amber-600">환불 처리</summary>
                 <CloseOnSubmitForm action={changeStatus} className="mt-1">
@@ -173,7 +183,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
 
   const now = await currentCohort();
   const { k = "all", p = "all", b = "all", t = "all", q = "", c = now, ra = "", mv = "" } = await searchParams;
-  const everything = await listApplications();
+  // 30분 자동 취소(timeout)는 관리 화면 어디에도 안 보여요. 관리자 취소(admin)는 '취소' 필터에서만.
+  const everything = (await listApplications()).filter(visibleToAdmin);
   const [account, cafeHomeworkUrl, cafeUrl, blogUrl, studyBoardUrl, chatUrl, chatCode, rawCohort, kakaoChannel] = await Promise.all([
     getSetting("bank_account"),
     getSetting("cafe_homework_url"),
@@ -198,9 +209,11 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   // 수강 시간이 아직 비어 있는 학생 (예전 신청). 오전/저녁을 정해 주세요.
   const unslotted = everything.filter((a) => a.cohort === now && !a.slot && a.status !== "refunded").sort((a, b) => b.created_at.localeCompare(a.created_at));
   const cohorts = [...new Set([now, ...everything.map((a) => a.cohort)])].sort().reverse();
-  const all = c === "all" ? everything : everything.filter((a) => a.cohort === c);
+  const withCancelled = c === "all" ? everything : everything.filter((a) => a.cohort === c);
+  const all = withCancelled.filter((a) => a.status !== "cancelled"); // 숫자 카드는 취소 제외
 
-  const list = all.filter((a) => {
+  const list = withCancelled.filter((a) => {
+    if (p === "cancelled" ? a.status !== "cancelled" : a.status === "cancelled") return false;
     if (k !== "all" && a.kind !== k) return false;
     if (p === "pending" && a.status !== "pending") return false;
     if (p === "paid" && !isPaid(a)) return false;
@@ -288,7 +301,10 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
               </li>
             ))}
           </ul>
-          <button className="btn mt-3 w-full !py-3 !text-base">체크한 학생 납부 확인</button>
+          <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+            <button className="btn w-full !py-3 !text-base">체크한 학생 납부 확인</button>
+            <button formAction={adminCancelApps} className="rounded-2xl bg-white px-4 py-3 text-sm font-bold text-slate-600 ring-1 ring-slate-300">체크한 학생 취소 처리 (미입금)</button>
+          </div>
         </CloseOnSubmitForm>
       )}
 
@@ -493,7 +509,17 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
             <SelectAll group="*" /> 보이는 {list.length}명 전체 선택
           </label>
           <span className="mx-1 h-5 w-px bg-sky-main" />
-          <button className="btn !py-2 !text-sm">선택 납부 확인</button>
+          {p === "cancelled" ? (
+            <>
+              <button formAction={adminReviveApps} className="btn-ghost !py-2 text-sm">선택 되살리기 (30분 새로)</button>
+              <button formAction={adminConfirmCancelledApps} className="btn !py-2 !text-sm">선택 납부 확인</button>
+            </>
+          ) : (
+            <>
+              <button className="btn !py-2 !text-sm">선택 납부 확인</button>
+              <button formAction={adminCancelApps} className="btn-ghost !py-2 text-sm">선택 취소 처리 (미입금)</button>
+            </>
+          )}
           <button formAction={bulkMarkBooksDone} className="btn !py-2 !text-sm">선택 교재 수령·발송 완료</button>
           <details className="relative">
             <summary className="btn-ghost cursor-pointer list-none !py-2 text-sm">반 변경</summary>

@@ -28,6 +28,10 @@ import { boardsFor, studentKeyOf } from "@/lib/gifts";
 import { giftWindowOpen } from "@/lib/stickerComplete";
 import { getGiftDraw } from "@/lib/db";
 import GiftDraw from "@/components/gift/GiftDraw";
+import { expireUnpaid } from "@/lib/cancellations";
+import { getApplications } from "@/lib/db";
+import { getStudentIds } from "@/lib/auth";
+import CancelledNotice from "@/components/CancelledNotice";
 
 const nextMonthOf = (today: string) => shiftMonth(today.slice(0, 7), 1);
 
@@ -35,10 +39,13 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "강의실 · vella_toeic", robots: { index: false } };
 
 export default async function ClassRoom({ searchParams }: { searchParams: Promise<{ t?: string }> }) {
+  await expireUnpaid(); // 30분 지난 입금 대기는 먼저 자동 취소
   const { loggedIn, apps } = await activeStudentApps();
   if (!loggedIn) return <StudentLogin />;
-  // 환불·삭제된 수강생은 아무것도 볼 수 없어요.
+  // 환불·삭제된 수강생은 아무것도 볼 수 없어요. 취소된 신청만 있으면 취소 안내를 보여줘요.
   if (apps.length === 0) {
+    const cancelled = (await getApplications(await getStudentIds())).filter((a) => a.status === "cancelled").sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    if (cancelled) return <CancelledNotice reason={cancelled.cancel_reason} retryHref={`/guide/${cancelled.kind}`} kakao={await getSetting("kakao_channel_url")} />;
     return (
       <div className="pt-12">
         <div className="card mx-auto max-w-sm space-y-3 text-center">

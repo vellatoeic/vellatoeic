@@ -6,7 +6,8 @@ import type { Application, LcAudio, Lecture } from "./db";
 // 시간대(오전/저녁)로는 막지 않아요. 같은 반 수업은 오전·저녁 교차 수강이 가능해요.
 
 // 환불·삭제된 신청은 로그인부터 막아요.
-export const isActive = (a: Application) => a.status !== "refunded";
+// 환불·취소된 신청은 로그인·중복 검사·명단·집계 어디에도 넣지 않아요
+export const isActive = (a: Application) => a.status !== "refunded" && a.status !== "cancelled";
 
 // 납부가 확인된 신청만 강의실 이용 가능 (입금 대기·환불 X)
 export const canWatch = (a: Application) => a.status === "paid" || a.status === "shipped";
@@ -48,11 +49,14 @@ export function canDownloadAudio(
   });
 }
 
-// 로그인: 이름·비밀번호가 맞는 신청 중 환불되지 않은 것만. 없으면 안내 문구를 돌려줘요.
-export function loginApps(found: Application[], pinMatches: (a: Application) => boolean) {
+// 로그인: 이름·비밀번호가 맞는 신청 중 환불·취소되지 않은 것만. 없으면 안내 문구를 돌려줘요.
+// 취소된 신청만 있으면 그 신청 화면(취소 안내)으로 보내도록 cancelledId를 돌려줘요.
+export function loginApps(found: Application[], pinMatches: (a: Application) => boolean): { apps?: Application[]; error?: string; cancelledId?: string } {
   const matched = found.filter(pinMatches);
   const active = matched.filter(isActive);
   if (active.length > 0) return { apps: active };
+  const cancelled = matched.filter((a) => a.status === "cancelled").sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+  if (cancelled) return { error: "신청이 취소됐어요.", cancelledId: cancelled.id };
   if (found.length === 0 || matched.length > 0) return { error: "수강 정보가 없어요. Vella쌤에게 문의해 주세요." };
   return { error: "이름 또는 비밀번호가 맞지 않아요." };
 }

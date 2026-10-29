@@ -8,14 +8,21 @@ import HowToWatch from "@/components/HowToWatch";
 import AddToHome from "@/components/AddToHome";
 import BookReceived from "@/components/BookReceived";
 import { activeStudentApps } from "@/lib/student";
+import { depositDeadline, expireUnpaid, ruleFrom } from "@/lib/cancellations";
+import DepositCountdown from "@/components/DepositCountdown";
+import CancelledNotice from "@/components/CancelledNotice";
 
 export const dynamic = "force-dynamic";
 
 export default async function MyPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ again?: string }> }) {
   const { id } = await params;
   const { again } = await searchParams;
+  await expireUnpaid(); // 30분 지난 입금 대기는 먼저 자동 취소
   const a = await getApplication(id);
   if (!a) notFound();
+  if (a.status === "cancelled") {
+    return <CancelledNotice reason={a.cancel_reason} retryHref={`/guide/${a.kind}`} kakao={await getSetting("kakao_channel_url")} />;
+  }
   if (a.status === "refunded") {
     return (
       <div className="pt-12">
@@ -27,6 +34,7 @@ export default async function MyPage({ params, searchParams }: { params: Promise
     );
   }
   const account = await getSetting("bank_account");
+  const deadline = depositDeadline(a, await ruleFrom()); // 규칙 켜기 전 신청은 null (마감 안내 없음)
   // 본인으로 로그인돼 있을 때만 '교재 받았어요' 버튼을 보여줘요.
   const isMine = (await activeStudentApps()).apps.some((x) => x.id === a.id);
   const deskWaiting = a.kind === "online" && a.pickup === "classroom" && a.status === "paid";
@@ -83,8 +91,8 @@ export default async function MyPage({ params, searchParams }: { params: Promise
           <p className="text-sm text-slate-600">
             입금자명: <b>{a.depositor}</b>
           </p>
-          <p className="text-xs text-slate-400">입금이 확인되면 이 화면이 &apos;납부 확인&apos;으로 바뀌어요.</p>
-          <p className="text-xs text-slate-400">입금 확인은 일괄처리됩니다.</p>
+          {deadline && <DepositCountdown deadline={deadline} />}
+          <p className="text-xs text-slate-400">입금이 확인되면 이 화면이 &apos;납부 확인&apos;으로 바뀌어요. 보통 몇 분 안에 자동 확인돼요.</p>
           {a.pickup === "delivery" && <p className="text-xs text-slate-500">입금이 확인되면 바로 택배를 접수해요 📦</p>}
         </section>
       )}

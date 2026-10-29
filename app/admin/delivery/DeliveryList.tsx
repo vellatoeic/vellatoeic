@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { bulkMarkBooksDone, confirmYbmPayments } from "@/app/actions";
+import { adminCancelYbm, bulkMarkBooksDone, confirmYbmPayments } from "@/app/actions";
 
 export type Row = { id: string; name: string; klass: string; phone: string; address: string; books: string; status: "pending" | "paid" | "shipped"; proof?: string; ybm?: boolean; at: string };
 
@@ -42,6 +42,7 @@ export default function DeliveryList({ rows, csv }: { rows: Row[]; csv: string }
         </button>
         <a href={csv} className="btn-ghost !py-2 text-sm">CSV 받기</a>
         {ybmPending > 0 && <button formAction={confirmYbmPayments} className="btn-ghost !py-2 text-sm">체크한 인강 주문 입금 확인</button>}
+        {ybmPending > 0 && <button formAction={adminCancelYbm} className="rounded-2xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-600">체크한 인강 주문 취소 처리 (미입금)</button>}
       </div>
       {copied && <p className="mt-2 text-sm font-bold text-sky-deep">{copied}</p>}
       <p className="mt-1 text-xs text-slate-500 print:hidden">복사하면 이름·수강반·연락처·주소가 칸으로 나뉘어 엑셀이나 택배 사이트에 붙여넣을 수 있어요. 미납 학생은 체크·복사에서 빠져요.{ybmPending > 0 && " 입금 문자가 자동 확인되지 않은 YBM 인강 주문은 직접 체크해서 [입금 확인]을 눌러 주세요."}</p>

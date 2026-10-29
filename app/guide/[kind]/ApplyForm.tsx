@@ -241,6 +241,7 @@ export default function ApplyForm({ kind, months }: { kind: Kind; months: MonthO
         )}
         <label className="sm:col-span-2">
           <span className="label">입금자명 <span className="font-normal text-slate-400">(이름과 같으면 비워두세요)</span></span>
+          <span className="mb-1 block text-xs font-bold text-red-600">다른 이름으로 입금하면 꼭 적어 주세요 (안 적으면 자동 확인이 안 돼요)</span>
           <input name="depositor" className="input" placeholder="예: 홍길동(엄마)" />
         </label>
         <label className="sm:col-span-2">
@@ -342,6 +343,7 @@ export default function ApplyForm({ kind, months }: { kind: Kind; months: MonthO
               <dt className="text-slate-500">교재비</dt><dd className="font-jua text-xl text-sky-ink">{won(amount)}</dd>
             </dl>
             <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">반·시간을 잘못 고르면 다른 교재가 준비돼요.<br />학원에 등록한 반과 같은지 꼭 확인해 주세요.</p>
+            <p className="rounded-xl bg-red-50 p-3 text-center text-sm font-bold text-red-600">⏰ 제출 후 30분 안에 입금해 주세요</p>
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => setConfirm(null)} className="btn-ghost">수정하기</button>
               <button type="button" onClick={submit} className="btn">맞아요, 제출</button>

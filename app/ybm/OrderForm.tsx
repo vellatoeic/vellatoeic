@@ -107,7 +107,7 @@ export default function OrderForm({ amountLabel }: { amountLabel: string }) {
           <input ref={detailRef} name="address_detail" className="input" placeholder="상세 주소 (예: 101동 1001호)" />
           <span className="block text-sm font-bold text-red-600">* 교재를 받을 수 있도록 동·호수까지 정확한 주소를 입력해 주세요.</span>
         </div>
-        <label className="block"><span className="label">입금자명 <span className="font-normal text-slate-400">(이름과 다르면 입력)</span></span><input name="depositor" className="input" placeholder="예: 홍길동(엄마)" /></label>
+        <label className="block"><span className="label">입금자명 <span className="font-normal text-slate-400">(이름과 다르면 입력)</span></span><span className="mb-1 block text-xs font-bold text-red-600">다른 이름으로 입금하면 꼭 적어 주세요 (안 적으면 자동 확인이 안 돼요)</span><input name="depositor" className="input" placeholder="예: 홍길동(엄마)" /></label>
         <div className="space-y-2">
           <span className="label">YBM 인강 수강증 캡처</span>
           <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-sky-main bg-sky-soft p-4 text-sm font-bold text-sky-ink">
@@ -136,6 +136,7 @@ export default function OrderForm({ amountLabel }: { amountLabel: string }) {
               <dt className="text-slate-500">입금자명</dt><dd>{String(confirm.get("depositor") ?? "").trim() || String(confirm.get("name"))}</dd>
               <dt className="text-slate-500">금액</dt><dd className="font-jua text-xl text-sky-ink">{amountLabel}</dd>
             </dl>
+            <p className="rounded-xl bg-red-50 p-3 text-center text-sm font-bold text-red-600">⏰ 제출 후 30분 안에 입금해 주세요</p>
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => setConfirm(null)} className="btn-ghost">수정하기</button>
               <button type="button" onClick={() => { const fd = confirm; setConfirm(null); startTransition(() => action(fd)); }} className="btn">맞아요, 신청</button>

@@ -25,6 +25,9 @@ export type Application = {
   pin_hash: string | null;
   created_at: string;
   paid_at?: string | null; // 납부 확인 시각 (LC 음원 기간 시작에 써요)
+  cancelled_at?: string | null; // 취소된 시각
+  cancel_reason?: "timeout" | "admin" | null; // timeout = 30분 안에 입금 미확인(자동), admin = 관리자 취소
+  pending_from?: string | null; // 30분 입금 타이머 시작 (비어 있으면 신청 시각, 관리자가 되살리면 그 시각)
   audio_extended_until?: string | null; // 관리자가 음원 기간을 다시 열어준 마지막 날
 };
 
@@ -62,11 +65,14 @@ export type YbmOrder = {
   address: string;
   depositor: string;
   amount: number;
-  status: "pending" | "paid" | "shipped";
+  status: "pending" | "paid" | "shipped" | "cancelled";
   proof_path: string | null;
   paid_at: string | null;
   shipped_at: string | null;
   created_at: string;
+  cancelled_at?: string | null;
+  cancel_reason?: "timeout" | "admin" | null;
+  pending_from?: string | null;
 };
 
 export type FaqItem = {
@@ -276,7 +282,7 @@ export async function listApplications(): Promise<Application[]> {
   return mem.apps;
 }
 
-type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "continuing" | "slot" | "books" | "amount" | "cohort" | "audio_extended_until">>;
+type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "continuing" | "slot" | "books" | "amount" | "cohort" | "audio_extended_until" | "cancelled_at" | "cancel_reason" | "pending_from">>;
 
 export async function updateApplication(id: string, patch: ApplicationPatch) {
   await updateApplications([id], patch);
@@ -329,6 +335,8 @@ export async function deleteApplications(ids: string[]) {
     return;
   }
   mem.apps = mem.apps.filter((x) => !ok.includes(x.id));
+  // DB처럼 입금 기록은 남기고 연결만 풀어요 (on delete set null)
+  for (const e of mem.depositEvents) if (e.application_id && ok.includes(e.application_id)) e.application_id = null;
 }
 
 // ── 강의 ───────────────────────────────────────
@@ -420,7 +428,7 @@ export async function getYbmOrder(id: string): Promise<YbmOrder | null> {
   return mem.ybmOrders.find((o) => o.id === id) ?? null;
 }
 
-export async function updateYbmOrders(ids: string[], patch: Partial<Pick<YbmOrder, "status" | "paid_at" | "shipped_at" | "proof_path">>) {
+export async function updateYbmOrders(ids: string[], patch: Partial<Pick<YbmOrder, "status" | "paid_at" | "shipped_at" | "proof_path" | "cancelled_at" | "cancel_reason" | "pending_from">>) {
   const ok = ids.filter(isUuid);
   if (ok.length === 0) return;
   if (sb) {
@@ -1332,4 +1340,24 @@ export async function setGiftSent(ids: string[], sent: boolean) {
     return;
   }
   for (const d of memGifts.draws) if (ok.includes(d.id)) d.sent_at = sent_at;
+}
+
+// 인강 주문 지우기 (30분 자동 취소 후 7일 지난 주문 정리용). 수강증 사진도 함께 지워요.
+export async function deleteYbmOrders(ids: string[]) {
+  const ok = ids.filter(isUuid);
+  if (ok.length === 0) return;
+  const photos = (await listYbmOrders()).filter((o) => ok.includes(o.id) && o.proof_path).map((o) => o.proof_path!);
+  if (sb) {
+    if (photos.length) await sb.storage.from(YBM_BUCKET).remove(photos);
+    const db = sb;
+    await inChunks(ok, async (chunk) => {
+      const { error } = await db.from("ybm_orders").delete().in("id", chunk);
+      if (error) throw error;
+      return [];
+    });
+    return;
+  }
+  for (const p of photos) delete mem.photos[p];
+  mem.ybmOrders = mem.ybmOrders.filter((o) => !ok.includes(o.id));
+  for (const e of mem.depositEvents) if (e.ybm_order_id && ok.includes(e.ybm_order_id)) e.ybm_order_id = null;
 }

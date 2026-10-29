@@ -6,11 +6,12 @@ import { isAdmin } from "@/lib/auth";
 import { summariesFor } from "@/lib/studentSummary";
 import AdminTabs from "../AdminTabs";
 import LoginForm from "../LoginForm";
+import { visibleToAdmin } from "@/lib/cancellations";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "학생 찾기 · vella_toeic", robots: { index: false } };
 
-const STATUS = { pending: "미납", paid: "납부 완료", shipped: "납부 완료", refunded: "환불" } as const;
+const STATUS = { pending: "미납", paid: "납부 완료", shipped: "납부 완료", refunded: "환불", cancelled: "취소" } as const;
 
 // 관리 화면 어디서나 쓰는 학생 검색: 이름·입금자·연락처 → 한 명이면 바로 통합 화면
 export default async function StudentSearch({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
@@ -19,7 +20,7 @@ export default async function StudentSearch({ searchParams }: { searchParams: Pr
   const q = raw.replace(/[\s-]/g, "");
   const found = q
     ? (await listApplications())
-        .filter((a) => `${a.name}${a.depositor}${a.phone ?? ""}`.replace(/\s/g, "").includes(q))
+        .filter((a) => visibleToAdmin(a) && `${a.name}${a.depositor}${a.phone ?? ""}`.replace(/\s/g, "").includes(q))
         .sort((a, b) => b.cohort.localeCompare(a.cohort) || b.created_at.localeCompare(a.created_at))
     : [];
   if (found.length === 1) redirect(`/admin/students/${found[0].id}`);

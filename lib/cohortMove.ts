@@ -12,7 +12,7 @@ export function planCohortMove(a: Application, target: string, round: 1 | 2, all
   if (a.cohort === target) return { ok: false, error: `${a.name}: 이미 그 기수예요.` };
   // 옮길 기수에 같은 이름 신청(환불 제외)이 있으면 막아요. 비밀번호는 암호화돼 있어 같은지 비교할 수 없어서
   // 이름으로 확인하고, 동명이인이면 '같은 이름이 있어도 옮기기'(force)로 옮겨요.
-  if (!force && all.some((x) => x.id !== a.id && x.cohort === target && x.name === a.name && x.status !== "refunded")) {
+  if (!force && all.some((x) => x.id !== a.id && x.cohort === target && x.name === a.name && x.status !== "refunded" && x.status !== "cancelled")) {
     return { ok: false, error: `${a.name}: 옮길 기수에 같은 이름 신청이 이미 있어요 (같은 학생이면 중복이에요. 동명이인이면 '같은 이름이 있어도 옮기기'를 체크)` };
   }
   const continuing = a.course === "start" && isAlt(a.track) && a.continuing;

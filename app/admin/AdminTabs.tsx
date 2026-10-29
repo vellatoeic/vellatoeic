@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { logout, markAppsSeen } from "@/app/actions";
 import { adminAlerts } from "@/lib/adminAlerts";
+import { expireUnpaid, purgeTimedOut } from "@/lib/cancellations";
 
 export default async function AdminTabs({ active }: { active: "apps" | "roster" | "stamps" | "lectures" | "schedule" | "special" | "delivery" | "audio" | "faq" | "tests" | "notices" }) {
+  // 관리 화면을 열 때마다: 30분 지난 입금 대기 자동 취소 + 자동 취소 7일 지난 것 삭제
+  await expireUnpaid().catch(() => null);
+  await purgeTimedOut().catch(() => null);
   const { fresh, waiting, checks, delivery, refunds } = await adminAlerts();
   const tab = (on: boolean) =>
     `relative rounded-full px-4 py-2 font-bold ${on ? "bg-sky-deep text-white" : "bg-white text-sky-ink"}`;

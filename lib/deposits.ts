@@ -2,6 +2,7 @@ import "server-only";
 import { DEPOSIT_MINUTES, SPECIAL_DEPOSIT } from "./config";
 import { parseBankSms, sameName, type ParsedDeposit } from "./bankSms";
 import { BOOK_PRICE, SHIPPING_FEE } from "./config";
+import { expireUnpaid, revivable } from "./cancellations";
 import { createDepositEvent, listApplications, listSpecialRegistrations, listWaitingDepositEvents, listWaitingDeposits, listYbmOrders, updateApplications, updateDepositEvent, updateOnsiteRegistrations, updateYbmOrders, type DepositEvent } from "./db";
 
 // ── 입금 문자 자동 확인 ─────────────────────────
@@ -60,10 +61,33 @@ const ybmDepositHandler: DepositHandler = {
   related: async (d) => (await listYbmOrders()).some((o) => o.status === "pending" && sameName(o.depositor, d.name)),
 };
 
-const HANDLERS: DepositHandler[] = [specialDepositHandler, bookDepositHandler, ybmDepositHandler];
+// 늦은 입금 되살리기: 30분이 지나 자동 취소된 지 24시간 안이고 입금자명(비었으면 이름)·금액이 같으면 납부 확인으로 되살려요.
+const reviveAppHandler: DepositHandler = {
+  target: "book",
+  async candidates(d) {
+    return (await listApplications())
+      .filter((a) => revivable(a) && a.amount === d.amount && sameName(a.depositor || a.name, d.name))
+      .map((a) => ({ target: "book" as const, id: a.id, confirm: () => updateApplications([a.id], { status: "paid", cancelled_at: null, cancel_reason: null }) }));
+  },
+  related: async () => false,
+};
+
+const reviveYbmHandler: DepositHandler = {
+  target: "book",
+  async candidates(d) {
+    return (await listYbmOrders())
+      .filter((o) => revivable(o) && o.amount === d.amount && sameName(o.depositor || o.name, d.name))
+      .map((o) => ({ target: "book" as const, id: o.id, ybm: true, confirm: () => updateYbmOrders([o.id], { status: "paid", paid_at: new Date().toISOString(), cancelled_at: null, cancel_reason: null }) }));
+  },
+  related: async () => false,
+};
+
+const HANDLERS: DepositHandler[] = [specialDepositHandler, bookDepositHandler, ybmDepositHandler, reviveAppHandler, reviveYbmHandler];
 
 // 문자에서 이름·금액만 뽑고 원문은 바로 버려요. 우리 학생 입금으로 보이지 않으면 기록도 남기지 않아요.
 export async function handleBankSms(text: string): Promise<{ result: DepositEvent["result"] | "ignored" }> {
+  // 먼저 30분 지난 입금 대기를 자동 취소해요 (그 뒤 늦은 입금은 24시간 안이면 되살려요)
+  await expireUnpaid();
   const parsed = parseBankSms(text);
   if (!parsed) {
     await createDepositEvent({ target: "special", name: "", amount: 0, result: "unmatched", registration_id: null, application_id: null, ybm_order_id: null });

@@ -2,25 +2,26 @@ import { COURSES, TRACKS, TIME_SLOTS, KINDS } from "./config";
 import { currentCohort, getSetting, listApplications, listDepositEvents, listYbmOrders } from "./db";
 import { specialRefundsDue } from "./specialRefunds";
 import { classCohortNow } from "./classCohort";
+import { visibleToAdmin } from "./cancellations";
 
 // 수강 · YBM 인강 주문을 한 줄씩 (최신순). 특강은 [특강 관리]에서 따로 관리해요.
 export type RecentItem = { id: string; at: string; type: "수강" | "인강"; name: string; detail: string; warn?: string; href: string };
 
-const YBM = { pending: "입금 대기", paid: "발송 대기", shipped: "발송 완료" } as const;
+const YBM = { pending: "입금 대기", paid: "발송 대기", shipped: "발송 완료", cancelled: "취소" } as const;
 
 export async function recentApplications(limit = 300): Promise<RecentItem[]> {
   const [apps, ybm] = await Promise.all([listApplications(), listYbmOrders()]);
   const items: RecentItem[] = [
-    ...apps.map((a) => ({
+    ...apps.filter(visibleToAdmin).map((a) => ({
       id: a.id, at: a.created_at, type: "수강" as const, name: a.name,
       detail: `${COURSES[a.course].label} ${TRACKS[a.track]} · ${a.slot ? TIME_SLOTS[a.slot] : "시간 미정"} · ${KINDS[a.kind].short}`,
-      warn: a.status === "pending" ? "미납" : a.status === "refunded" ? "환불" : undefined,
+      warn: a.status === "pending" ? "미납" : a.status === "refunded" ? "환불" : a.status === "cancelled" ? "취소" : undefined,
       href: `/admin/students/${a.id}`,
     })),
-    ...ybm.map((o) => ({
+    ...ybm.filter(visibleToAdmin).map((o) => ({
       id: o.id, at: o.created_at, type: "인강" as const, name: o.name,
       detail: `개념 zip · ${YBM[o.status]}`,
-      warn: o.status === "pending" ? "입금 대기" : undefined,
+      warn: o.status === "pending" ? "입금 대기" : o.status === "cancelled" ? "취소" : undefined,
       href: "/admin/delivery?from=ybm",
     })),
   ];
