@@ -1,7 +1,9 @@
 "use client";
 
 import { startTransition, useActionState, useRef, useState, type FormEvent } from "react";
-import { submitApplication, type FormState } from "@/app/actions";
+import { previewApplication, submitApplication, type FormState } from "@/app/actions";
+import { lateDeliveryWarning, LATE_DELIVERY_TEXT } from "@/lib/altContinue";
+import { scheduleClassFor } from "@/lib/schedule";
 import {
   BOOKS, COURSES, KINDS, TRACKS, PICKUPS, SHIPPING_FEE, TIME_SLOTS, booksFor, isAlt, calcAmount, slotLabel, todayKST, won,
   type CourseId, type Kind, type Pickup, type TimeSlot, type Track,
@@ -34,9 +36,9 @@ const POSTCODE_SRC = "https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/post
 const choice = (on: boolean) =>
   `rounded-2xl border-2 p-4 text-left transition ${on ? "border-sky-deep bg-sky-soft" : "border-sky-main/50 bg-white"}`;
 
-type MonthOption = { cohort: string; label: string; range: string; round: 1 | 2 };
+type MonthOption = { cohort: string; label: string; range: string; round: 1 | 2; windows: Record<string, { first: string | null; last: string | null }> };
 
-export default function ApplyForm({ kind, months }: { kind: Kind; months: MonthOption[] }) {
+export default function ApplyForm({ kind, months, today }: { kind: Kind; months: MonthOption[]; today: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(submitApplication, {});
   // 수강 월: 하나뿐이면 자동, 둘이면 기본 선택 없이 꼭 고르기
   const [month, setMonth] = useState<string | null>(months.length === 1 ? months[0].cohort : null);
@@ -53,6 +55,8 @@ export default function ApplyForm({ kind, months }: { kind: Kind; months: MonthO
   const [manualAddress, setManualAddress] = useState(false);
   const [checkError, setCheckError] = useState("");
   const [confirm, setConfirm] = useState<FormData | null>(null);
+  const [plan, setPlan] = useState<Awaited<ReturnType<typeof previewApplication>> | null>(null);
+  const [checking, setChecking] = useState(false);
   const detailRef = useRef<HTMLInputElement>(null);
 
   // 시작반 격일반만 지난달 이어듣기 여부를 확인해요
@@ -81,7 +85,7 @@ export default function ApplyForm({ kind, months }: { kind: Kind; months: MonthO
   }
 
   // 제출 전에 한 번 더 확인해요. 잘못된 칸이 있으면 확인 화면 대신 안내를 보여줘요.
-  function review(e: FormEvent<HTMLFormElement>) {
+  async function review(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const get = (k: string) => String(fd.get(k) ?? "").trim();
@@ -102,6 +106,12 @@ export default function ApplyForm({ kind, months }: { kind: Kind; months: MonthO
     if (pickup === "delivery") {
       fd.set("address", manualAddress ? `${get("address_manual")} ${get("address_detail")}` : `[${zip}] ${baseAddress}, ${get("address_detail")}`);
     }
+    // 서버가 지난달 기록으로 이어듣기·두 달째 요일을 판단해 교재·금액을 알려줘요
+    setChecking(true);
+    const r = await previewApplication(fd).catch(() => ({ error: "잠시 후 다시 눌러 주세요." }) as Awaited<ReturnType<typeof previewApplication>>);
+    setChecking(false);
+    if (r.error) { setCheckError(r.error); return; }
+    setPlan(r);
     setConfirm(fd);
   }
 
@@ -178,12 +188,15 @@ export default function ApplyForm({ kind, months }: { kind: Kind; months: MonthO
               </button>
             ))}
           </div>
+          {COURSES[course].tracks.some((t) => isAlt(t)) && (
+            <p className="mt-2 text-xs text-slate-500">두 달째 수강생: 지난달 월·수반 → 이번 달 화·목반 / 지난달 화·목반 → 이번 달 월·수반</p>
+          )}
         </div>
       )}
 
       {askContinuing && (
         <div>
-          <p className="label">지난달에도 시작반 격일반을 들었어요?</p>
+          <p className="label">지난달에도 시작반 격일반을 들었어요? <span className="font-normal text-slate-400">(지난달 기록으로 자동 확인돼요)</span></p>
           <div className="grid grid-cols-2 gap-3">
             <button type="button" onClick={() => setContinuing(true)} className={`${choice(continuing === true)} text-center`}>
               <span className="font-jua text-lg text-sky-ink">예</span>
@@ -225,6 +238,11 @@ export default function ApplyForm({ kind, months }: { kind: Kind; months: MonthO
               </button>
             ))}
           </div>
+          {/* 개강 직전(학생 반 첫 수업일 3일 전 ~ 마지막 수업일)에 택배를 고르면 안내만 (막지는 않아요) */}
+          {pickup === "delivery" && chosen && course && (() => {
+            const w = chosen.windows[scheduleClassFor(course, track)];
+            return w && lateDeliveryWarning(today, w.first, w.last) ? <p className="mt-2 rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-800">{LATE_DELIVERY_TEXT}</p> : null;
+          })()}
         </div>
       )}
 
@@ -316,8 +334,8 @@ export default function ApplyForm({ kind, months }: { kind: Kind; months: MonthO
 
       {(checkError || state.error) && <p className="rounded-xl bg-red-50 p-3 text-center font-bold text-red-600">{checkError || state.error}</p>}
 
-      <button className="btn w-full" disabled={pending || blocked}>
-        {pending ? "제출 중…" : "입력 내용 확인하기"}
+      <button className="btn w-full" disabled={pending || blocked || checking}>
+        {pending ? "제출 중…" : checking ? "확인 중…" : "입력 내용 확인하기"}
       </button>
       <p className="text-center text-sm text-slate-600">제출 후 나오는 계좌로 <b className="text-red-600">입금까지 해야</b> 신청이 완료돼요.<br />신청서는 한 번만 제출해 주세요.</p>
 
@@ -330,8 +348,9 @@ export default function ApplyForm({ kind, months }: { kind: Kind; months: MonthO
               <p className="text-sm text-slate-500">{KINDS[kind].label}</p>
               <p className="font-jua text-2xl text-sky-ink">{COURSES[course].label} {TRACKS[track]}</p>
               <p className="font-jua text-xl text-sky-deep">{slotLabel({ course, track }, slot)}</p>
-              {askContinuing && continuing === true && <p className="text-sm text-slate-600">이어듣기 (LC 교재만)</p>}
+              {plan?.continuing && <p className="text-sm text-slate-600">이어듣기 (지난달 기록 확인 · LC 교재만)</p>}
             </div>
+            {plan?.notice && <p className="rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-800">{plan.notice}</p>}
             <dl className="grid grid-cols-[5.5rem_1fr] gap-y-2 text-[15px]">
               <dt className="text-slate-500">이름</dt><dd className="font-bold">{String(confirm.get("name")).trim()}</dd>
               {online && (<><dt className="text-slate-500">연락처</dt><dd className="font-bold">{phone}</dd></>)}
@@ -339,8 +358,8 @@ export default function ApplyForm({ kind, months }: { kind: Kind; months: MonthO
               {online && (<><dt className="text-slate-500">교재 수령</dt><dd>{PICKUPS[pickup].label}</dd></>)}
               {online && pickup === "classroom" && (<><dt className="text-slate-500">수령 희망</dt><dd className="font-bold">{String(confirm.get("pickup_date"))} {String(confirm.get("pickup_time"))} · 1층 데스크</dd></>)}
               {pickup === "delivery" && (<><dt className="text-slate-500">택배 주소</dt><dd className="font-bold">{String(confirm.get("address"))}</dd></>)}
-              <dt className="text-slate-500">교재</dt><dd>{books.map((b) => BOOKS[b]).join(", ")}</dd>
-              <dt className="text-slate-500">교재비</dt><dd className="font-jua text-xl text-sky-ink">{won(amount)}</dd>
+              <dt className="text-slate-500">교재</dt><dd>{(plan?.books ?? books.map((b) => BOOKS[b])).join(", ")}</dd>
+              <dt className="text-slate-500">교재비</dt><dd className="font-jua text-xl text-sky-ink">{won(plan?.amount ?? amount)}</dd>
             </dl>
             <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">반·시간을 잘못 고르면 다른 교재가 준비돼요.<br />학원에 등록한 반과 같은지 꼭 확인해 주세요.</p>
             <p className="rounded-xl bg-red-50 p-3 text-center text-sm font-bold text-red-600">⏰ 제출 후 30분 안에 입금해 주세요</p>

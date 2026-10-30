@@ -8,6 +8,9 @@ import HowToWatch from "@/components/HowToWatch";
 import AddToHome from "@/components/AddToHome";
 import BookReceived from "@/components/BookReceived";
 import { activeStudentApps } from "@/lib/student";
+import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
+import { lateDeliveryWarning, LATE_DELIVERY_TEXT } from "@/lib/altContinue";
+import { kstDate } from "@/lib/studentDays";
 import { depositDeadline, expireUnpaid, ruleFrom } from "@/lib/cancellations";
 import DepositCountdown from "@/components/DepositCountdown";
 import CancelledNotice from "@/components/CancelledNotice";
@@ -35,6 +38,12 @@ export default async function MyPage({ params, searchParams }: { params: Promise
   }
   const account = await getSetting("bank_account");
   const deadline = depositDeadline(a, await ruleFrom()); // 규칙 켜기 전 신청은 null (마감 안내 없음)
+  // 개강 직전(학생 반 첫 수업일 3일 전 ~ 마지막 수업일)에 택배로 신청했으면 안내
+  const lateDelivery = a.pickup === "delivery" && a.status !== "shipped" && await (async () => {
+    const [days, holidays] = await Promise.all([classDaysOf(a), holidaysOf(a.cohort)]);
+    const real = days.filter((d) => !holidays[d]).sort();
+    return lateDeliveryWarning(kstDate(a.created_at), real[0] ?? null, real.at(-1) ?? null);
+  })();
   // 본인으로 로그인돼 있을 때만 '교재 받았어요' 버튼을 보여줘요.
   const isMine = (await activeStudentApps()).apps.some((x) => x.id === a.id);
   const deskWaiting = a.kind === "online" && a.pickup === "classroom" && a.status === "paid";
@@ -94,6 +103,7 @@ export default async function MyPage({ params, searchParams }: { params: Promise
           {deadline && <DepositCountdown deadline={deadline} />}
           <p className="text-xs text-slate-400">입금이 확인되면 이 화면이 &apos;납부 확인&apos;으로 바뀌어요. 보통 몇 분 안에 자동 확인돼요.</p>
           {a.pickup === "delivery" && <p className="text-xs text-slate-500">입금이 확인되면 바로 택배를 접수해요 📦</p>}
+          {lateDelivery && <p className="rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-800">{LATE_DELIVERY_TEXT}</p>}
         </section>
       )}
 
@@ -110,6 +120,7 @@ export default async function MyPage({ params, searchParams }: { params: Promise
                   ? "교재 수령이 확인됐어요. 수업 준비 완료!"
                   : <>납부가 확인됐어요.<br />{a.pickup_date ? <><b>{specialDay(a.pickup_date)} {a.pickup_time}</b>에 </> : ""}1층 데스크에서 교재를 받아 가세요!</>}
           </p>
+          {lateDelivery && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-800">{LATE_DELIVERY_TEXT}</p>}
         </section>
       )}
 

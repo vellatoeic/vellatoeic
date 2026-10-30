@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
-import { CLASSROOM, KINDS, type Kind } from "@/lib/config";
-import { roundFor } from "@/lib/db";
+import { CLASSROOM, KINDS, todayKST, type Kind } from "@/lib/config";
+import { getSetting, roundFor } from "@/lib/db";
+import { holidaysOf } from "@/lib/classCalendar";
+import { SCHEDULE_CLASSES, scheduleKey, schoolDaysFor, type ScheduleClass } from "@/lib/schedule";
 import { signupMonths } from "@/lib/signupMonthsServer";
 import ApplyForm from "./ApplyForm";
 import HowToWatch from "@/components/HowToWatch";
@@ -29,7 +31,16 @@ export default async function KindGuide({ params }: { params: Promise<{ kind: st
   const { kind } = await params;
   if (kind !== "onsite" && kind !== "online") notFound();
   // 신청서에서 고를 수 있는 수강 월 (이번 달: 2주차 마지막 수업일까지 / 다음 달: 15일부터)
-  const months = await Promise.all((await signupMonths()).map(async (m) => ({ ...m, round: await roundFor(m.cohort) })));
+  // 반별 첫·마지막 수업일 (개강 직전 택배 안내용)
+  const windowsOf = async (cohort: string) => {
+    const holidays = await holidaysOf(cohort);
+    const entries = await Promise.all((Object.keys(SCHEDULE_CLASSES) as ScheduleClass[]).map(async (k) => {
+      const days = schoolDaysFor(await getSetting(scheduleKey(cohort, k)), cohort, k).filter((d) => !holidays[d]).sort();
+      return [k, { first: days[0] ?? null, last: days.at(-1) ?? null }] as const;
+    }));
+    return Object.fromEntries(entries);
+  };
+  const months = await Promise.all((await signupMonths()).map(async (m) => ({ ...m, round: await roundFor(m.cohort), windows: await windowsOf(m.cohort) })));
 
   return (
     <div className="space-y-6 pt-8">
@@ -63,7 +74,7 @@ export default async function KindGuide({ params }: { params: Promise<{ kind: st
 
       {kind === "online" && <HowToWatch beforeApply />}
 
-      <ApplyForm kind={kind} months={months} />
+      <ApplyForm kind={kind} months={months} today={todayKST()} />
     </div>
   );
 }

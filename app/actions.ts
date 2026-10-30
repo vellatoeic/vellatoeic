@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
-  COURSES, PARTS, LECTURE_COURSES, DEPOSIT_MINUTES, YBM_ORDER_AMOUNT, booksFor, isAlt, isTimeSlot, calcAmount, youtubeId, todayKST,
+  BOOKS, COURSES, PARTS, LECTURE_COURSES, DEPOSIT_MINUTES, YBM_ORDER_AMOUNT, booksFor, isAlt, isTimeSlot, calcAmount, youtubeId, todayKST,
   type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
 } from "@/lib/config";
 import {
@@ -29,6 +29,7 @@ import { linkWaitingDeposit } from "@/lib/deposits";
 import { signupMonths } from "@/lib/signupMonthsServer";
 import { expireUnpaid } from "@/lib/cancellations";
 import { syncSpecialDrafts, weekdayKey } from "@/lib/specialDrafts";
+import { altTrackError, findPrevAlt, planBooks } from "@/lib/altContinue";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
 } from "@/lib/auth";
@@ -65,15 +66,9 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   const course = clean(fd.get("course")) as CourseId;
   const pickup = (kind === "onsite" ? "classroom" : clean(fd.get("pickup"))) as Pickup;
   const track = clean(fd.get("track")) as Track;
-  // 이어듣기 교재 할인은 시작반 격일반에만 적용해요
-  const continuing = course === "start" && isAlt(track) && !!fd.get("continuing");
   // 수강 월: 학생이 신청서에서 고른 달 (오늘 고를 수 있는 달만 받아요)
   const cohort = clean(fd.get("cohort"));
   if (!(await signupMonths()).some((m) => m.cohort === cohort)) return { error: "몇 월 수업인지 다시 골라 주세요." };
-  // 교재는 반·과정·회차로 자동 결정 (학생이 고르지 않아요)
-  const books = Object.hasOwn(COURSES, course) && COURSES[course].tracks.includes(track)
-    ? booksFor(course, track, await roundFor(cohort), continuing)
-    : [];
   const name = normName(clean(fd.get("name")));
   const phone = clean(fd.get("phone")).replace(/[^0-9]/g, "");
   const depositor = clean(fd.get("depositor")) || name;
@@ -99,6 +94,11 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   if (pin !== clean(fd.get("pin2"))) return { error: "비밀번호 확인이 맞지 않아요. 같은 숫자 4자리를 두 번 입력해 주세요." };
   if (!fd.get("ybm_registered")) return { error: "YBM 학원 수강 등록을 먼저 마쳐 주세요. (등록했다면 체크)" };
   if (!fd.get("agree")) return { error: "필독 사항 확인에 체크해 주세요." };
+
+  // 격일반 두 달째·이어듣기는 서버가 지난달 기록(같은 이름·비밀번호·반·격일반·납부 완료)으로 판단해요
+  const plan = await applicationPlan({ cohort, course, track, pickup, name, pin, wantContinuing: !!fd.get("continuing") });
+  if (plan.error) return { error: plan.error };
+  const { continuing, books } = plan;
 
   await expireUnpaid(); // 30분 지난 입금 대기는 취소돼서 아래 중복 검사에서 빠져요 (다시 신청 가능)
   // 같은 달에 같은 이름 + 같은 비밀번호로 이미 낸 신청이 있으면 새로 만들지 않고 그 신청 화면으로 보내요.
@@ -132,6 +132,27 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   await linkWaitingDeposit({ kind: "app", id, depositor, amount: calcAmount(books, pickup) });
   await setStudent([id]); // 신청하면 바로 강의실 로그인 상태
   redirect(`/my/${id}`);
+}
+
+// 신청 전에 서버 판단으로 교재·금액·안내를 미리 계산해요 (확인 창에서 보여줘요)
+async function applicationPlan(p: { cohort: string; course: CourseId; track: Track; pickup: Pickup; name: string; pin: string; wantContinuing: boolean }) {
+  const found = isAlt(p.track) && /^\d{4}$/.test(p.pin) ? await findByName(p.name) : [];
+  const prev = isAlt(p.track) ? findPrevAlt(found, (a) => checkPin(p.pin, a.pin_hash), p.cohort, p.course) : null;
+  const error = altTrackError(prev, p.track);
+  const books = planBooks({ course: p.course, track: p.track, pickup: p.pickup, round: await roundFor(p.cohort), prev, wantContinuing: p.wantContinuing });
+  return { ...books, error, secondMonth: !!prev };
+}
+
+export async function previewApplication(fd: FormData): Promise<{ error?: string; books?: string[]; amount?: number; continuing?: boolean; notice?: string | null; secondMonth?: boolean }> {
+  const kind = clean(fd.get("kind")) as Kind;
+  const course = clean(fd.get("course")) as CourseId;
+  const track = clean(fd.get("track")) as Track;
+  const pickup = (kind === "onsite" ? "classroom" : clean(fd.get("pickup"))) as Pickup;
+  const cohort = clean(fd.get("cohort"));
+  if (!Object.hasOwn(COURSES, course) || !COURSES[course].tracks.includes(track) || !/^\d{4}-\d{2}$/.test(cohort)) return { error: "반·과정·수강 월을 다시 골라 주세요." };
+  const plan = await applicationPlan({ cohort, course, track, pickup, name: normName(clean(fd.get("name"))), pin: clean(fd.get("pin")), wantContinuing: !!fd.get("continuing") });
+  if (plan.error) return { error: plan.error };
+  return { books: plan.books.map((b) => BOOKS[b]), amount: plan.amount, continuing: plan.continuing, notice: plan.notice, secondMonth: plan.secondMonth };
 }
 
 // ── 학생 강의실 로그인 ──────────────────────────
