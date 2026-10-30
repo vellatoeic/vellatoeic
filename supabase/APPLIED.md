@@ -31,6 +31,7 @@ Vella가 Supabase SQL Editor에서 실행했다고 확인한 SQL 파일만 기�
 | `25_sticker_gifts.sql` | 완료 | 스티커판 완성 선물 표(gift_items·gift_draws) 생성, 수량을 넘지 않는 뽑기 함수(draw_gift) 생성 |
 | `26_delete_student_question.sql` | 완료 | 지난 질문함의 학생 질문 1개 삭제(질문이 정확히 1개일 때만, 표·FAQ는 그대로) |
 | `27_deposit_timeout.sql` | 완료 | 신청·인강 주문에 취소 상태(cancelled)·취소 시각·취소 이유·30분 타이머 시작 칸 추가(상태 규칙 교체, 데이터 그대로), FAQ 입금 확인 답 수정 |
+| `28_special_drafts.sql` | 완료 | 특강 공개 여부 칸(published, 기존 특강 모두 공개) 추가, 2026-11 특강 요일 금요일 저장, 11/6·11/20 초안 생성(같은 날짜·제목이 없을 때만) |
 
 ## 기록 갱신 규칙
 
