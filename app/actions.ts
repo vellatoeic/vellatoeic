@@ -28,6 +28,7 @@ import { planCohortMove } from "@/lib/cohortMove";
 import { linkWaitingDeposit } from "@/lib/deposits";
 import { signupMonths } from "@/lib/signupMonthsServer";
 import { expireUnpaid } from "@/lib/cancellations";
+import { syncSpecialDrafts, weekdayKey } from "@/lib/specialDrafts";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
 } from "@/lib/auth";
@@ -215,8 +216,31 @@ export async function confirmSchedule(fd: FormData) {
   if (!(await isAdmin())) return;
   const cohort = clean(fd.get("cohort"));
   if (!/^\d{4}-\d{2}$/.test(cohort)) return;
-  await setSetting(`schedule_confirmed:${cohort}`, clean(fd.get("undo")) ? "" : "1");
+  const undo = !!clean(fd.get("undo"));
+  await setSetting(`schedule_confirmed:${cohort}`, undo ? "" : "1");
+  // 수업일을 확인하면 특강 요일에 맞춰 그 기수 특강 초안 2개를 만들어요 (공개 전에는 학생에게 안 보여요)
+  if (!undo) await syncSpecialDrafts(cohort);
   revalidatePath("/admin", "layout");
+}
+
+// [수업일 설정] 특강 요일 (금 5 / 토 6 / 비우기). 수업일을 이미 확인했으면 초안을 바로 만들거나 날짜를 옮겨요.
+export async function setSpecialWeekday(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const cohort = clean(fd.get("cohort"));
+  const w = clean(fd.get("weekday"));
+  if (!/^\d{4}-\d{2}$/.test(cohort) || !["", "5", "6"].includes(w)) return;
+  await setSetting(weekdayKey(cohort), w);
+  if (w && (await getSetting(`schedule_confirmed:${cohort}`)) === "1") await syncSpecialDrafts(cohort);
+  revalidatePath("/admin", "layout");
+}
+
+// [특강 관리] 초안 공개 (개별·여러 개)
+export async function publishSpecials(fd: FormData) {
+  if (!(await isAdmin())) return;
+  for (const id of fd.getAll("ids").map(clean).filter(Boolean)) await updateSpecialLecture(id, { published: true });
+  revalidatePath("/admin", "layout");
+  revalidatePath("/special");
+  revalidatePath("/");
 }
 
 // '이번 달 할 일': 이번 달 환불 학생을 단톡방에서 내보냈어요
@@ -743,7 +767,7 @@ export async function registerSpecialLecture(_: FormState, fd: FormData): Promis
   const name = clean(fd.get("name"));
   const pin = clean(fd.get("pin"));
   const event = await getSpecialLecture(eventId);
-  if (!event) return { error: "신청할 특강을 선택해 주세요." };
+  if (!event || event.published === false) return { error: "신청할 특강을 선택해 주세요." };
   if (!specialRegistrationOpen(event)) return { error: "신청이 마감됐어요." };
   if (mode !== "onsite" && mode !== "online") return { error: "현장 또는 불라방을 선택해 주세요." };
   if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 강의실 비밀번호 4자리를 입력해 주세요." };

@@ -1,6 +1,6 @@
 import { isAdmin } from "@/lib/auth";
 import { listApplications, expireSpecialDeposits, listDepositEvents, listSpecialLectures, listSpecialMaterials, listSpecialRegistrations, listWaitingDeposits, isPreview, type SpecialLecture, type SpecialRegistration } from "@/lib/db";
-import { markDepositRefunded, addSpecialLecture, bulkSpecialOnsite, removeSpecialLecture, removeSpecialMaterial, removeSpecialRegistration, resolveDepositEvent, saveSpecialLecture } from "@/app/actions";
+import { publishSpecials, markDepositRefunded, addSpecialLecture, bulkSpecialOnsite, removeSpecialLecture, removeSpecialMaterial, removeSpecialRegistration, resolveDepositEvent, saveSpecialLecture } from "@/app/actions";
 import { DEPOSIT_MINUTES, DEPOSIT_LABEL, SPECIAL_DEPOSIT, won, type DepositStatus } from "@/lib/config";
 import SmsTest from "./SmsTest";
 import SelectAll from "../SelectAll";
@@ -86,6 +86,7 @@ export default async function SpecialAdminPage() {
   await expireSpecialDeposits(DEPOSIT_MINUTES);
   const [events, depositEvents, waitingDeposits, apps, refundsDue] = await Promise.all([listSpecialLectures(), listDepositEvents(20), listWaitingDeposits(), listApplications(), specialRefundsDue()]);
   const refunded = new Set(apps.filter((a) => a.status === "refunded").map((a) => a.id));
+  const drafts = events.filter((e) => e.published === false);
   const toCheck = depositEvents.filter((e) => e.target === "special" && (e.result === "review" || e.result === "unmatched"));
   const webhookOn = (process.env.DEPOSIT_WEBHOOK_TOKEN ?? "").length >= 16;
   const rows = await Promise.all(events.map(async (event) => ({
@@ -97,6 +98,15 @@ export default async function SpecialAdminPage() {
   return (
     <div className="space-y-6 pt-8">
       <AdminTabs active="special" />
+
+      {drafts.length > 0 && (
+        <form action={publishSpecials} className="flex flex-wrap items-center gap-3 rounded-3xl border-2 border-dashed border-amber-300 bg-amber-50 p-4 text-sm">
+          {drafts.map((d) => <input key={d.id} type="hidden" name="ids" value={d.id} />)}
+          <p className="font-jua text-lg text-amber-700">📝 공개 전 초안 {drafts.length}개</p>
+          <p className="text-slate-600">{drafts.map((d) => `${specialDay(d.event_date)} ${d.title}`).join(" · ")} — 날짜·시간·제목을 확인하고 공개해 주세요.</p>
+          <button className="btn ml-auto !py-2 !text-sm">초안 모두 공개</button>
+        </form>
+      )}
 
       {refundsDue.length > 0 && (
         <CloseOnSubmitForm id="refunds" action={markDepositRefunded} className="block rounded-3xl border-2 border-red-300 bg-red-50 p-5">
@@ -213,10 +223,16 @@ export default async function SpecialAdminPage() {
         const onsite = registrations.filter((r) => r.mode === "onsite");
         const online = registrations.filter((r) => r.mode === "online");
         return (
-          <section key={event.id} className="card space-y-5">
+          <section key={event.id} className={`card space-y-5 ${event.published === false ? "!border-2 !border-dashed !border-amber-300" : ""}`}>
             <div>
               <p className="text-sm text-slate-500">{specialWhen(event)}</p>
-              <p className="mt-0.5 text-sm">
+              <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm">
+                {event.published === false ? (
+                  <>
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">초안 · 학생에게 안 보여요</span>
+                    <form action={publishSpecials} className="inline"><input type="hidden" name="ids" value={event.id} /><button className="btn !px-3 !py-1 !text-xs">공개</button></form>
+                  </>
+                ) : null}
                 <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${specialRegistrationOpen(event) ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>{specialRegistrationOpen(event) ? "모집 중" : "마감"}</span>
                 <span className="ml-2 text-slate-500">신청 마감 {kstLabel(deadlineOf(event))}{event.registration_deadline ? "" : " (자동: 전날 17:00)"}</span>
               </p>

@@ -5,6 +5,7 @@ import { specialLogout } from "@/app/actions";
 import { canSeeSpecialMaterials, deadlineBadge, specialRegistrationOpen, specialWhen } from "@/lib/special";
 import { todayKST } from "@/lib/config";
 import SpecialForm from "./SpecialForm";
+import { publicSpecials } from "@/lib/specialPlan";
 import SpecialLogin from "./SpecialLogin";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export const metadata = { title: "특강 신청 · vella_toeic", robots: { index
 
 export default async function SpecialPage() {
   await expireSpecialDeposits(DEPOSIT_MINUTES);
-  const [events, mine] = await Promise.all([listSpecialLectures(), activeStudentApps().then(({ apps }) => getSpecialRegistrationsFor(apps.map((a) => a.id)))]);
+  const [events, mine] = await Promise.all([listSpecialLectures().then(publicSpecials), activeStudentApps().then(({ apps }) => getSpecialRegistrationsFor(apps.map((a) => a.id)))]);
   const account = await getSetting("bank_account");
   // 아직 열리지 않은(오늘 이후) 특강은 모두 보여주고, 마감된 것은 '신청이 마감됐어요'로 막아요.
   const today = todayKST();

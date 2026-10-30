@@ -130,6 +130,7 @@ export type SpecialLecture = {
   youtube_id: string | null;
   registration_deadline: string | null; // 비어 있으면 특강 전날 17:00
   material_note: string | null; // 불라방 자료 위에 보여줄 안내 문구 (여러 줄)
+  published?: boolean; // false = 자동으로 만든 초안 (공개 전에는 학생에게 안 보여요)
   created_at: string;
 };
 
@@ -832,7 +833,7 @@ export async function saveMission(mission: Omit<Mission, "updated_at">) {
 
 // ── 특강 ────────────────────────────────────────
 const SPECIAL_BUCKET = "special-lecture-materials";
-type SpecialLectureFields = Pick<SpecialLecture, "event_date" | "title" | "starts_at" | "ends_at" | "registration_deadline"> & { material_note?: string | null };
+type SpecialLectureFields = Pick<SpecialLecture, "event_date" | "title" | "starts_at" | "ends_at" | "registration_deadline"> & { material_note?: string | null; published?: boolean };
 
 export async function listSpecialLectures(): Promise<SpecialLecture[]> {
   if (sb) {
@@ -859,7 +860,7 @@ export async function createSpecialLecture(fields: SpecialLectureFields) {
     if (error) throw error;
     return;
   }
-  mem.specialLectures.push({ ...fields, material_note: fields.material_note ?? null, id: crypto.randomUUID(), youtube_id: null, created_at: new Date().toISOString() });
+  mem.specialLectures.push({ ...fields, material_note: fields.material_note ?? null, published: fields.published ?? true, id: crypto.randomUUID(), youtube_id: null, created_at: new Date().toISOString() });
 }
 
 export async function updateSpecialLecture(id: string, patch: Partial<SpecialLectureFields & Pick<SpecialLecture, "youtube_id">>) {

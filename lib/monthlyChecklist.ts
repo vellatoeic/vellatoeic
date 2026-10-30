@@ -42,9 +42,16 @@ export async function monthlyChecklist(today = todayKST()): Promise<{ cohort: st
   const items: CheckItem[] = [];
   // 1. 다음 달 LC 음원 업로드 (첫 수업일 7일 전부터)
   items.push(gate(addDays(first, -7), audios.length > 0, { key: "audio", title: `${mon} LC 음원 올리기`, detail: audios.length ? `${audios.length}개 올림` : "아직 없어요", href: `/admin/audio?c=${cohort}` }));
-  // 2. 다음 달 특강 등록 (전달 20일부터)
-  const specialCount = specials.filter((e) => e.event_date.startsWith(cohort)).length;
-  items.push(gate(`${shiftMonth(cohort, -1)}-20`, specialCount > 0, { key: "special", title: `${mon} 특강 등록`, detail: specialCount ? `${specialCount}개 등록` : "아직 없어요", href: "/admin/special" }));
+  // 2. 다음 달 특강: 요일 고르기 → 초안 확인 → 공개 (전달 20일부터, 공개까지 해야 ✅)
+  const monthSpecials = specials.filter((e) => e.event_date.startsWith(cohort));
+  const published = monthSpecials.filter((e) => e.published !== false).length;
+  const draftCount = monthSpecials.length - published;
+  const weekday = await getSetting(`special_weekday:${cohort}`);
+  items.push(gate(`${shiftMonth(cohort, -1)}-20`, published > 0 && draftCount === 0, {
+    key: "special", title: `${mon} 특강 요일 고르기 → 초안 확인 → 공개`,
+    detail: !weekday && monthSpecials.length === 0 ? "[수업일 설정]에서 특강 요일을 골라 주세요" : draftCount ? `초안 ${draftCount}개 공개 전` : published ? `${published}개 공개` : "수업일 [확인했어요]를 누르면 초안이 생겨요",
+    href: !weekday && monthSpecials.length === 0 ? `/admin/schedule?cohort=${cohort}` : "/admin/special",
+  }));
   // 3. 다음 달 수업일 확인 ([수업일 설정] '확인' 버튼). 공휴일 있는 달은 빨간 강조
   const holidayNames = Object.entries(holidays).map(([d, n]) => `${md(d)} ${n}`);
   items.push({

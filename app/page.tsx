@@ -3,6 +3,7 @@ import Link from "next/link";
 import Cloud from "@/components/Cloud";
 import NoticePopupHost from "@/components/notices/NoticePopupHost";
 import { listSpecialLectures } from "@/lib/db";
+import { publicSpecials } from "@/lib/specialPlan";
 import { deadlineBadge, specialDay, specialRegistrationOpen } from "@/lib/special";
 
 // 특강 모집 여부를 매번 확인해요.
@@ -39,7 +40,7 @@ function MenuItem({ href, icon, bg, title, sub, alert }: { href: string; icon: s
 export default async function Home() {
   // 이번 달 특강이 하나라도 있으면(마감·지난 특강 포함) 메뉴를 보여줘요. 신청 가능하면 '특강 신청', 아니면 '특강 다시 보기'.
   const month = todayKST().slice(0, 7);
-  const thisMonth = (await listSpecialLectures()).filter((event) => event.event_date.startsWith(month));
+  const thisMonth = publicSpecials(await listSpecialLectures()).filter((event) => event.event_date.startsWith(month)); // 공개 전 초안 제외
   const open = thisMonth.filter((event) => specialRegistrationOpen(event));
 
   return (

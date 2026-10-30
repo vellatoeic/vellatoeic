@@ -24,6 +24,7 @@ import { defaultHolidays, holidayKey, parseHolidays, schoolDaysFor, scheduleClas
 import { classAppsFor } from "@/lib/classCohort";
 import { studentDays } from "@/lib/studentDays";
 import { shiftMonth } from "@/lib/signupMonths";
+import { publicSpecials } from "@/lib/specialPlan";
 import { boardsFor, studentKeyOf } from "@/lib/gifts";
 import { giftWindowOpen } from "@/lib/stickerComplete";
 import { getGiftDraw } from "@/lib/db";
@@ -115,7 +116,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
   // 맨 위 "🔴 라이브 입장": 고른 시간대 수업 10분 전 ~ 종료까지 빨간색, 그 외엔 다음 라이브 안내
   // 다가오는 특강 신청 (취소 제외) → 라이브 버튼 아래 작은 카드
-  const [mySpecialRegs, specialEvents] = await Promise.all([getSpecialRegistrationsFor(apps.map((x) => x.id)), listSpecialLectures()]);
+  const [mySpecialRegs, specialEvents] = await Promise.all([getSpecialRegistrationsFor(apps.map((x) => x.id)), listSpecialLectures().then(publicSpecials)]);
   const mySpecials = mySpecialRegs
     .filter((r) => r.deposit !== "cancelled")
     .map((r) => ({ r, e: specialEvents.find((e) => e.id === r.special_lecture_id) }))

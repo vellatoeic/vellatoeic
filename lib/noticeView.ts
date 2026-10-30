@@ -1,5 +1,6 @@
 import "server-only";
-import { getSetting, listNoticeReads, listNotices, type Application } from "./db";
+import { getSetting, getSpecialRegistrationsFor, listNoticeReads, listNotices, listSpecialLectures, type Application } from "./db";
+import { specialDeadlineNotices } from "./specialPopups";
 import { activeStudentApps } from "./student";
 import { isForEveryone, isLive, liveFor, myNotices, popupNotices, readKey, seenStorageKey, type Notice } from "./notices";
 import { classDaysOf } from "./classCalendar";
@@ -43,8 +44,15 @@ export async function noticeSummary() {
   const mine = myNotices(all, students, today);
   return {
     loggedIn: true, cohort,
-    popups: await withLinks(popupNotices(all, students, reads, today)),
+    popups: [...(await specialPopups()), ...(await withLinks(popupNotices(all, students, reads, today)))],
     unread: mine.filter((n) => liveFor(n, students, today) && !reads.has(readKey(n, cohort))).length,
     visitorKeys: [] as string[],
   };
+}
+
+// 특강 마감 안내 팝업: 로그인한 학생의 모든 납부 신청 기준, 아직 신청 안 한 공개 특강만 (확인은 기기에 특강id로 남겨요)
+async function specialPopups() {
+  const { apps } = await activeStudentApps();
+  const [events, regs] = await Promise.all([listSpecialLectures(), getSpecialRegistrationsFor(apps.map((a) => a.id))]);
+  return specialDeadlineNotices(events, apps, regs);
 }
