@@ -123,3 +123,24 @@ test("관리자 취소 되살리기: 입금 대기로, 30분 타이머는 되살
   await expireUnpaid(revivedAt + 31 * MIN);
   assert.equal((await getApplication(a.id))?.status, "cancelled");
 });
+
+// ── 보완: 다시 신청한 학생의 입금 · 확인 필요 후보는 자동 취소하지 않기 ──
+test("자동 취소 → 다시 신청 → 입금하면 새 신청이 납부 확인 (옛 신청은 그대로 취소)", async () => {
+  await setSetting("deposit_timeout_from", "2000-01-01T00:00:00Z");
+  const old = await newApp("재신청생", Date.now() - 2 * 3600 * 1000, "재신청생", 30000);
+  await updateApplication(old.id, { status: "cancelled", cancel_reason: "timeout", cancelled_at: new Date(Date.now() - 3600 * 1000).toISOString() });
+  const fresh = await newApp("재신청생", Date.now(), "재신청생", 30000);
+  assert.equal((await handleBankSms("[신한은행] 입금 30,000원 재신청생")).result, "matched");
+  assert.equal((await getApplication(fresh.id))?.status, "paid");
+  assert.equal((await getApplication(old.id))?.status, "cancelled");
+});
+
+test("'확인 필요' 입금의 후보 신청은 30분이 지나도 자동 취소되지 않아요", async () => {
+  await setSetting("deposit_timeout_from", "2000-01-01T00:00:00Z");
+  const a = await newApp("확인필요1", Date.now(), "같은입금", 40000);
+  const b = await newApp("확인필요2", Date.now(), "같은입금", 40000);
+  assert.equal((await handleBankSms("[신한은행] 입금 40,000원 같은입금")).result, "review");
+  await expireUnpaid(Date.now() + 2 * 3600 * 1000);
+  assert.equal((await getApplication(a.id))?.status, "pending");
+  assert.equal((await getApplication(b.id))?.status, "pending");
+});

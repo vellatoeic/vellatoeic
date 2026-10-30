@@ -15,6 +15,7 @@ import SelectAll from "./SelectAll";
 import { autoCleanupAudios } from "@/lib/audio";
 import { md, monthlyChecklist } from "@/lib/monthlyChecklist";
 import { visibleToAdmin } from "@/lib/cancellations";
+import { reviewHolds } from "@/lib/deposits";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
@@ -204,6 +205,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   // 자동으로 확정하지 못한 교재비 입금 문자 (같은 입금자명이 여러 명이거나 금액이 다를 때)
   const ybmPending = (await listYbmOrders()).filter((o) => o.status === "pending");
   const waitingDeposits = await listWaitingDepositEvents(60); // 신청서보다 먼저 온 교재비 입금
+  const holds = await reviewHolds(); // '확인 필요' 입금의 후보 학생
   const bookChecks = (await listDepositEvents(50)).filter((e) => e.target === "book" && (e.result === "review" || e.result === "unmatched"));
   const pendingAll = everything.filter((a) => a.status === "pending");
   // 수강 시간이 아직 비어 있는 학생 (예전 신청). 오전/저녁을 정해 주세요.
@@ -336,6 +338,19 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
             {bookChecks.map((e) => (
               <li key={e.id} className="rounded-2xl bg-white p-3 text-sm">
                 <p><b className="text-sky-ink">{e.name}</b> · {won(e.amount)} · {new Date(e.received_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                {/* 후보 학생 (입금자명·금액이 같은 입금 대기). 확인 필요인 동안은 30분 자동 취소에서 빠져요. */}
+                {(holds.byEvent.get(e.id) ?? []).length > 0 && (
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    <span className="text-xs text-slate-500">후보:</span>
+                    {(holds.byEvent.get(e.id) ?? []).map((c) => (
+                      <CloseOnSubmitForm key={c.id} action={resolveBookDepositEvent} className="inline">
+                        <input type="hidden" name="event_id" value={e.id} />
+                        <input type="hidden" name="application_id" value={c.kind === "ybm" ? `ybm:${c.id}` : c.id} />
+                        <button className="rounded-full bg-sky-deep px-3 py-1 text-xs font-bold text-white">{c.name} · {c.label} → 납부 확인</button>
+                      </CloseOnSubmitForm>
+                    ))}
+                  </div>
+                )}
                 <CloseOnSubmitForm action={resolveBookDepositEvent} className="mt-2 flex flex-wrap gap-2">
                   <input type="hidden" name="event_id" value={e.id} />
                   <select name="application_id" className="input !w-auto min-w-0 flex-1 !py-2">

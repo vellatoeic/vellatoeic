@@ -3,7 +3,7 @@ import { DEPOSIT_MINUTES, SPECIAL_DEPOSIT } from "./config";
 import { parseBankSms, sameName, type ParsedDeposit } from "./bankSms";
 import { BOOK_PRICE, SHIPPING_FEE } from "./config";
 import { expireUnpaid, revivable } from "./cancellations";
-import { createDepositEvent, listApplications, listSpecialRegistrations, listWaitingDepositEvents, listWaitingDeposits, listYbmOrders, updateApplications, updateDepositEvent, updateOnsiteRegistrations, updateYbmOrders, type DepositEvent } from "./db";
+import { createDepositEvent, listDepositEvents, listApplications, listSpecialRegistrations, listWaitingDepositEvents, listWaitingDeposits, listYbmOrders, updateApplications, updateDepositEvent, updateOnsiteRegistrations, updateYbmOrders, type DepositEvent } from "./db";
 
 // ── 입금 문자 자동 확인 ─────────────────────────
 // 아이폰 단축어가 은행 입금 문자를 /api/bank-sms 로 보내면 여기서 처리해요.
@@ -14,7 +14,9 @@ import { createDepositEvent, listApplications, listSpecialRegistrations, listWai
 // 모든 처리기를 통틀어 딱 한 건만 맞으면 자동 확정, 두 건 이상이면 '확인 필요', 없으면 '확인 필요'(관련 있어 보일 때만 기록).
 // 웹훅이 바꿀 수 있는 건 '입금 대기 → 확정(납부 확인)' 하나뿐이에요.
 
-type Candidate = { target: DepositEvent["target"]; id: string; ybm?: boolean; confirm: () => Promise<void> };
+// who = 같은 학생인지 비교하는 열쇠 (신청: 이름|기수, 인강 주문: ybm|이름), revive = 취소된 신청 되살리기 후보
+type Candidate = { target: DepositEvent["target"]; id: string; ybm?: boolean; who?: string; revive?: boolean; confirm: () => Promise<void> };
+const key = (name: string) => name.replace(/\s+/g, "");
 type DepositHandler = {
   target: DepositEvent["target"];
   candidates: (d: ParsedDeposit) => Promise<Candidate[]>;
@@ -44,7 +46,7 @@ const bookDepositHandler: DepositHandler = {
   async candidates(d) {
     return (await listApplications())
       .filter((a) => a.status === "pending" && a.amount === d.amount && sameName(a.depositor, d.name))
-      .map((a) => ({ target: "book" as const, id: a.id, confirm: () => updateApplications([a.id], { status: "paid" }) }));
+      .map((a) => ({ target: "book" as const, id: a.id, who: `${key(a.name)}|${a.cohort}`, confirm: () => updateApplications([a.id], { status: "paid" }) }));
   },
   // 입금자명이 같은 입금 대기 신청이 있으면(금액이 달라도) 기록해서 관리자가 확인해요.
   related: async (d) => (await listApplications()).some((a) => a.status === "pending" && sameName(a.depositor, d.name)),
@@ -56,7 +58,7 @@ const ybmDepositHandler: DepositHandler = {
   async candidates(d) {
     return (await listYbmOrders())
       .filter((o) => o.status === "pending" && o.amount === d.amount && sameName(o.depositor, d.name))
-      .map((o) => ({ target: "book" as const, id: o.id, ybm: true, confirm: () => updateYbmOrders([o.id], { status: "paid", paid_at: new Date().toISOString() }) }));
+      .map((o) => ({ target: "book" as const, id: o.id, ybm: true, who: `ybm|${key(o.name)}`, confirm: () => updateYbmOrders([o.id], { status: "paid", paid_at: new Date().toISOString() }) }));
   },
   related: async (d) => (await listYbmOrders()).some((o) => o.status === "pending" && sameName(o.depositor, d.name)),
 };
@@ -67,7 +69,7 @@ const reviveAppHandler: DepositHandler = {
   async candidates(d) {
     return (await listApplications())
       .filter((a) => revivable(a) && a.amount === d.amount && sameName(a.depositor || a.name, d.name))
-      .map((a) => ({ target: "book" as const, id: a.id, confirm: () => updateApplications([a.id], { status: "paid", cancelled_at: null, cancel_reason: null }) }));
+      .map((a) => ({ target: "book" as const, id: a.id, who: `${key(a.name)}|${a.cohort}`, revive: true, confirm: () => updateApplications([a.id], { status: "paid", cancelled_at: null, cancel_reason: null }) }));
   },
   related: async () => false,
 };
@@ -77,7 +79,7 @@ const reviveYbmHandler: DepositHandler = {
   async candidates(d) {
     return (await listYbmOrders())
       .filter((o) => revivable(o) && o.amount === d.amount && sameName(o.depositor || o.name, d.name))
-      .map((o) => ({ target: "book" as const, id: o.id, ybm: true, confirm: () => updateYbmOrders([o.id], { status: "paid", paid_at: new Date().toISOString(), cancelled_at: null, cancel_reason: null }) }));
+      .map((o) => ({ target: "book" as const, id: o.id, ybm: true, who: `ybm|${key(o.name)}`, revive: true, confirm: () => updateYbmOrders([o.id], { status: "paid", paid_at: new Date().toISOString(), cancelled_at: null, cancel_reason: null }) }));
   },
   related: async () => false,
 };
@@ -93,7 +95,9 @@ export async function handleBankSms(text: string): Promise<{ result: DepositEven
     await createDepositEvent({ target: "special", name: "", amount: 0, result: "unmatched", registration_id: null, application_id: null, ybm_order_id: null });
     return { result: "unmatched" };
   }
-  const candidates = (await Promise.all(HANDLERS.map((h) => h.candidates(parsed)))).flat();
+  const all = (await Promise.all(HANDLERS.map((h) => h.candidates(parsed)))).flat();
+  // 다시 신청한 학생: 같은 학생(이름·기수)의 입금 대기 신청이 있으면 취소된 옛 신청은 후보에서 빼요 → 새 신청만 납부 확인
+  const candidates = all.filter((c) => !(c.revive && all.some((x) => !x.revive && x.who === c.who)));
   const record = (result: DepositEvent["result"], target: DepositEvent["target"], c?: Candidate) =>
     createDepositEvent({
       target, name: parsed.name, amount: parsed.amount, result,
@@ -149,4 +153,25 @@ export async function linkWaitingDeposit(target: { kind: "app" | "ybm"; id: stri
     await updateDepositEvent(hits[0].id, { result: "resolved", ybm_order_id: target.id });
   }
   return "linked" as const;
+}
+
+// '확인 필요'(후보 여러 명)로 남은 교재비 입금의 후보들: 입금자명·금액이 같은 입금 대기 신청·주문.
+// 관리자가 [납부 확인]하거나 [취소 처리]할 때까지 30분 자동 취소에서 빼요.
+export async function reviewHolds(): Promise<{ apps: Set<string>; orders: Set<string>; byEvent: Map<string, { kind: "app" | "ybm"; id: string; name: string; label: string }[]> }> {
+  const events = (await listDepositEvents(200)).filter((e) => e.target === "book" && e.result === "review");
+  const apps = new Set<string>(), orders = new Set<string>();
+  const byEvent = new Map<string, { kind: "app" | "ybm"; id: string; name: string; label: string }[]>();
+  if (events.length === 0) return { apps, orders, byEvent };
+  const [pendingApps, pendingOrders] = await Promise.all([
+    listApplications().then((l) => l.filter((a) => a.status === "pending")),
+    listYbmOrders().then((l) => l.filter((o) => o.status === "pending")),
+  ]);
+  for (const e of events) {
+    const list = [
+      ...pendingApps.filter((a) => a.amount === e.amount && sameName(a.depositor || a.name, e.name)).map((a) => { apps.add(a.id); return { kind: "app" as const, id: a.id, name: a.name, label: `${a.cohort.slice(5, 7)}월 신청` }; }),
+      ...pendingOrders.filter((o) => o.amount === e.amount && sameName(o.depositor || o.name, e.name)).map((o) => { orders.add(o.id); return { kind: "ybm" as const, id: o.id, name: o.name, label: "인강 주문" }; }),
+    ];
+    byEvent.set(e.id, list);
+  }
+  return { apps, orders, byEvent };
 }

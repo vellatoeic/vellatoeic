@@ -39,9 +39,11 @@ export async function expireUnpaid(nowMs = Date.now()) {
   const from = await ruleFrom(nowMs);
   const now = new Date(nowMs).toISOString();
   const late = (x: Pend) => { const d = depositDeadline(x, from); return !!d && d <= now; };
-  const [apps, orders] = await Promise.all([listApplications(), listYbmOrders()]);
-  const a = apps.filter(late).map((x) => x.id);
-  const o = orders.filter(late).map((x) => x.id);
+  // '확인 필요'(후보 여러 명) 입금의 후보는 관리자가 처리할 때까지 자동 취소하지 않아요
+  const { reviewHolds } = await import("./deposits");
+  const [apps, orders, holds] = await Promise.all([listApplications(), listYbmOrders(), reviewHolds()]);
+  const a = apps.filter((x) => late(x) && !holds.apps.has(x.id)).map((x) => x.id);
+  const o = orders.filter((x) => late(x) && !holds.orders.has(x.id)).map((x) => x.id);
   if (a.length) await updateApplications(a, { status: "cancelled", cancelled_at: now, cancel_reason: "timeout" });
   if (o.length) await updateYbmOrders(o, { status: "cancelled", cancelled_at: now, cancel_reason: "timeout" });
   return { apps: a.length, orders: o.length };
