@@ -34,6 +34,7 @@ Vella가 Supabase SQL Editor에서 실행했다고 확인한 SQL 파일만 기�
 | `28_special_drafts.sql` | 완료 | 특강 공개 여부 칸(published, 기존 특강 모두 공개) 추가, 2026-11 특강 요일 금요일 저장, 11/6·11/20 초안 생성(같은 날짜·제목이 없을 때만) |
 | `29_faq_view_period.sql` | 완료 | FAQ 답 2개를 열람 기간 공식 규칙(종강일까지)으로 수정: 지난 특강 다시 보기, 라이브를 놓쳤어요(이미 종강일까지면 그대로) |
 | `30_books_adjusted.sql` | 완료 | 신청에 교재 직접 수정 표시 칸(books_adjusted, 기존 신청 모두 false) 추가 |
+| `31_round_auto.sql` | 완료 | 교재 회차 완전 자동(홀수달 1·짝수달 2)으로 바꾸며 settings의 round_% 덮어쓰기 값 삭제(다른 설정 그대로) |
 
 ## 기록 갱신 규칙
 
