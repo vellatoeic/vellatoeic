@@ -33,6 +33,7 @@ Vella가 Supabase SQL Editor에서 실행했다고 확인한 SQL 파일만 기�
 | `27_deposit_timeout.sql` | 완료 | 신청·인강 주문에 취소 상태(cancelled)·취소 시각·취소 이유·30분 타이머 시작 칸 추가(상태 규칙 교체, 데이터 그대로), FAQ 입금 확인 답 수정 |
 | `28_special_drafts.sql` | 완료 | 특강 공개 여부 칸(published, 기존 특강 모두 공개) 추가, 2026-11 특강 요일 금요일 저장, 11/6·11/20 초안 생성(같은 날짜·제목이 없을 때만) |
 | `29_faq_view_period.sql` | 완료 | FAQ 답 2개를 열람 기간 공식 규칙(종강일까지)으로 수정: 지난 특강 다시 보기, 라이브를 놓쳤어요(이미 종강일까지면 그대로) |
+| `30_books_adjusted.sql` | 완료 | 신청에 교재 직접 수정 표시 칸(books_adjusted, 기존 신청 모두 false) 추가 |
 
 ## 기록 갱신 규칙
 
