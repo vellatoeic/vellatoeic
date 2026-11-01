@@ -1,5 +1,5 @@
 import { adminAlerts } from "@/lib/adminAlerts";
-import { BOOKS, COURSES, KINDS, TRACKS, TIME_SLOTS, bookStatusLabel, cohortLabel, roundOf, thisMonthKST, won, type CourseId, type TimeSlot, type Track } from "@/lib/config";
+import { BOOKS, COURSES, KINDS, TRACKS, TIME_SLOTS, bookStatusLabel, cohortLabel, roundOf, thisMonthKST, won, type BookId, type CourseId, type TimeSlot, type Track } from "@/lib/config";
 import { listApplications, listDepositEvents, listWaitingDepositEvents, listYbmOrders, listMissions, getSetting, currentCohort, roundFor, isPreview, type Application, type Mission } from "@/lib/db";
 import { missionCount } from "@/lib/mission";
 import { summariesFor } from "@/lib/studentSummary";
@@ -7,7 +7,7 @@ import { movableCohorts } from "@/lib/cohortMove";
 import { WATCH_RULES, type WatchSummary } from "@/lib/watchlist";
 import Link from "next/link";
 import { isAdmin } from "@/lib/auth";
-import { saveRound, fixAltIssue, ignoreAltIssue, adminCancelApps, adminConfirmCancelledApps, adminReviveApps, changeCohort, bulkChangeCohort, markChatKicked, changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove, resolveBookDepositEvent } from "@/app/actions";
+import { adjustBooksAction, saveRound, fixAltIssue, ignoreAltIssue, adminCancelApps, adminConfirmCancelledApps, adminReviveApps, changeCohort, bulkChangeCohort, markChatKicked, changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove, resolveBookDepositEvent } from "@/app/actions";
 import LoginForm from "./LoginForm";
 import AdminTabs from "./AdminTabs";
 import CloseOnSubmitForm from "./CloseOnSubmitForm";
@@ -18,11 +18,12 @@ import { visibleToAdmin } from "@/lib/cancellations";
 import { reviewHolds } from "@/lib/deposits";
 import { currentAltIssues } from "@/lib/altIssuesServer";
 import { altFixResult } from "@/lib/altContinue";
+import { classBookOptions } from "@/lib/manualLink";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
 
-type Filters = { k: string; p: string; b: string; t: string; q: string; c: string; ra: string; mv: string; rr: string };
+type Filters = { k: string; p: string; b: string; t: string; q: string; c: string; ra: string; mv: string; rr: string; linked: string };
 
 const KIND_FILTERS = [["all", "전체"], ["onsite", "현장"], ["online", "불라방"]] as const;
 const PAY_FILTERS = [["all", "전체"], ["pending", "미납"], ["paid", "납부 완료"], ["refunded", "환불"], ["cancelled", "취소"]] as const;
@@ -43,7 +44,7 @@ function Badge({ tone, children }: { tone: "amber" | "sky" | "slate" | "green"; 
   return <span className={`inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold ${color}`}>{children}</span>;
 }
 
-function Row({ a, group, mission, fresh, sum, back }: { a: Application; group: string; mission?: Mission; fresh?: boolean; sum?: WatchSummary; back: string }) {
+function Row({ a, group, mission, fresh, sum, back, bookOptions }: { a: Application; group: string; mission?: Mission; fresh?: boolean; sum?: WatchSummary; back: string; bookOptions: BookId[] }) {
   const book = bookStatusLabel(a);
   return (
     <li className={`py-3 ${fresh ? "bg-red-50" : a.status === "pending" ? "bg-amber-50/60" : ""}`}>
@@ -57,6 +58,7 @@ function Row({ a, group, mission, fresh, sum, back }: { a: Application; group: s
             <Badge tone={a.status === "pending" ? "amber" : a.status === "refunded" || a.status === "cancelled" ? "slate" : "green"}>{a.status === "pending" ? "미납" : a.status === "refunded" ? "환불" : a.status === "cancelled" ? "취소" : "납부 완료"}</Badge>
             {a.kind === "online" && <Badge tone={a.status === "shipped" ? "green" : a.status === "paid" ? "amber" : "slate"}>교재 {book}</Badge>}
             {a.continuing && <Badge tone="slate">이어듣기</Badge>}
+            {a.books_adjusted && <Badge tone="amber">⚠️ 교재 조정</Badge>}
             <Badge tone={missionCount(mission) === 4 ? "green" : "slate"}>미션 {missionCount(mission)}/4</Badge>
           </div>
           {sum && sum.past > 0 && (
@@ -126,6 +128,19 @@ function Row({ a, group, mission, fresh, sum, back }: { a: Application; group: s
               <button className="btn-ghost !py-1.5 text-sm">시간 저장</button>
             </CloseOnSubmitForm>
             <details className="text-sm">
+              <summary className="cursor-pointer text-slate-500">교재 직접 수정</summary>
+              <CloseOnSubmitForm action={adjustBooksAction} className="mt-2 space-y-2 rounded-xl bg-sky-soft p-3 text-left">
+                <input type="hidden" name="id" value={a.id} />
+                <div className="flex flex-wrap gap-3">
+                  {bookOptions.map((b) => (
+                    <label key={b} className="flex items-center gap-1.5"><input type="checkbox" name="book" value={b} defaultChecked={a.books.includes(b)} className="h-4 w-4 accent-sky-deep" />{BOOKS[b]}</label>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500">고른 교재로 금액을 다시 계산해요{a.pickup === "delivery" ? " (택배비 포함)" : ""}. 저장하면 &apos;교재 조정&apos; 표시가 붙고 회차·반 변경 때 교재가 자동으로 안 바뀌어요.</p>
+                <button className="btn !py-1.5 !text-sm">교재 저장</button>
+              </CloseOnSubmitForm>
+            </details>
+            <details className="text-sm">
               <summary className="cursor-pointer text-slate-500">기수 변경</summary>
               <CloseOnSubmitForm action={changeCohort} className="mt-2 flex gap-2">
                 <input type="hidden" name="id" value={a.id} />
@@ -185,7 +200,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   await autoCleanupAudios().catch(() => 0); // 기간이 끝나고 7일 지난 LC 음원 자동 정리
 
   const now = await currentCohort();
-  const { k = "all", p = "all", b = "all", t = "all", q = "", c = now, ra = "", mv = "", rr = "" } = await searchParams;
+  const { k = "all", p = "all", b = "all", t = "all", q = "", c = now, ra = "", mv = "", rr = "", linked = "" } = await searchParams;
   // 30분 자동 취소(timeout)는 관리 화면 어디에도 안 보여요. 관리자 취소(admin)는 '취소' 필터에서만.
   const everything = (await listApplications()).filter(visibleToAdmin);
   const [account, cafeHomeworkUrl, cafeUrl, blogUrl, studyBoardUrl, chatUrl, chatCode, rawCohort, kakaoChannel] = await Promise.all([
@@ -237,6 +252,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   const count = (fn: (a: Application) => boolean) => all.filter(fn).length;
   const missions = new Map((await listMissions(list.map((a) => a.id))).map((m) => [m.app_id, m]));
   const sums = await summariesFor(list);
+  const listRounds = new Map(await Promise.all([...new Set(list.map((a) => a.cohort))].map(async (co) => [co, await roundFor(co)] as const)));
   const link = (patch: Partial<Filters>) => {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries({ c, k, p, b, t, q, ...patch })) {
@@ -282,12 +298,14 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
           ))}
         </ul>
       </section>
+      {linked && <p className="card !bg-emerald-50 text-center font-bold text-emerald-700">💳 입금을 학생 신청에 연결하고 납부 확인했어요</p>}
       {rr && (() => {
-        const [co, r, n, diffs] = rr.split("|");
+        const [co, r, n, diffs, skipped] = rr.split("|");
         return (
           <div className="space-y-1 rounded-3xl border-2 border-sky-main bg-white p-4 text-sm">
             <p className="font-jua text-lg text-sky-ink">📚 {Number(co.slice(5, 7))}월 신청 {n}건 교재를 {r}회차로 바꿨어요</p>
             {diffs && <p className="font-bold text-amber-700">💰 납부 완료라 금액은 그대로, 차이: {diffs}</p>}
+            {skipped && <p className="font-bold text-amber-700">⚠️ 교재 조정 신청은 그대로 뒀어요: {skipped} — 교재를 직접 확인해 주세요</p>}
           </div>
         );
       })()}
@@ -360,7 +378,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
               <li key={e.id} className="flex items-center gap-2 rounded-xl bg-white p-2.5 text-sm">
                 <b className="text-sky-ink">{e.name}</b> · {won(e.amount)}
                 <span className="text-xs text-slate-400">{new Date(e.received_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-                <CloseOnSubmitForm action={resolveBookDepositEvent} className="ml-auto">
+                <a href={`/admin/deposit/${e.id}`} className="ml-auto rounded-full bg-sky-deep px-3 py-1 text-xs font-bold text-white">학생 연결</a>
+                <CloseOnSubmitForm action={resolveBookDepositEvent}>
                   <input type="hidden" name="event_id" value={e.id} />
                   <input type="hidden" name="application_id" value="" />
                   <button className="text-xs text-slate-400 underline">관계없는 입금 (지우기)</button>
@@ -404,6 +423,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
                       .map((o) => <option key={o.id} value={`ybm:${o.id}`}>{o.depositor}{o.depositor !== o.name ? ` (${o.name})` : ""} · {won(o.amount)} · YBM 인강 교재</option>)}
                   </select>
                   <button className="btn !py-2 !text-sm">처리</button>
+                  <a href={`/admin/deposit/${e.id}`} className="btn-ghost !py-2 text-sm">학생 연결 (취소된 신청·검색)</a>
                 </CloseOnSubmitForm>
               </li>
             ))}
@@ -646,7 +666,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
               {pending > 0 && <Badge tone="amber">미납 {pending}명</Badge>}
             </div>
             <ul className="divide-y divide-sky-soft">
-              {g.items.map((a) => <Row key={a.id} a={a} group={g.key} mission={missions.get(a.id)} fresh={a.created_at > alerts.since} sum={sums.get(a.id)} back={link({})} />)}
+              {g.items.map((a) => <Row key={a.id} a={a} group={g.key} mission={missions.get(a.id)} fresh={a.created_at > alerts.since} sum={sums.get(a.id)} back={link({})} bookOptions={classBookOptions(a, listRounds.get(a.cohort) ?? 1)} />)}
             </ul>
           </section>
         );

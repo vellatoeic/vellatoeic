@@ -28,6 +28,7 @@ export type Application = {
   cancelled_at?: string | null; // 취소된 시각
   cancel_reason?: "timeout" | "admin" | null; // timeout = 30분 안에 입금 미확인(자동), admin = 관리자 취소
   pending_from?: string | null; // 30분 입금 타이머 시작 (비어 있으면 신청 시각, 관리자가 되살리면 그 시각)
+  books_adjusted?: boolean; // 관리자가 교재를 직접 고른 신청 (회차 재계산·반 변경에서 교재를 자동으로 바꾸지 않아요)
   audio_extended_until?: string | null; // 관리자가 음원 기간을 다시 열어준 마지막 날
 };
 
@@ -283,7 +284,7 @@ export async function listApplications(): Promise<Application[]> {
   return mem.apps;
 }
 
-type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "continuing" | "slot" | "books" | "amount" | "cohort" | "audio_extended_until" | "cancelled_at" | "cancel_reason" | "pending_from">>;
+type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "continuing" | "slot" | "books" | "amount" | "cohort" | "audio_extended_until" | "cancelled_at" | "cancel_reason" | "pending_from" | "books_adjusted">>;
 
 export async function updateApplication(id: string, patch: ApplicationPatch) {
   await updateApplications([id], patch);

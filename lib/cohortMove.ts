@@ -15,6 +15,8 @@ export function planCohortMove(a: Application, target: string, round: 1 | 2, all
   if (!force && all.some((x) => x.id !== a.id && x.cohort === target && x.name === a.name && x.status !== "refunded" && x.status !== "cancelled")) {
     return { ok: false, error: `${a.name}: 옮길 기수에 같은 이름 신청이 이미 있어요 (같은 학생이면 중복이에요. 동명이인이면 '같은 이름이 있어도 옮기기'를 체크)` };
   }
+  // 교재를 직접 고친 신청은 기수만 옮기고 교재·금액은 그대로
+  if (a.books_adjusted) return { ok: true, patch: { cohort: target, books: a.books, amount: a.amount }, amountChanged: false };
   const continuing = a.course === "start" && isAlt(a.track) && a.continuing;
   const books = booksFor(a.course, a.track, round, continuing);
   const amount = calcAmount(books, a.pickup);

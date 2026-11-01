@@ -6,9 +6,13 @@ import type { Application } from "./db";
 
 export type RoundChange = { app: Application; books: BookId[]; amount: number; diff: number };
 
+// 관리자가 교재를 직접 고른 신청(books_adjusted)은 바꾸지 않아요 (adjustedSkipped로 따로 알려요)
+export const adjustedSkipped = (apps: Application[], cohort: string) =>
+  apps.filter((a) => a.cohort === cohort && a.books_adjusted && (a.status === "pending" || a.status === "paid" || a.status === "shipped"));
+
 export function recalcForRound(apps: Application[], cohort: string, round: 1 | 2): RoundChange[] {
   return apps
-    .filter((a) => a.cohort === cohort && (a.status === "pending" || a.status === "paid" || a.status === "shipped"))
+    .filter((a) => a.cohort === cohort && !a.books_adjusted && (a.status === "pending" || a.status === "paid" || a.status === "shipped"))
     .map((a) => {
       const books = booksFor(a.course, a.track, round, a.course === "start" && isAlt(a.track) && a.continuing);
       const fresh = calcAmount(books, a.pickup);

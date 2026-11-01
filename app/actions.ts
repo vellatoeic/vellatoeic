@@ -8,7 +8,7 @@ import {
 } from "@/lib/config";
 import {
   createApplication, listApplications, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, setHomeworkStar, drawGift, getGiftDraw, saveGiftItem, deleteGiftItem, setGiftSent, type GiftDraw, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  saveMission, type Mission, createYbmOrder, listYbmOrders, updateYbmOrders, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, setTestDouble, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
+  saveMission, type Mission, createYbmOrder, listYbmOrders, updateYbmOrders, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, setTestDouble, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, listDepositEvents, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
 } from "@/lib/db";
 import { canWatch, isActive, loginApps } from "@/lib/access";
 import { parseBankSms } from "@/lib/bankSms";
@@ -31,7 +31,8 @@ import { expireUnpaid } from "@/lib/cancellations";
 import { syncSpecialDrafts, weekdayKey } from "@/lib/specialDrafts";
 import { altFixResult, altTrackError, findPrevAlt, planBooks } from "@/lib/altContinue";
 import { currentAltIssues } from "@/lib/altIssuesServer";
-import { recalcForRound } from "@/lib/roundRecalc";
+import { adjustedSkipped, recalcForRound } from "@/lib/roundRecalc";
+import { adjustedBooks } from "@/lib/manualLink";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
 } from "@/lib/auth";
@@ -977,6 +978,8 @@ export async function changeClass(fd: FormData) {
   const a = await getApplication(id);
   if (!a) return;
   const continuing = course === "start" && isAlt(track) && a.continuing;
+  // 교재를 직접 고친 신청은 반만 바꾸고 교재·금액은 그대로 (⚠️ 교재 조정 표시로 확인)
+  if (a.books_adjusted) { await updateApplication(id, { course, track, continuing }); revalidatePath("/admin"); return; }
   const books = booksFor(course, track, await roundFor(a.cohort), continuing);
   await updateApplication(id, { course, track, continuing, books, amount: calcAmount(books, a.pickup) });
   revalidatePath("/admin");
@@ -1197,6 +1200,7 @@ export async function bulkChangeClass(fd: FormData) {
   const apps = await getApplications(ids);
   for (const a of apps) {
     const continuing = course === "start" && isAlt(track) && a.continuing;
+    if (a.books_adjusted) { await updateApplication(a.id, { course, track, continuing }); continue; } // 교재 조정 신청은 교재 그대로
     const books = booksFor(course, track, await roundFor(a.cohort), continuing);
     await updateApplication(a.id, { course, track, continuing, books, amount: calcAmount(books, a.pickup) });
   }
@@ -1330,9 +1334,54 @@ export async function saveRound(fd: FormData) {
   if (!/^\d{4}-\d{2}$/.test(cohort) || (r !== "1" && r !== "2")) return;
   const round = Number(r) as 1 | 2;
   await setSetting(`round_${cohort}`, r);
-  const changes = recalcForRound(await listApplications(), cohort, round);
+  const allApps = await listApplications();
+  const changes = recalcForRound(allApps, cohort, round);
+  const skipped = adjustedSkipped(allApps, cohort).map((a) => a.name);
   for (const c of changes) await updateApplication(c.app.id, { books: c.books, amount: c.amount });
   const diffs = changes.filter((c) => c.app.status !== "pending" && c.diff !== 0).map((c) => `${c.app.name}(${c.diff > 0 ? "+" : ""}${c.diff.toLocaleString("ko-KR")}원)`);
   revalidatePath("/admin", "layout");
-  redirect(`/admin?rr=${encodeURIComponent(`${cohort}|${round}|${changes.length}|${diffs.join(", ")}`)}#settings`);
+  redirect(`/admin?rr=${encodeURIComponent(`${cohort}|${round}|${changes.length}|${diffs.join(", ")}|${skipped.join(", ")}`)}#settings`);
+}
+
+// ── 입금 기록 수동 연결 ([학생 연결]) ──
+// 취소된 신청이면 되살려 납부 확인, 입금 기록은 resolved로 연결. 금액이 다르면 [교재 조정 후 확인] 또는 [금액 그대로 확인].
+export async function linkDepositManual(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const eventId = clean(fd.get("event_id"));
+  const kind = clean(fd.get("kind"));
+  const id = clean(fd.get("id"));
+  const mode = clean(fd.get("mode"));
+  const now = new Date().toISOString();
+  const event = (await listDepositEvents(500)).find((e) => e.id === eventId);
+  if (!event) return;
+  if (kind === "ybm") {
+    const o = (await listYbmOrders()).find((x) => x.id === id);
+    if (!o || (o.status !== "pending" && o.status !== "cancelled")) return;
+    await updateYbmOrders([o.id], { status: "paid", paid_at: now, cancelled_at: null, cancel_reason: null });
+    await updateDepositEvent(eventId, { result: "resolved", ybm_order_id: o.id });
+  } else {
+    const [a] = await getApplications([id]);
+    if (!a || (a.status !== "pending" && a.status !== "cancelled")) return;
+    if (mode === "adjust") {
+      const r = adjustedBooks(a, await roundFor(a.cohort), fd.getAll("book").map(String));
+      // 고른 교재 금액이 입금액과 같을 때만 확인해요
+      if (r.amount !== event.amount) redirect(`/admin/deposit/${eventId}?q=${encodeURIComponent(clean(fd.get("q")))}&err=${encodeURIComponent(`고른 교재 금액(${r.amount.toLocaleString("ko-KR")}원)이 입금액(${event.amount.toLocaleString("ko-KR")}원)과 달라요.`)}`);
+      await updateApplication(a.id, { books: r.books, amount: r.amount, books_adjusted: true });
+    }
+    await updateApplications([a.id], { status: "paid", cancelled_at: null, cancel_reason: null });
+    await updateDepositEvent(eventId, { result: "resolved", application_id: a.id });
+  }
+  revalidatePath("/admin", "layout");
+  redirect("/admin?linked=1");
+}
+
+// ── 신청 [관리] '교재 직접 수정' (관리자만) ──
+export async function adjustBooksAction(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const [a] = await getApplications([clean(fd.get("id"))]);
+  if (!a) return;
+  const r = adjustedBooks(a, await roundFor(a.cohort), fd.getAll("book").map(String));
+  if (r.books.length === 0) return;
+  await updateApplication(a.id, { books: r.books, amount: r.amount, books_adjusted: true });
+  revalidatePath("/admin", "layout");
 }
