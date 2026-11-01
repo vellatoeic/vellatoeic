@@ -58,3 +58,44 @@ test("개강 직전 택배 안내: 첫 수업일 3일 전부터 마지막 수업
   assert.equal(lateDeliveryWarning("2026-11-26", "2026-11-02", "2026-11-26"), true);
   assert.equal(lateDeliveryWarning("2026-11-27", "2026-11-02", "2026-11-26"), false);
 });
+
+// ── 이미 들어온 신청 점검 ──
+import { altFixResult, altIssues } from "@/lib/altContinue";
+
+test("점검: 지난달 월·수인데 이번 달도 월·수 → 요일 확인 필요 (화·목으로 고치기)", () => {
+  const prev = app({ id: "p", cohort: "2026-10", track: "alt_mw" });
+  const now = app({ id: "n", cohort: "2026-11", track: "alt_mw", continuing: true, status: "pending", amount: 10000 });
+  const issues = altIssues([prev, now], ["2026-11"]);
+  assert.deepEqual(issues.map((i) => i.kind), ["weekday"]);
+  assert.equal(issues[0].fix.track, "alt_tt");
+  assert.match(issues[0].text, /화·목반이어야 해요/);
+});
+
+test("점검: 이어듣기인데 기록 없음 / 기록 있는데 이어듣기 아님", () => {
+  const noRec = app({ id: "a", cohort: "2026-11", track: "alt_tt", continuing: true, name: "기록없음" });
+  assert.deepEqual(altIssues([noRec], ["2026-11"]).map((i) => i.kind), ["noRecord"]);
+  const prev = app({ id: "p2", cohort: "2026-10", track: "alt_mw", name: "기록있음" });
+  const now = app({ id: "b", cohort: "2026-11", track: "alt_tt", continuing: false, name: "기록있음" });
+  assert.deepEqual(altIssues([prev, now], ["2026-11"]).map((i) => i.kind), ["shouldContinue"]);
+});
+
+test("점검: 문제없으면 빈 목록, 무시한 신청은 빼요", () => {
+  const prev = app({ id: "p3", cohort: "2026-10", track: "alt_mw", name: "정상" });
+  const ok = app({ id: "c", cohort: "2026-11", track: "alt_tt", continuing: true, name: "정상" });
+  assert.equal(altIssues([prev, ok], ["2026-11"]).length, 0);
+  const bad = app({ id: "d", cohort: "2026-11", track: "alt_tt", continuing: true, name: "무시대상" });
+  assert.equal(altIssues([bad], ["2026-11"], new Set(["d"])).length, 0);
+});
+
+test("고치기: 입금 대기면 새 금액, 납부 완료면 금액 유지하고 차이만", () => {
+  const pend = app({ id: "e", cohort: "2026-11", track: "alt_tt", continuing: true, status: "pending", amount: 10000, name: "고치기" });
+  const [issue] = altIssues([pend], ["2026-11"]);
+  const r = altFixResult(pend, issue, 1);
+  assert.equal(r.books.length, 3);
+  assert.equal(r.amount, 30000);
+  const paid = { ...pend, status: "paid" as const };
+  const r2 = altFixResult(paid, issue, 1);
+  assert.equal(r2.amount, 10000);
+  assert.equal(r2.diff, 20000);
+  assert.equal(r2.keepAmount, true);
+});

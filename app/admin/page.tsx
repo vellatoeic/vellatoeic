@@ -7,7 +7,7 @@ import { movableCohorts } from "@/lib/cohortMove";
 import { WATCH_RULES, type WatchSummary } from "@/lib/watchlist";
 import Link from "next/link";
 import { isAdmin } from "@/lib/auth";
-import { adminCancelApps, adminConfirmCancelledApps, adminReviveApps, changeCohort, bulkChangeCohort, markChatKicked, changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove, resolveBookDepositEvent } from "@/app/actions";
+import { fixAltIssue, ignoreAltIssue, adminCancelApps, adminConfirmCancelledApps, adminReviveApps, changeCohort, bulkChangeCohort, markChatKicked, changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove, resolveBookDepositEvent } from "@/app/actions";
 import LoginForm from "./LoginForm";
 import AdminTabs from "./AdminTabs";
 import CloseOnSubmitForm from "./CloseOnSubmitForm";
@@ -16,6 +16,8 @@ import { autoCleanupAudios } from "@/lib/audio";
 import { md, monthlyChecklist } from "@/lib/monthlyChecklist";
 import { visibleToAdmin } from "@/lib/cancellations";
 import { reviewHolds } from "@/lib/deposits";
+import { currentAltIssues } from "@/lib/altIssuesServer";
+import { altFixResult } from "@/lib/altContinue";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
@@ -205,7 +207,9 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   // 자동으로 확정하지 못한 교재비 입금 문자 (같은 입금자명이 여러 명이거나 금액이 다를 때)
   const ybmPending = (await listYbmOrders()).filter((o) => o.status === "pending");
   const waitingDeposits = await listWaitingDepositEvents(60); // 신청서보다 먼저 온 교재비 입금
-  const holds = await reviewHolds(); // '확인 필요' 입금의 후보 학생
+  const holds = await reviewHolds();
+  // 격일반 확인 필요 (이번 달·다음 달): 요일·이어듣기 검사, 고쳤을 때 교재·금액
+  const altList = await Promise.all((await currentAltIssues()).map(async (issue) => ({ issue, fix: altFixResult(issue.app, issue, await roundFor(issue.app.cohort)) }))); // '확인 필요' 입금의 후보 학생
   const bookChecks = (await listDepositEvents(50)).filter((e) => e.target === "book" && (e.result === "review" || e.result === "unmatched"));
   const pendingAll = everything.filter((a) => a.status === "pending");
   // 수강 시간이 아직 비어 있는 학생 (예전 신청). 오전/저녁을 정해 주세요.
@@ -308,6 +312,31 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
             <button formAction={adminCancelApps} className="rounded-2xl bg-white px-4 py-3 text-sm font-bold text-slate-600 ring-1 ring-slate-300">체크한 학생 취소 처리 (미입금)</button>
           </div>
         </CloseOnSubmitForm>
+      )}
+
+      {altList.length > 0 && (
+        <section id="alt" className="rounded-3xl border-2 border-amber-300 bg-amber-50 p-5">
+          <p className="font-jua text-xl text-amber-700">⚠️ 격일반 확인 필요 {altList.length}건</p>
+          <p className="mt-1 text-sm text-slate-600">이번 달·다음 달 격일반 신청을 지난달 기록(같은 이름·반·격일반·납부 완료)과 비교했어요. 관리 화면에서는 비밀번호를 비교할 수 없어 같은 이름으로 찾아요 — 동명이인이면 [무시]를 눌러 주세요.</p>
+          <ul className="mt-3 space-y-2">
+            {altList.map(({ issue, fix }) => (
+              <li key={`${issue.app.id}${issue.kind}`} className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 text-sm">
+                <a href={`/admin/students/${issue.app.id}`} className="font-bold text-sky-ink underline decoration-sky-main underline-offset-2">{issue.app.name}</a>
+                <span className="text-slate-500">{cohortLabel(issue.app.cohort)} · {COURSES[issue.app.course].label} {TRACKS[issue.app.track]}{issue.app.continuing ? " · 이어듣기" : ""} · {issue.app.status === "pending" ? "미납" : "납부 완료"}</span>
+                <b className="text-amber-700">{issue.text}</b>
+                {fix.diff !== 0 && (
+                  <span className="text-xs text-slate-500">
+                    {fix.keepAmount ? `고쳐도 금액은 그대로 (${won(issue.app.amount)}) · 차이 ${fix.diff > 0 ? "+" : ""}${won(fix.diff)}` : `교재비 ${won(issue.app.amount)} → ${won(fix.amount)}`}
+                  </span>
+                )}
+                <span className="ml-auto flex gap-2">
+                  <CloseOnSubmitForm action={fixAltIssue}><input type="hidden" name="id" value={issue.app.id} /><input type="hidden" name="kind" value={issue.kind} /><button className="btn !px-3 !py-1.5 !text-xs">바로 고치기</button></CloseOnSubmitForm>
+                  <CloseOnSubmitForm action={ignoreAltIssue}><input type="hidden" name="id" value={issue.app.id} /><button className="rounded-full bg-slate-100 px-3 py-1.5 text-xs text-slate-500">동명이인 · 무시</button></CloseOnSubmitForm>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {waitingDeposits.length > 0 && (

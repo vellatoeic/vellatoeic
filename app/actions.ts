@@ -29,7 +29,8 @@ import { linkWaitingDeposit } from "@/lib/deposits";
 import { signupMonths } from "@/lib/signupMonthsServer";
 import { expireUnpaid } from "@/lib/cancellations";
 import { syncSpecialDrafts, weekdayKey } from "@/lib/specialDrafts";
-import { altTrackError, findPrevAlt, planBooks } from "@/lib/altContinue";
+import { altFixResult, altTrackError, findPrevAlt, planBooks } from "@/lib/altContinue";
+import { currentAltIssues } from "@/lib/altIssuesServer";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
 } from "@/lib/auth";
@@ -1298,5 +1299,26 @@ export async function adminReviveYbm(fd: FormData) {
   const id = clean(fd.get("id"));
   const o = (await listYbmOrders()).find((x) => x.id === id && x.status === "cancelled");
   if (o) await updateYbmOrders([o.id], { status: "pending", cancelled_at: null, cancel_reason: null, pending_from: new Date().toISOString() });
+  revalidatePath("/admin", "layout");
+}
+
+// ── 격일반 확인 필요: [바로 고치기] / [무시] ──
+export async function fixAltIssue(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const id = clean(fd.get("id"));
+  const kind = clean(fd.get("kind"));
+  const issue = (await currentAltIssues()).find((i) => i.app.id === id && i.kind === kind);
+  if (!issue) return;
+  const r = altFixResult(issue.app, issue, await roundFor(issue.app.cohort));
+  await updateApplication(id, { track: r.track, continuing: r.continuing, books: r.books, amount: r.amount });
+  revalidatePath("/admin", "layout");
+}
+
+export async function ignoreAltIssue(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const id = clean(fd.get("id"));
+  const list = new Set((await getSetting("alt_ignore")).split(",").filter(Boolean));
+  list.add(id);
+  await setSetting("alt_ignore", [...list].join(","));
   revalidatePath("/admin", "layout");
 }

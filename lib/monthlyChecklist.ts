@@ -5,6 +5,7 @@ import { holidaysOf } from "./classCalendar";
 import { classCohortNow } from "./classCohort";
 import { SCHEDULE_CLASSES, scheduleKey, schoolDaysFor, type ScheduleClass } from "./schedule";
 import { shiftMonth } from "./signupMonths";
+import { currentAltIssues } from "./altIssuesServer";
 
 // ── 관리자 첫 화면 '📅 이번 달 할 일' 자동 점검 ──
 // 상태: done(✅) / todo(⚠️ + 바로가기) / later(회색 '○일부터')
@@ -68,6 +69,9 @@ export async function monthlyChecklist(today = todayKST()): Promise<{ cohort: st
   const unshipped = mine.filter((a) => a.kind === "online" && a.pickup === "delivery" && a.status === "paid").length;
   items.push(gate(addDays(first, -3), pending === 0, { key: "pending", title: `개강 전 입금 대기 ${pending}명`, href: `/admin?c=${cohort}&p=pending` }));
   items.push(gate(addDays(first, -3), unshipped === 0, { key: "delivery", title: `개강 전 불라방 택배 미발송 ${unshipped}명`, href: "/admin/delivery" }));
+  // 격일반 확인 필요 (요일·이어듣기)
+  const alt = await currentAltIssues(today);
+  items.push({ key: "alt", title: `격일반 확인 필요 ${alt.length}건`, state: alt.length ? "todo" : "done", detail: alt.length ? "요일·이어듣기를 지난달 기록과 맞춰 주세요" : "모두 맞아요", href: "/admin#alt" });
   // 7. 단톡방: 이번 달 환불 학생 내보내기 / 매달 1일 참여코드 바꾸기
   const refunded = apps.filter((a) => a.cohort === running && a.status === "refunded");
   const kickedIds = new Set(kicked.split(",").filter(Boolean));

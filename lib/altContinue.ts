@@ -44,3 +44,38 @@ export function lateDeliveryWarning(today: string, first: string | null, last: s
   return today >= from && today <= last;
 }
 export const LATE_DELIVERY_TEXT = "📦 지금 신청하면 첫 수업 전에 교재가 도착하기 어려워요 (평일 2~3일). 1층 데스크 수령을 추천해요.";
+
+// ── 이미 들어온 신청 점검 (관리자 '⚠️ 격일반 확인 필요') ──
+// 관리자 쪽에서는 비밀번호를 비교할 수 없어서(학생마다 따로 암호화) '같은 이름'으로 지난달 기록을 찾아요.
+// 동명이인이면 관리 화면에서 [무시]로 빼요.
+export type AltIssue = { app: Application; kind: "weekday" | "noRecord" | "shouldContinue"; text: string; fix: { track?: Track; continuing?: boolean } };
+
+const sameName = (a: Pick<Application, "name">, b: Pick<Application, "name">) => a.name.replace(/\s/g, "") === b.name.replace(/\s/g, "");
+
+export function altIssues(all: Application[], months: string[], ignore: Set<string> = new Set()): AltIssue[] {
+  const out: AltIssue[] = [];
+  for (const a of all) {
+    if (!months.includes(a.cohort) || !isAlt(a.track) || ignore.has(a.id)) continue;
+    if (a.status === "refunded" || a.status === "cancelled") continue;
+    const prev = findPrevAlt(all.filter((x) => x.id !== a.id && sameName(x, a)), () => true, a.cohort, a.course);
+    const need = requiredAltTrack(prev);
+    if (need && (a.track === "alt_mw" || a.track === "alt_tt") && a.track !== need) {
+      out.push({ app: a, kind: "weekday", text: `요일: ${DAY[need]}반이어야 해요 (지난달 ${DAY[prev!.track]}반)`, fix: { track: need } });
+    }
+    if (a.course === "start") {
+      if (a.continuing && !prev) out.push({ app: a, kind: "noRecord", text: "이어듣기 기록 없음 (교재 3권이어야 해요)", fix: { continuing: false } });
+      if (!a.continuing && prev) out.push({ app: a, kind: "shouldContinue", text: "이어듣기 대상 (LC만이면 돼요)", fix: { continuing: true } });
+    }
+  }
+  return out;
+}
+
+// 고쳤을 때의 교재·금액. 입금 대기면 새 금액으로, 납부 완료면 금액은 그대로 두고 차이만 보여줘요.
+export function altFixResult(a: Application, issue: AltIssue, round: 1 | 2) {
+  const track = issue.fix.track ?? a.track;
+  const continuing = issue.fix.continuing ?? a.continuing;
+  const books = booksFor(a.course, track, round, a.course === "start" && isAlt(track) && continuing);
+  const newAmount = calcAmount(books, a.pickup);
+  const keepAmount = a.status !== "pending";
+  return { track, continuing, books, amount: keepAmount ? a.amount : newAmount, diff: newAmount - a.amount, keepAmount };
+}
