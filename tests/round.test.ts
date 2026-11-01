@@ -46,3 +46,34 @@ test("금액이 달라지면 입금 대기만 새 금액, 납부 완료는 금�
   assert.equal(b.amount, 20000);
   assert.equal(b.diff, 14000);
 });
+
+// ── 교재 회차 완전 자동 ──
+import { roundFor, setSetting, isPreview } from "@/lib/db";
+import { fixRounds } from "@/lib/roundRecalc";
+
+test("자동 회차: 2026-11=1, 2026-12=2, 2027-01=1", () => {
+  assert.equal(roundOf("2026-11"), 1);
+  assert.equal(roundOf("2026-12"), 2);
+  assert.equal(roundOf("2027-01"), 1);
+});
+
+test("덮어쓰기 값(round_기수)이 있어도 무시해요", async () => {
+  assert.equal(isPreview, true);
+  await setSetting("round_2026-11", "2");
+  assert.equal(await roundFor("2026-11"), 1);
+  await setSetting("round_2026-12", "1");
+  assert.equal(await roundFor("2026-12"), 2);
+});
+
+test("바로잡기 대상: 이번 달·다음 달 입금 대기·납부·발송 / 제외: 다른 달·취소·환불·교재 조정·이미 맞는 신청", () => {
+  const list = [
+    app({ id: "nov", books: ["concept", "start_rc", "lc2"] }),                       // 11월 LC2 → LC1
+    app({ id: "dec", cohort: "2026-12", books: ["concept", "start_rc", "lc1"], status: "paid" }), // 12월 LC1 → LC2
+    app({ id: "oct", cohort: "2026-10", books: ["concept", "start_rc", "lc1"] }),     // 다른 달
+    app({ id: "cx", status: "cancelled" }), app({ id: "rf", status: "refunded" }),
+    app({ id: "adj", books_adjusted: true }),
+    app({ id: "ok", books: ["concept", "start_rc", "lc1"] }),
+  ];
+  const ids = fixRounds(list, ["2026-11", "2026-12"]).map((c) => c.app.id).sort();
+  assert.deepEqual(ids, ["dec", "nov"]);
+});

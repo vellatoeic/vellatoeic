@@ -1118,9 +1118,9 @@ export async function currentCohort() {
 }
 
 // 그 기수의 교재 회차. 관리 페이지에서 바꿨으면 그 값, 없으면 달마다 번갈아 자동 계산.
+// 교재 회차는 완전 자동: 홀수달 1회차, 짝수달 2회차 (예전 round_<기수> 덮어쓰기 값은 보지 않아요)
 export async function roundFor(cohort: string): Promise<1 | 2> {
-  const v = await getSetting(`round_${cohort}`);
-  return v === "1" ? 1 : v === "2" ? 2 : roundOf(cohort);
+  return roundOf(cohort);
 }
 
 // ── 출석·숙제 스티커 ─────────────────────────────

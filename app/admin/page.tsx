@@ -7,7 +7,7 @@ import { movableCohorts } from "@/lib/cohortMove";
 import { WATCH_RULES, type WatchSummary } from "@/lib/watchlist";
 import Link from "next/link";
 import { isAdmin } from "@/lib/auth";
-import { adjustBooksAction, saveRound, fixAltIssue, ignoreAltIssue, adminCancelApps, adminConfirmCancelledApps, adminReviveApps, changeCohort, bulkChangeCohort, markChatKicked, changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove, resolveBookDepositEvent } from "@/app/actions";
+import { adjustBooksAction, fixAltIssue, ignoreAltIssue, adminCancelApps, adminConfirmCancelledApps, adminReviveApps, changeCohort, bulkChangeCohort, markChatKicked, changeStatus, saveSettings, resetPin, changeClass, changeSlot, removeApplication, bulkChangeClass, bulkChangeSlot, bulkConfirmPayment, bulkMarkBooksDone, bulkRemove, resolveBookDepositEvent } from "@/app/actions";
 import LoginForm from "./LoginForm";
 import AdminTabs from "./AdminTabs";
 import CloseOnSubmitForm from "./CloseOnSubmitForm";
@@ -19,11 +19,12 @@ import { reviewHolds } from "@/lib/deposits";
 import { currentAltIssues } from "@/lib/altIssuesServer";
 import { altFixResult } from "@/lib/altContinue";
 import { classBookOptions } from "@/lib/manualLink";
+import { fixRoundsOnce } from "@/lib/roundFixServer";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
 
-type Filters = { k: string; p: string; b: string; t: string; q: string; c: string; ra: string; mv: string; rr: string; linked: string };
+type Filters = { k: string; p: string; b: string; t: string; q: string; c: string; ra: string; mv: string; linked: string };
 
 const KIND_FILTERS = [["all", "전체"], ["onsite", "현장"], ["online", "불라방"]] as const;
 const PAY_FILTERS = [["all", "전체"], ["pending", "미납"], ["paid", "납부 완료"], ["refunded", "환불"], ["cancelled", "취소"]] as const;
@@ -200,7 +201,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   await autoCleanupAudios().catch(() => 0); // 기간이 끝나고 7일 지난 LC 음원 자동 정리
 
   const now = await currentCohort();
-  const { k = "all", p = "all", b = "all", t = "all", q = "", c = now, ra = "", mv = "", rr = "", linked = "" } = await searchParams;
+  const { k = "all", p = "all", b = "all", t = "all", q = "", c = now, ra = "", mv = "", linked = "" } = await searchParams;
   // 30분 자동 취소(timeout)는 관리 화면 어디에도 안 보여요. 관리자 취소(admin)는 '취소' 필터에서만.
   const everything = (await listApplications()).filter(visibleToAdmin);
   const [account, cafeHomeworkUrl, cafeUrl, blogUrl, studyBoardUrl, chatUrl, chatCode, rawCohort, kakaoChannel] = await Promise.all([
@@ -217,7 +218,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   const round = await roundFor(now);
   // 교재 회차 (이번 달·다음 달): 저장된 값과 자동 값(roundOf)
   const thisMonth = thisMonthKST();
-  const roundRows = await Promise.all(movableCohorts(thisMonth).map(async (co) => ({ cohort: co, saved: await roundFor(co), auto: roundOf(co) })));
+  // 한 번만: 예전 회차 덮어쓰기로 틀린 이번 달·다음 달 신청 교재를 자동 회차로 바로잡아요 (결과는 이번 한 번만 보여줘요)
+  const roundFix = await fixRoundsOnce();
   const checklist = await monthlyChecklist();
   const alerts = await adminAlerts();
   // 이번 모집 기수에서 아직 입금 확인이 안 된 학생 (수업 전에 확인해야 라이브·강의가 열려요)
@@ -299,16 +301,12 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
         </ul>
       </section>
       {linked && <p className="card !bg-emerald-50 text-center font-bold text-emerald-700">💳 입금을 학생 신청에 연결하고 납부 확인했어요</p>}
-      {rr && (() => {
-        const [co, r, n, diffs, skipped] = rr.split("|");
-        return (
-          <div className="space-y-1 rounded-3xl border-2 border-sky-main bg-white p-4 text-sm">
-            <p className="font-jua text-lg text-sky-ink">📚 {Number(co.slice(5, 7))}월 신청 {n}건 교재를 {r}회차로 바꿨어요</p>
-            {diffs && <p className="font-bold text-amber-700">💰 납부 완료라 금액은 그대로, 차이: {diffs}</p>}
-            {skipped && <p className="font-bold text-amber-700">⚠️ 교재 조정 신청은 그대로 뒀어요: {skipped} — 교재를 직접 확인해 주세요</p>}
-          </div>
-        );
-      })()}
+      {roundFix && (
+        <div className="space-y-1 rounded-3xl border-2 border-sky-main bg-white p-4 text-sm">
+          <p className="font-jua text-lg text-sky-ink">📚 교재 회차 바로잡음 {roundFix.count}건 (홀수달 1회차·짝수달 2회차로 자동)</p>
+          {roundFix.diffs && <p className="font-bold text-amber-700">💰 납부 완료라 금액은 그대로, 차이: {roundFix.diffs}</p>}
+        </div>
+      )}
       {mv && (() => {
         const [target, n, changed, errors] = mv.split("|");
         return (
@@ -519,21 +517,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
             새 신청만 이 기수로 저장돼요.<br />바꿔도 지금 수업 중인 반에는 영향이 없어요.
           </p>
         </CloseOnSubmitForm>
-          <div className="card mt-3 space-y-2 !p-4">
-            <p className="font-jua text-lg text-sky-ink">📚 교재 회차 <span className="text-sm font-normal text-slate-500">· 바꿀 때만 저장해요. 저장하면 그 기수 신청 교재를 새 회차로 다시 계산해요.</span></p>
-            {roundRows.map((r) => (
-              <CloseOnSubmitForm key={r.cohort} action={saveRound} className="flex flex-wrap items-center gap-2 text-sm">
-                <input type="hidden" name="cohort" value={r.cohort} />
-                <b className="w-24 text-sky-ink">{cohortLabel(r.cohort)}</b>
-                <select name="round" defaultValue={String(r.saved)} className="input !w-28 !py-1.5">
-                  <option value="1">1회차</option>
-                  <option value="2">2회차</option>
-                </select>
-                <span className={r.saved !== r.auto ? "font-bold text-amber-600" : "text-slate-500"}>{r.saved !== r.auto ? `⚠️ 자동: ${r.auto}회차와 달라요` : `자동: ${r.auto}회차`}</span>
-                <button className="btn-ghost !py-1.5 text-sm">회차 저장</button>
-              </CloseOnSubmitForm>
-            ))}
-          </div>
+          <p className="mt-3 rounded-2xl bg-sky-soft p-3 text-sm text-sky-ink">📚 교재 회차는 자동이에요 · 이번 달 {roundOf(thisMonth)}회차 / 다음 달 {roundOf(movableCohorts(thisMonth)[1])}회차 <span className="text-slate-500">(홀수달 1회차, 짝수달 2회차)</span></p>
         </div>
       </details>
 

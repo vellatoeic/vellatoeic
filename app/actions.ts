@@ -31,7 +31,6 @@ import { expireUnpaid } from "@/lib/cancellations";
 import { syncSpecialDrafts, weekdayKey } from "@/lib/specialDrafts";
 import { altFixResult, altTrackError, findPrevAlt, planBooks } from "@/lib/altContinue";
 import { currentAltIssues } from "@/lib/altIssuesServer";
-import { adjustedSkipped, recalcForRound } from "@/lib/roundRecalc";
 import { adjustedBooks } from "@/lib/manualLink";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
@@ -1325,23 +1324,6 @@ export async function ignoreAltIssue(fd: FormData) {
   revalidatePath("/admin", "layout");
 }
 
-// ── 교재 회차 저장 (기본 설정의 별도 칸) ──
-// 바꿀 때만 저장하고, 그 기수 신청 교재를 새 회차로 다시 계산해요.
-export async function saveRound(fd: FormData) {
-  if (!(await isAdmin())) return;
-  const cohort = clean(fd.get("cohort"));
-  const r = clean(fd.get("round"));
-  if (!/^\d{4}-\d{2}$/.test(cohort) || (r !== "1" && r !== "2")) return;
-  const round = Number(r) as 1 | 2;
-  await setSetting(`round_${cohort}`, r);
-  const allApps = await listApplications();
-  const changes = recalcForRound(allApps, cohort, round);
-  const skipped = adjustedSkipped(allApps, cohort).map((a) => a.name);
-  for (const c of changes) await updateApplication(c.app.id, { books: c.books, amount: c.amount });
-  const diffs = changes.filter((c) => c.app.status !== "pending" && c.diff !== 0).map((c) => `${c.app.name}(${c.diff > 0 ? "+" : ""}${c.diff.toLocaleString("ko-KR")}원)`);
-  revalidatePath("/admin", "layout");
-  redirect(`/admin?rr=${encodeURIComponent(`${cohort}|${round}|${changes.length}|${diffs.join(", ")}|${skipped.join(", ")}`)}#settings`);
-}
 
 // ── 입금 기록 수동 연결 ([학생 연결]) ──
 // 취소된 신청이면 되살려 납부 확인, 입금 기록은 resolved로 연결. 금액이 다르면 [교재 조정 후 확인] 또는 [금액 그대로 확인].
