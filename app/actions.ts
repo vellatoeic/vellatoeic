@@ -31,6 +31,7 @@ import { expireUnpaid } from "@/lib/cancellations";
 import { syncSpecialDrafts, weekdayKey } from "@/lib/specialDrafts";
 import { altFixResult, altTrackError, findPrevAlt, planBooks } from "@/lib/altContinue";
 import { currentAltIssues } from "@/lib/altIssuesServer";
+import { recalcForRound } from "@/lib/roundRecalc";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
 } from "@/lib/auth";
@@ -295,10 +296,7 @@ export async function saveSettings(fd: FormData) {
       await setSetting("chat_code_changed_on", todayKST());
     }
   }
-  // 교재 회차는 자동으로 번갈아 정해지고, 필요할 때만 여기서 바꿔요
-  const round = clean(fd.get("round"));
-  const roundCohort = c || (await currentCohort()); // 모집 기수를 비우면 자동 기수에 적용
-  if (/^\d{4}-\d{2}$/.test(roundCohort) && (round === "1" || round === "2")) await setSetting(`round_${roundCohort}`, round);
+  // 교재 회차는 여기서 저장하지 않아요 (모집 기수를 바꾸며 저장하면 다른 기수 회차를 덮어쓰던 문제). [회차 저장]에서 따로.
   const cafeLink = clean(fd.get("cafe_homework_url"));
   if (!cafeLink) await setSetting("cafe_homework_url", "");
   else {
@@ -1321,4 +1319,20 @@ export async function ignoreAltIssue(fd: FormData) {
   list.add(id);
   await setSetting("alt_ignore", [...list].join(","));
   revalidatePath("/admin", "layout");
+}
+
+// ── 교재 회차 저장 (기본 설정의 별도 칸) ──
+// 바꿀 때만 저장하고, 그 기수 신청 교재를 새 회차로 다시 계산해요.
+export async function saveRound(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const cohort = clean(fd.get("cohort"));
+  const r = clean(fd.get("round"));
+  if (!/^\d{4}-\d{2}$/.test(cohort) || (r !== "1" && r !== "2")) return;
+  const round = Number(r) as 1 | 2;
+  await setSetting(`round_${cohort}`, r);
+  const changes = recalcForRound(await listApplications(), cohort, round);
+  for (const c of changes) await updateApplication(c.app.id, { books: c.books, amount: c.amount });
+  const diffs = changes.filter((c) => c.app.status !== "pending" && c.diff !== 0).map((c) => `${c.app.name}(${c.diff > 0 ? "+" : ""}${c.diff.toLocaleString("ko-KR")}원)`);
+  revalidatePath("/admin", "layout");
+  redirect(`/admin?rr=${encodeURIComponent(`${cohort}|${round}|${changes.length}|${diffs.join(", ")}`)}#settings`);
 }
