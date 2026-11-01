@@ -43,11 +43,11 @@ export function specialWhen(event: { event_date: string; starts_at: string; ends
 }
 
 // ── 지난 특강 다시 보기 ──
-// 특강이 있던 달 말까지만 자료·영상을 볼 수 있어요.
-// 불라방 신청자: 특강 전부터 달 말까지 / 현장 신청자: 보증금 확인(paid)된 경우 특강 다음 날부터 달 말까지
+// 공식: 종강일까지 / 실제: 그 특강 달 기수의 열람 마감일(until = 다음 달 개강 전날)까지 (lib/viewWindow.ts)
+// 불라방 신청자: 특강 전부터 / 현장 신청자: 보증금 확인(paid)된 경우 특강 다음 날부터
 type ViewReg = { mode: "onsite" | "online"; deposit: string | null };
-export function canSeeSpecialMaterials(reg: ViewReg, eventDate: string, today: string) {
-  if (today.slice(0, 7) > eventDate.slice(0, 7)) return false;
+export function canSeeSpecialMaterials(reg: ViewReg, eventDate: string, today: string, until: string) {
+  if (today > until) return false;
   if (reg.mode === "online") return true;
   return reg.deposit === "paid" && eventDate < today;
 }

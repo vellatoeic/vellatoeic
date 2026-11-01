@@ -33,13 +33,16 @@ import { expireUnpaid } from "@/lib/cancellations";
 import { getApplications } from "@/lib/db";
 import { getStudentIds } from "@/lib/auth";
 import CancelledNotice from "@/components/CancelledNotice";
+import { viewInfo } from "@/lib/viewWindowServer";
+import { dayLabelKo, viewPhase } from "@/lib/viewWindow";
+import { signupMonths } from "@/lib/signupMonthsServer";
 
 const nextMonthOf = (today: string) => shiftMonth(today.slice(0, 7), 1);
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "강의실 · vella_toeic", robots: { index: false } };
 
-export default async function ClassRoom({ searchParams }: { searchParams: Promise<{ t?: string }> }) {
+export default async function ClassRoom({ searchParams }: { searchParams: Promise<{ t?: string; expired?: string }> }) {
   await expireUnpaid(); // 30분 지난 입금 대기는 먼저 자동 취소
   const { loggedIn, apps } = await activeStudentApps();
   if (!loggedIn) return <StudentLogin />;
@@ -109,8 +112,18 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
   const myTests = testApp ? await studentTests(testApp, today) : null;
 
   // 맨 위 탭 [☀️ 오전반 | 🌙 저녁반]: 본인 시간대가 먼저 선택되고, 교차 수강을 위해 다른 시간대로 바꿔 볼 수 있어요.
-  const liveApp = paid.find((a) => a.cohort === cohort);
-  const { t } = await searchParams;
+  // 열람 기간: 공식 '종강일까지', 실제 '다음 달 개강 전날까지' (lib/viewWindow.ts). 지난 신청은 기록(스티커판 등)만 보여요.
+  const view = await viewInfo(paid);
+  const viewable = (a: (typeof paid)[number]) => today <= (view.get(a.id)?.until ?? "");
+  const nextMonth = nextMonthOf(today);
+  // 그 신청의 다음 달 신청이 있는지 (연장 안내에서 '다음 달 수업도 함께해요' 버튼을 띄울지)
+  const hasNextOf = (a: (typeof paid)[number]) => apps.some((x) => x.cohort === shiftMonth(a.cohort, 1));
+  const signupMonth = (await signupMonths())[0] ?? null;
+  // 열람 가능한 신청이 없고 이번 달·다음 달 신청도 없으면 맨 위에 '열람 기간이 끝났어요'
+  const allClosed = paid.length > 0 && !paid.some(viewable) && !apps.some((x) => x.cohort === today.slice(0, 7) || x.cohort === nextMonth);
+  const lastClosed = [...paid].sort((x, y) => y.cohort.localeCompare(x.cohort))[0];
+  const liveApp = paid.find((a) => a.cohort === cohort && viewable(a));
+  const { t, expired } = await searchParams;
   const ownSlot: TimeSlot = liveApp?.slot ?? paid[0]?.slot ?? "am";
   const tab: TimeSlot = t === "am" || t === "pm" ? t : ownSlot;
 
@@ -161,6 +174,20 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
       </div>
 
 
+
+      {expired && <p className="card !bg-slate-100 text-center font-bold text-slate-600">📚 열람 기간이 끝났어요</p>}
+
+      {allClosed && lastClosed && (
+        <div className="rounded-3xl border-2 border-sky-main bg-white p-5 text-center">
+          <p className="font-jua text-xl text-sky-ink">📚 {Number(lastClosed.cohort.slice(5, 7))}월 강의 열람 기간이 끝났어요.</p>
+          {signupMonth && (
+            <>
+              <p className="mt-1 text-sm text-slate-600">{signupMonth.label}은 수강 신청 후 들을 수 있어요.</p>
+              <a href={`/guide/${lastClosed.kind}`} className="btn mt-3 inline-block">{signupMonth.label.replace(" 수업", "")} 수강 신청하기</a>
+            </>
+          )}
+        </div>
+      )}
 
       {pending.map((a) => (
         <div key={a.id} className="rounded-3xl border-2 border-amber-300 bg-amber-50 p-5 text-center">
@@ -279,7 +306,10 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
       {paid.map((a) => {
         // 강의 목록은 고른 시간대(☀️/🌙) 강의만 보여요. 구분 없는 예전 강의는 둘 다에 보여요.
-        const mine = lectures.filter((l) => covers(a, l) && (!l.slot || l.slot === tab));
+        // 열람 기간이 지난 신청은 강의 목록을 보여주지 않아요 (스티커판 등 기록은 보기만)
+        const mine = viewable(a) ? lectures.filter((l) => covers(a, l) && (!l.slot || l.slot === tab)) : [];
+        const w = view.get(a.id);
+        const phase = w ? viewPhase(w.end, w.until, today) : "before";
         return (
           <section key={a.id} className="card">
             <div className="flex flex-wrap items-center gap-2">
@@ -327,6 +357,12 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
                 welcome={missionCount(missionFor(a.id, missions)) === 4}
               />;
             })()}
+            {phase === "extended" && w && (
+              <div className="mt-6 rounded-2xl bg-emerald-50 p-3 text-center text-sm">
+                <p className="font-bold text-emerald-700">📚 {Number(a.cohort.slice(5, 7))}월 강의는 {dayLabelKo(w.until)}까지 볼 수 있어요{!hasNextOf(a) && ` · ${Number(shiftMonth(a.cohort, 1).slice(5, 7))}월 수업도 함께해요!`}</p>
+                {!hasNextOf(a) && <a href={`/guide/${a.kind}`} className="btn mt-2 inline-block !py-2 !text-sm">{Number(shiftMonth(a.cohort, 1).slice(5, 7))}월 수강 신청하기</a>}
+              </div>
+            )}
             {mine.length > 0 && <h3 className="font-jua mt-6 border-t border-sky-main/50 pt-5 text-2xl text-sky-ink">📚 지난 강의</h3>}
             {TRACK_PARTS[a.track].map((part) => {
               const list = mine.filter((l) => l.part === part);

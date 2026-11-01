@@ -5,15 +5,19 @@ import { specialLogout } from "@/app/actions";
 import { canSeeSpecialMaterials, deadlineBadge, specialRegistrationOpen, specialWhen } from "@/lib/special";
 import { todayKST } from "@/lib/config";
 import SpecialForm from "./SpecialForm";
+import { cohortUntil, viewInfo } from "@/lib/viewWindowServer";
+import { dayLabelKo, viewPhase } from "@/lib/viewWindow";
 import { publicSpecials } from "@/lib/specialPlan";
 import SpecialLogin from "./SpecialLogin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "특강 신청 · vella_toeic", robots: { index: false } };
 
-export default async function SpecialPage() {
+export default async function SpecialPage({ searchParams }: { searchParams: Promise<{ expired?: string }> }) {
+  const { expired } = await searchParams;
   await expireSpecialDeposits(DEPOSIT_MINUTES);
-  const [events, mine] = await Promise.all([listSpecialLectures().then(publicSpecials), activeStudentApps().then(({ apps }) => getSpecialRegistrationsFor(apps.map((a) => a.id)))]);
+  const { apps: myApps } = await activeStudentApps();
+  const [events, mine, info] = await Promise.all([listSpecialLectures().then(publicSpecials), getSpecialRegistrationsFor(myApps.map((a) => a.id)), viewInfo(myApps)]);
   const account = await getSetting("bank_account");
   // 아직 열리지 않은(오늘 이후) 특강은 모두 보여주고, 마감된 것은 '신청이 마감됐어요'로 막아요.
   const today = todayKST();
@@ -24,16 +28,22 @@ export default async function SpecialPage() {
   const firstDay = upcoming.length ? new Date(`${[...upcoming].sort((x, y) => x.event_date.localeCompare(y.event_date))[0].event_date}T00:00:00Z`).getUTCDay() : -1;
   const weekdayLabel = firstDay === 5 ? "금요 특강" : firstDay === 6 ? "토요 특강" : "특강";
   const eventById = new Map(events.map((event) => [event.id, event]));
-  const myRows = await Promise.all(
+  // 열람 기간: 그 특강 달 기수의 종강일(공식)·실제 마감일(다음 달 개강 전날). 마감일이 지나면 목록에서 빼요.
+  const windowOf = async (registration: (typeof mine)[number], event: (typeof events)[number]) => {
+    const w = registration.application_id ? info.get(registration.application_id) : undefined;
+    const until = w?.until ?? (await cohortUntil(event.event_date.slice(0, 7)));
+    return { end: w?.end ?? until, until };
+  };
+  const myRows = (await Promise.all(
     mine
-      // 지난달 이전 특강은 열람 기간이 끝나서 목록에서 빼요
-      .filter((registration) => eventById.has(registration.special_lecture_id) && eventById.get(registration.special_lecture_id)!.event_date.slice(0, 7) >= today.slice(0, 7))
+      .filter((registration) => eventById.has(registration.special_lecture_id))
       .map(async (registration) => {
         const event = eventById.get(registration.special_lecture_id)!;
-        const canSee = canSeeSpecialMaterials(registration, event.event_date, today);
-        return { registration, event, canSee, materials: canSee ? await listSpecialMaterials(registration.special_lecture_id) : [] };
+        const w = await windowOf(registration, event);
+        const canSee = canSeeSpecialMaterials(registration, event.event_date, today, w.until);
+        return { registration, event, canSee, w, materials: canSee ? await listSpecialMaterials(registration.special_lecture_id) : [] };
       }),
-  );
+  )).filter((row) => today <= row.w.until);
   // 다가오는 특강이 먼저(가까운 순), 지난 특강은 그 아래(최근 순)
   myRows.sort((a, b) => {
     const pa = a.event.event_date < today, pb = b.event.event_date < today;
@@ -43,6 +53,7 @@ export default async function SpecialPage() {
 
   return (
     <div className="space-y-6 pt-8">
+      {expired && <p className="card !bg-slate-100 text-center font-bold text-slate-600">📚 열람 기간이 끝났어요</p>}
       <div className="text-center">
         <span className="rounded-full bg-sky-main px-4 py-1.5 text-sm font-bold text-sky-ink">{weekdayLabel}</span>
         <h1 className="font-jua mt-3 text-4xl text-sky-ink">특강 신청</h1>
@@ -56,7 +67,7 @@ export default async function SpecialPage() {
       {myRows.length > 0 ? (
         <section className="space-y-3">
           <h2 className="font-jua text-2xl text-sky-ink">내 특강 신청</h2>
-          {myRows.map(({ registration, event, materials, canSee }) => (
+          {myRows.map(({ registration, event, materials, canSee, w }) => (
             <div key={registration.id} className="card space-y-3">
               {event.event_date >= today && (() => {
                 // 다가오는 특강: 신청 상태를 카드 맨 위에 크게
@@ -109,7 +120,7 @@ export default async function SpecialPage() {
               ) : (
                 <div className="space-y-3">
                   {event.event_date < today && (
-                    <p className="rounded-2xl bg-emerald-50 p-3 text-center text-sm font-bold text-emerald-700">📚 지난 특강 · {Number(event.event_date.slice(5, 7))}월 말까지 다시 볼 수 있어요</p>
+                    <p className="rounded-2xl bg-emerald-50 p-3 text-center text-sm font-bold text-emerald-700">📚 지난 특강 · {viewPhase(w.end, w.until, today) === "extended" ? `${dayLabelKo(w.until)}까지` : `종강일(${dayLabelKo(w.end)})까지`} 다시 볼 수 있어요</p>
                   )}
                   {event.material_note && (
                     <div className="rounded-2xl border-2 border-sky-main bg-white p-4 text-center text-[15px] leading-relaxed text-slate-700">

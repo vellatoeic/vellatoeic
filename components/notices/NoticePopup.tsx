@@ -4,11 +4,15 @@ import { useEffect, useState, startTransition } from "react";
 import { readNotice } from "@/app/actions";
 import { seenStorageKey, type Notice } from "@/lib/notices";
 import { SPECIAL_POPUP_PREFIX } from "@/lib/specialPopups";
+import { COURSE_END_PREFIX } from "@/lib/courseEndPopups";
 import { NoticeBody, NoticeHeader } from "./NoticeContent";
 
-// 특강 마감 팝업은 기기에 특강id로 '확인했어요'를 남겨요 (서버 공지 표에 없는 자동 팝업)
-const isSpecial = (n: Notice) => n.id.startsWith(SPECIAL_POPUP_PREFIX);
-const specialSeen = (n: Notice) => { try { return !!localStorage.getItem(`vella-special-popup:${n.id.slice(SPECIAL_POPUP_PREFIX.length)}`); } catch { return false; } };
+// 자동 팝업(공지 표에 없음)은 기기에 '확인했어요'를 남겨요: 특강 마감은 특강id, 종강 연장은 기수별
+const autoKey = (n: Notice) =>
+  n.id.startsWith(SPECIAL_POPUP_PREFIX) ? `vella-special-popup:${n.id.slice(SPECIAL_POPUP_PREFIX.length)}`
+    : n.id.startsWith(COURSE_END_PREFIX) ? `vella-course-end:${n.id.slice(COURSE_END_PREFIX.length)}` : null;
+const isSpecial = (n: Notice) => autoKey(n) !== null;
+const specialSeen = (n: Notice) => { try { return !!localStorage.getItem(autoKey(n)!); } catch { return false; } };
 
 // 아래에서 올라오는 공지 창. 여러 개면 최신순으로 넘겨 봐요(1/2). [확인했어요]를 누르면 다시 안 떠요.
 // 로그인 안 한 방문자는 '전체' 공지만, 기기당 한 번 (브라우저에 기록).
@@ -31,7 +35,7 @@ export default function NoticePopup({ notices, loggedIn, cohort }: { notices: No
 
   function confirm() {
     if (isSpecial(n)) {
-      try { localStorage.setItem(`vella-special-popup:${n.id.slice(SPECIAL_POPUP_PREFIX.length)}`, "1"); } catch { /* 저장이 안 돼도 창은 닫아요 */ }
+      try { localStorage.setItem(autoKey(n)!, "1"); } catch { /* 저장이 안 돼도 창은 닫아요 */ }
     } else if (loggedIn) {
       const fd = new FormData();
       fd.set("id", n.id);

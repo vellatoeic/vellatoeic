@@ -1,6 +1,9 @@
 import "server-only";
 import { getSetting, getSpecialRegistrationsFor, listNoticeReads, listNotices, listSpecialLectures, type Application } from "./db";
 import { specialDeadlineNotices } from "./specialPopups";
+import { courseEndNotices, type CourseEndInput } from "./courseEndPopups";
+import { viewInfo } from "./viewWindowServer";
+import { shiftMonth } from "./signupMonths";
 import { activeStudentApps } from "./student";
 import { isForEveryone, isLive, liveFor, myNotices, popupNotices, readKey, seenStorageKey, type Notice } from "./notices";
 import { classDaysOf } from "./classCalendar";
@@ -44,7 +47,7 @@ export async function noticeSummary() {
   const mine = myNotices(all, students, today);
   return {
     loggedIn: true, cohort,
-    popups: [...(await specialPopups()), ...(await withLinks(popupNotices(all, students, reads, today)))],
+    popups: [...(await courseEndPopups(today)), ...(await specialPopups()), ...(await withLinks(popupNotices(all, students, reads, today)))],
     unread: mine.filter((n) => liveFor(n, students, today) && !reads.has(readKey(n, cohort))).length,
     visitorKeys: [] as string[],
   };
@@ -55,4 +58,17 @@ async function specialPopups() {
   const { apps } = await activeStudentApps();
   const [events, regs] = await Promise.all([listSpecialLectures(), getSpecialRegistrationsFor(apps.map((a) => a.id))]);
   return specialDeadlineNotices(events, apps, regs);
+}
+
+// 종강일 자동 연장 공지: 로그인한 학생의 납부 완료 신청을 기수별로 (그 기수 가장 늦은 종강일 ~ 열람 마감일)
+async function courseEndPopups(today: string) {
+  const { apps } = await activeStudentApps();
+  const paid = apps.filter((a) => a.status === "paid" || a.status === "shipped");
+  const info = await viewInfo(paid);
+  const byCohort = new Map<string, CourseEndInput>();
+  for (const a of paid) {
+    const w = info.get(a.id)!;
+    byCohort.set(a.cohort, { cohort: a.cohort, end: w.end, until: w.until, kind: a.kind, hasNext: apps.some((x) => x.cohort === shiftMonth(a.cohort, 1)) });
+  }
+  return courseEndNotices([...byCohort.values()], today);
 }

@@ -47,18 +47,20 @@ test("마감 배지: 24시간 넘게 남음 / 24시간 이내 / 1시간 이내 /
 
 import { canSeeSpecialMaterials } from "@/lib/special";
 
-test("지난 특강: 불라방은 그 달 말까지, 다음 달엔 닫혀요", () => {
+const UNTIL = "2026-11-01"; // 10월 기수 열람 마감일 (11/2 개강 전날)
+
+test("지난 특강: 불라방은 열람 마감일(다음 달 개강 전날)까지, 그 뒤엔 닫혀요", () => {
   const online = { mode: "online" as const, deposit: null };
-  assert.equal(canSeeSpecialMaterials(online, "2026-10-17", "2026-10-16"), true);
-  assert.equal(canSeeSpecialMaterials(online, "2026-10-17", "2026-10-31"), true);
-  assert.equal(canSeeSpecialMaterials(online, "2026-10-17", "2026-11-01"), false);
+  assert.equal(canSeeSpecialMaterials(online, "2026-10-17", "2026-10-16", UNTIL), true);
+  assert.equal(canSeeSpecialMaterials(online, "2026-10-17", "2026-11-01", UNTIL), true);
+  assert.equal(canSeeSpecialMaterials(online, "2026-10-17", "2026-11-02", UNTIL), false);
 });
 
-test("지난 특강: 현장은 보증금 확인된 신청만, 특강 다음 날부터", () => {
+test("지난 특강: 현장은 보증금 확인된 신청만, 특강 다음 날부터 마감일까지", () => {
   const paid = { mode: "onsite" as const, deposit: "paid" };
-  assert.equal(canSeeSpecialMaterials(paid, "2026-10-17", "2026-10-17"), false);
-  assert.equal(canSeeSpecialMaterials(paid, "2026-10-17", "2026-10-18"), true);
-  assert.equal(canSeeSpecialMaterials(paid, "2026-10-17", "2026-11-02"), false);
-  assert.equal(canSeeSpecialMaterials({ mode: "onsite", deposit: "cancelled" }, "2026-10-17", "2026-10-19"), false);
-  assert.equal(canSeeSpecialMaterials({ mode: "onsite", deposit: "pending" }, "2026-10-17", "2026-10-19"), false);
+  assert.equal(canSeeSpecialMaterials(paid, "2026-10-17", "2026-10-17", UNTIL), false);
+  assert.equal(canSeeSpecialMaterials(paid, "2026-10-17", "2026-10-18", UNTIL), true);
+  assert.equal(canSeeSpecialMaterials(paid, "2026-10-17", "2026-11-02", UNTIL), false);
+  assert.equal(canSeeSpecialMaterials({ mode: "onsite", deposit: "cancelled" }, "2026-10-17", "2026-10-19", UNTIL), false);
+  assert.equal(canSeeSpecialMaterials({ mode: "onsite", deposit: "pending" }, "2026-10-17", "2026-10-19", UNTIL), false);
 });
