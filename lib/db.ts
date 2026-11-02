@@ -209,6 +209,13 @@ mem.notices ??= [];
 mem.noticeReads ??= [];
 mem.ybmOrders ??= [];
 
+// 그 달 날짜 범위: 1일 이상 ~ 다음 달 1일 미만 (11월처럼 30일까지인 달에 '-31'을 만들면 DB 오류가 나요)
+export function monthRange(cohort: string) {
+  const [y, m] = cohort.split("-").map(Number);
+  const next = new Date(Date.UTC(y, m, 1));
+  return { from: `${cohort}-01`, to: `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-01` };
+}
+
 const isUuid = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
 
 // Supabase는 한 번에 최대 1,000줄만 돌려줘요. 학생이 수백 명이면 기록이 잘리지 않게 1,000줄씩 끝까지 읽어요.
@@ -558,9 +565,9 @@ export async function markNoticeRead(noticeId: string, apps: { id: string; cohor
 
 // ── 문풀반 데일리 테스트 ───────────────────────
 export async function listTestOverrides(cohort: string): Promise<TestOverride[]> {
-  const from = `${cohort}-01`, to = `${cohort}-31`;
+  const { from, to } = monthRange(cohort); // 말일(30·31일)을 직접 만들지 않아요
   if (sb) {
-    const { data, error } = await sb.from("test_overrides").select("*").gte("day", from).lte("day", to);
+    const { data, error } = await sb.from("test_overrides").select("*").gte("day", from).lt("day", to);
     if (error) throw error;
     return data as TestOverride[];
   }
@@ -569,9 +576,9 @@ export async function listTestOverrides(cohort: string): Promise<TestOverride[]>
 
 // 두 개 보는 날 (그날 그 종류 테스트 2개, 이후 번호가 밀려요)
 export async function listTestDoubles(cohort: string): Promise<TestDouble[]> {
-  const from = `${cohort}-01`, to = `${cohort}-31`;
+  const { from, to } = monthRange(cohort); // 말일(30·31일)을 직접 만들지 않아요
   if (sb) {
-    const { data, error } = await sb.from("test_doubles").select("day,kind").gte("day", from).lte("day", to);
+    const { data, error } = await sb.from("test_doubles").select("day,kind").gte("day", from).lt("day", to);
     if (error) throw error;
     return data as TestDouble[];
   }

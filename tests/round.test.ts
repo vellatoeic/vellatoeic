@@ -77,3 +77,17 @@ test("바로잡기 대상: 이번 달·다음 달 입금 대기·납부·발송 
   const ids = fixRounds(list, ["2026-11", "2026-12"]).map((c) => c.app.id).sort();
   assert.deepEqual(ids, ["dec", "nov"]);
 });
+
+// ── 달 범위 (말일을 직접 만들지 않기) ──
+import { monthRange, listTestOverrides, listTestDoubles } from "@/lib/db";
+
+test("달 범위: 11월·2월·12월은 다음 달 1일 미만까지", () => {
+  assert.deepEqual(monthRange("2026-11"), { from: "2026-11-01", to: "2026-12-01" });
+  assert.deepEqual(monthRange("2027-02"), { from: "2027-02-01", to: "2027-03-01" });
+  assert.deepEqual(monthRange("2026-12"), { from: "2026-12-01", to: "2027-01-01" });
+});
+
+test("11월 테스트 예외·두 개 보는 날 읽기가 오류 없이 돼요", async () => {
+  assert.ok(Array.isArray(await listTestOverrides("2026-11")));
+  assert.ok(Array.isArray(await listTestDoubles("2026-11")));
+});
