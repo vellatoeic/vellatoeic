@@ -79,3 +79,6 @@ export function altFixResult(a: Application, issue: AltIssue, round: 1 | 2) {
   const keepAmount = a.status !== "pending";
   return { track, continuing, books, amount: keepAmount ? a.amount : newAmount, diff: newAmount - a.amount, keepAmount };
 }
+
+// 시작반 격일반 이어듣기 학생 교재 지참 안내
+export const BRING_BOOKS_TEXT = "📚 이번 달은 LC 교재만 새로 받아요. 지난달 개념집과 시작반 RC 교재를 꼭 가져와 주세요!";

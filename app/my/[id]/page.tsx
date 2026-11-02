@@ -9,7 +9,7 @@ import AddToHome from "@/components/AddToHome";
 import BookReceived from "@/components/BookReceived";
 import { activeStudentApps } from "@/lib/student";
 import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
-import { lateDeliveryWarning, LATE_DELIVERY_TEXT } from "@/lib/altContinue";
+import { BRING_BOOKS_TEXT, lateDeliveryWarning, LATE_DELIVERY_TEXT } from "@/lib/altContinue";
 import { kstDate } from "@/lib/studentDays";
 import { depositDeadline, expireUnpaid, ruleFrom } from "@/lib/cancellations";
 import DepositCountdown from "@/components/DepositCountdown";
@@ -64,6 +64,10 @@ export default async function MyPage({ params, searchParams }: { params: Promise
         </h1>
         <p className="mt-2 text-slate-600">{a.name}님, 이 페이지를 즐겨찾기 해두면 진행 상황을 확인할 수 있어요.</p>
       </div>
+
+      {a.continuing && a.course === "start" && (
+        <p className="rounded-3xl border-2 border-yellow-300 bg-yellow-100 p-5 text-center font-jua text-xl leading-relaxed text-yellow-900">{BRING_BOOKS_TEXT}</p>
+      )}
 
       {again && (
         <p className="card !bg-sky-soft text-center font-bold text-sky-ink">이미 제출한 신청이 있어요.<br />다시 제출하지 않아도 돼요.</p>

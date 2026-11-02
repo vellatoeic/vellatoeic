@@ -35,7 +35,7 @@ function Table({ apps }: { apps: Application[] }) {
             <td className="py-2"><span className="inline-block h-4 w-4 rounded border-2 border-sky-main" /></td>
             <td className="py-2">
               {a.name}
-              {a.depositor !== a.name && <span className="ml-1 text-xs text-slate-400">({a.depositor})</span>}
+              {a.depositor !== a.name && <span className="ml-1 text-xs text-slate-400">({a.depositor})</span>}{a.continuing && a.course === "start" && <span className="ml-1.5 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-bold text-yellow-800">지난달 교재 지참</span>}
               <span className="ml-1.5 text-xs text-slate-400">{new Date(a.created_at).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" })}</span>
             </td>
             <td className="py-2 text-sm text-slate-600">{a.books.map((b) => BOOKS[b]).join(", ")}</td>
@@ -119,7 +119,7 @@ export default async function Roster() {
                   <tr key={a.id} className={`border-b border-sky-soft ${a.status === "pending" ? "bg-amber-50" : a.status === "shipped" ? "text-slate-400" : ""}`}>
                     <td className="py-2"><span className="inline-block h-4 w-4 rounded border-2 border-sky-main" /></td>
                     <td className="whitespace-nowrap py-2 font-bold text-sky-ink">{a.pickup_date ? `${specialDay(a.pickup_date)} ${a.pickup_time ?? ""}` : <span className="font-normal text-slate-400">미정</span>}</td>
-                    <td className="py-2">{a.name}{a.depositor !== a.name && <span className="ml-1 text-xs text-slate-400">({a.depositor})</span>}</td>
+                    <td className="py-2">{a.name}{a.depositor !== a.name && <span className="ml-1 text-xs text-slate-400">({a.depositor})</span>}{a.continuing && a.course === "start" && <span className="ml-1.5 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-bold text-yellow-800">지난달 교재 지참</span>}</td>
                     <td className="py-2 text-sm text-slate-600">{a.books.map((b) => BOOKS[b]).join(", ")}</td>
                     <td className={`whitespace-nowrap py-2 text-right font-bold ${a.status === "pending" ? "text-amber-600" : "text-sky-deep"}`}>
                       {a.status === "pending" ? "미납" : a.status === "shipped" ? "수령 완료" : "준비"}

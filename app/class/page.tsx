@@ -37,6 +37,7 @@ import { viewInfo } from "@/lib/viewWindowServer";
 import { dayLabelKo, viewPhase } from "@/lib/viewWindow";
 import { signupMonths } from "@/lib/signupMonthsServer";
 import { safe } from "@/lib/safe";
+import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
 
 const nextMonthOf = (today: string) => shiftMonth(today.slice(0, 7), 1);
 
@@ -126,6 +127,19 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
   const lastClosed = [...paid].sort((x, y) => y.cohort.localeCompare(x.cohort))[0];
   const liveApp = paid.find((a) => a.cohort === cohort && viewable(a));
   const { t, expired } = await searchParams;
+  // 시작반 격일반 이어듣기: 개강 3일 전 ~ 첫 수업일까지 '지난달 교재 챙겨 오기' 카드 (첫 수업일이 지나면 숨김)
+  const bringBooks = await safe("bringBooks", async () => {
+    for (const a of apps.filter((x) => x.continuing && x.course === "start" && x.status !== "refunded" && x.status !== "cancelled")) {
+      const [days, holidays] = await Promise.all([classDaysOf(a), holidaysOf(a.cohort)]);
+      const first = days.filter((d) => !holidays[d]).sort()[0];
+      if (!first) continue;
+      const from = new Date(Date.parse(`${first}T00:00:00Z`) - 3 * 86400000).toISOString().slice(0, 10);
+      if (today < from || today > first) continue;
+      const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
+      return today === first ? "오늘" : first === tomorrow ? "내일" : `${dayLabelKo(first)} 첫`;
+    }
+    return null;
+  }, null);
   const ownSlot: TimeSlot = liveApp?.slot ?? paid[0]?.slot ?? "am";
   const tab: TimeSlot = t === "am" || t === "pm" ? t : ownSlot;
 
@@ -178,6 +192,13 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
 
       {expired && <p className="card !bg-slate-100 text-center font-bold text-slate-600">📚 열람 기간이 끝났어요</p>}
+
+      {bringBooks && (
+        <div className="rounded-3xl border-2 border-yellow-300 bg-yellow-100 p-5 text-center">
+          <p className="font-jua text-xl text-yellow-900">📚 {bringBooks} 수업에 지난달 개념집 + 시작반 RC 교재를 챙겨 오세요</p>
+          <p className="mt-1 text-sm text-yellow-800">이번 달은 LC 교재만 새로 받아요 (격일반 이어듣기)</p>
+        </div>
+      )}
 
       {allClosed && lastClosed && (
         <div className="rounded-3xl border-2 border-sky-main bg-white p-5 text-center">

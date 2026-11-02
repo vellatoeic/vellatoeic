@@ -2,7 +2,7 @@
 
 import { startTransition, useActionState, useRef, useState, type FormEvent } from "react";
 import { previewApplication, submitApplication, type FormState } from "@/app/actions";
-import { lateDeliveryWarning, LATE_DELIVERY_TEXT } from "@/lib/altContinue";
+import { BRING_BOOKS_TEXT, lateDeliveryWarning, LATE_DELIVERY_TEXT } from "@/lib/altContinue";
 import { scheduleClassFor } from "@/lib/schedule";
 import {
   BOOKS, COURSES, KINDS, TRACKS, PICKUPS, SHIPPING_FEE, TIME_SLOTS, booksFor, isAlt, calcAmount, slotLabel, todayKST, won,
@@ -361,6 +361,7 @@ export default function ApplyForm({ kind, months, today }: { kind: Kind; months:
               <dt className="text-slate-500">교재</dt><dd>{(plan?.books ?? books.map((b) => BOOKS[b])).join(", ")}</dd>
               <dt className="text-slate-500">교재비</dt><dd className="font-jua text-xl text-sky-ink">{won(plan?.amount ?? amount)}</dd>
             </dl>
+            {plan?.continuing && <p className="rounded-xl bg-yellow-100 p-3 text-sm font-bold text-yellow-900">{BRING_BOOKS_TEXT}</p>}
             <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">반·시간을 잘못 고르면 다른 교재가 준비돼요.<br />학원에 등록한 반과 같은지 꼭 확인해 주세요.</p>
             <p className="rounded-xl bg-red-50 p-3 text-center text-sm font-bold text-red-600">⏰ 제출 후 30분 안에 입금해 주세요</p>
             <div className="grid grid-cols-2 gap-2">
