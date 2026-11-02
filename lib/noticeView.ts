@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { getSetting, getSpecialRegistrationsFor, listNoticeReads, listNotices, listSpecialLectures, type Application } from "./db";
 import { specialDeadlineNotices } from "./specialPopups";
 import { courseEndNotices, type CourseEndInput } from "./courseEndPopups";
@@ -10,13 +11,14 @@ import { classDaysOf } from "./classCalendar";
 import { studentStartDay } from "./studentDays";
 import { todayKST } from "./config";
 import { classAppsFor, classCohortNow } from "./classCohort";
+import { safe } from "./safe";
 
 // 공지를 판단할 때 쓰는 학생 신청: 이번 모집 기수 신청(없으면 가장 최근 기수)
 export async function noticeIdentity(): Promise<{ loggedIn: boolean; apps: Application[] }> {
   const { loggedIn, apps } = await activeStudentApps();
   if (apps.length === 0) return { loggedIn, apps: [] };
   // 수업 기수(날짜 기준)의 신청으로 공지 대상을 판단해요
-  return { loggedIn, apps: (await classAppsFor(apps)).apps };
+  return { loggedIn, apps: (await safe("noticeIdentity.classAppsFor", () => classAppsFor(apps), { cohort: null, apps })).apps };
 }
 
 // '@study' 링크는 관리자 설정의 스터디 인증 게시판 주소로 바꿔요. (주소가 없으면 버튼을 숨겨요)
@@ -41,13 +43,17 @@ export async function noticeSummary() {
     };
   }
   // 반복 공지용: 학생 첫 수업일(반 개강일, 중간 등록생은 신청 후 첫 수업일)
-  const students = await Promise.all(apps.map(async (a) => ({ ...a, start: studentStartDay(await classDaysOf(a), a.created_at) })));
+  const students = await safe("notice.studentStart", () => Promise.all(apps.map(async (a) => ({ ...a, start: studentStartDay(await classDaysOf(a), a.created_at) }))), apps.map((a) => ({ ...a, start: null as string | null })));
   const cohort = apps[0].cohort;
   const reads = new Set((await listNoticeReads({ appIds: apps.map((a) => a.id) })).flatMap((r) => (r.cohort ? [r.notice_id, `${r.notice_id}:${r.cohort}`] : [r.notice_id])));
   const mine = myNotices(all, students, today);
   return {
     loggedIn: true, cohort,
-    popups: [...(await courseEndPopups(today)), ...(await specialPopups()), ...(await withLinks(popupNotices(all, students, reads, today)))],
+    popups: [
+      ...(await safe("courseEndPopups", () => courseEndPopups(today), [])),
+      ...(await safe("specialPopups", () => specialPopups(), [])),
+      ...(await withLinks(popupNotices(all, students, reads, today))),
+    ],
     unread: mine.filter((n) => liveFor(n, students, today) && !reads.has(readKey(n, cohort))).length,
     visitorKeys: [] as string[],
   };
@@ -72,3 +78,8 @@ async function courseEndPopups(today: string) {
   }
   return courseEndNotices([...byCohort.values()], today);
 }
+
+// 레이아웃·팝업에서 쓰는 안전한 공지 묶음: 실패하면 공지 없이 화면을 그대로 보여줘요
+export const EMPTY_NOTICE = { loggedIn: false, cohort: "", popups: [] as Notice[], unread: 0, visitorKeys: [] as string[] };
+// 한 요청 안에서 레이아웃·팝업이 같은 결과를 함께 써요 (두 번 계산하지 않아요)
+export const safeNoticeSummary = cache(() => safe("noticeSummary", () => noticeSummary(), EMPTY_NOTICE, 5000));

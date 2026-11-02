@@ -1,6 +1,6 @@
 import "server-only";
 import { DEPOSIT_MINUTES } from "./config";
-import { deleteApplications, deleteYbmOrders, getSetting, listApplications, listYbmOrders, setSetting, updateApplications, updateYbmOrders, type Application, type YbmOrder } from "./db";
+import { deleteApplications, deleteYbmOrders, getSetting, listApplications, listPendingApplications, listPendingYbmOrders, listYbmOrders, setSetting, updateApplications, updateYbmOrders, type Application, type YbmOrder } from "./db";
 
 // ── 교재비 신청·인강 주문 30분 입금 규칙 ──
 // 신청(또는 관리자가 되살린 시각)부터 30분 안에 입금 확인이 안 되면 자동 취소(timeout).
@@ -35,15 +35,27 @@ export async function ruleFrom(nowMs = Date.now()) {
 }
 
 // 30분 지난 입금 대기 → 자동 취소 (교재비 신청 + 인강 주문)
-export async function expireUnpaid(nowMs = Date.now()) {
+// 학생 화면(강의실·로그인 등)에서 부를 때는 1분에 한 번만 돌아요 (여러 학생이 한꺼번에 들어와도 가볍게).
+// 시각을 넘겨 부르면(입금 문자·관리 화면·테스트) 바로 돌아요.
+let lastRun = 0;
+export async function expireUnpaid(at?: number) {
+  const nowMs = at ?? Date.now();
+  if (at === undefined) {
+    if (nowMs - lastRun < 60 * 1000) return { apps: 0, orders: 0 };
+    lastRun = nowMs;
+  }
   const from = await ruleFrom(nowMs);
   const now = new Date(nowMs).toISOString();
   const late = (x: Pend) => { const d = depositDeadline(x, from); return !!d && d <= now; };
+  // 입금 대기 신청·주문만 읽어요 (전체를 읽지 않아요)
+  const [pendingApps, pendingOrders] = await Promise.all([listPendingApplications(), listPendingYbmOrders()]);
+  const lateApps = pendingApps.filter(late), lateOrders = pendingOrders.filter(late);
+  if (lateApps.length === 0 && lateOrders.length === 0) return { apps: 0, orders: 0 };
   // '확인 필요'(후보 여러 명) 입금의 후보는 관리자가 처리할 때까지 자동 취소하지 않아요
   const { reviewHolds } = await import("./deposits");
-  const [apps, orders, holds] = await Promise.all([listApplications(), listYbmOrders(), reviewHolds()]);
-  const a = apps.filter((x) => late(x) && !holds.apps.has(x.id)).map((x) => x.id);
-  const o = orders.filter((x) => late(x) && !holds.orders.has(x.id)).map((x) => x.id);
+  const holds = await reviewHolds();
+  const a = lateApps.filter((x) => !holds.apps.has(x.id)).map((x) => x.id);
+  const o = lateOrders.filter((x) => !holds.orders.has(x.id)).map((x) => x.id);
   if (a.length) await updateApplications(a, { status: "cancelled", cancelled_at: now, cancel_reason: "timeout" });
   if (o.length) await updateYbmOrders(o, { status: "cancelled", cancelled_at: now, cancel_reason: "timeout" });
   return { apps: a.length, orders: o.length };

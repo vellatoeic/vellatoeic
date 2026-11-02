@@ -14,13 +14,14 @@ import { kstDate } from "@/lib/studentDays";
 import { depositDeadline, expireUnpaid, ruleFrom } from "@/lib/cancellations";
 import DepositCountdown from "@/components/DepositCountdown";
 import CancelledNotice from "@/components/CancelledNotice";
+import { safe } from "@/lib/safe";
 
 export const dynamic = "force-dynamic";
 
 export default async function MyPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ again?: string }> }) {
   const { id } = await params;
   const { again } = await searchParams;
-  await expireUnpaid(); // 30분 지난 입금 대기는 먼저 자동 취소
+  await safe("expireUnpaid", () => expireUnpaid(Date.now()), null); // 30분 지난 입금 대기는 먼저 자동 취소
   const a = await getApplication(id);
   if (!a) notFound();
   if (a.status === "cancelled") {

@@ -89,7 +89,7 @@ const HANDLERS: DepositHandler[] = [specialDepositHandler, bookDepositHandler, y
 // 문자에서 이름·금액만 뽑고 원문은 바로 버려요. 우리 학생 입금으로 보이지 않으면 기록도 남기지 않아요.
 export async function handleBankSms(text: string): Promise<{ result: DepositEvent["result"] | "ignored" }> {
   // 먼저 30분 지난 입금 대기를 자동 취소해요 (그 뒤 늦은 입금은 24시간 안이면 되살려요)
-  await expireUnpaid();
+  await expireUnpaid(Date.now()).catch(() => null); // 실패해도 입금 처리는 계속 (문자 처리 경로라 기록은 남기지 않아요)
   const parsed = parseBankSms(text);
   if (!parsed) {
     await createDepositEvent({ target: "special", name: "", amount: 0, result: "unmatched", registration_id: null, application_id: null, ybm_order_id: null });

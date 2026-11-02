@@ -6,7 +6,7 @@ import "@fontsource/gowun-dodum";
 import "./globals.css";
 import { INSTAGRAM_URL } from "@/lib/config";
 import Bell from "@/components/notices/Bell";
-import { noticeSummary } from "@/lib/noticeView";
+import { safeNoticeSummary } from "@/lib/noticeView";
 
 export const metadata: Metadata = {
   title: "vella_toeic",
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#9fd8f5" };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const notice = await noticeSummary();
+  const notice = await safeNoticeSummary(); // 공지 계산이 실패해도 페이지는 떠요
   return (
     <html lang="ko">
       <body className="min-h-dvh">

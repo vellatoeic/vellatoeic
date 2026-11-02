@@ -128,6 +128,7 @@
 - 반응형: 휴대폰이 기준이고, 학생 화면은 컴퓨터에서도 읽기 편한 폭(max-w-3xl)을 유지해요. 첫 화면은 태블릿에서 한 줄(조금 넓게), 컴퓨터(1024px 이상)에서 왼쪽 인사·수강 형태 / 오른쪽 메뉴 두 칸. 관리 화면(app/admin/layout.tsx)은 컴퓨터에서 최대 72rem까지 넓게. 스티커판은 이미지 저장용이라 휴대폰 크기 그대로.
 
 ## 기술 구성
+- 핵심 화면 보호(lib/safe.ts): 로그인·강의실·레이아웃 공지에서 부가 기능(30분 자동 취소 점검, 열람 기간, 종강·특강 팝업, 선물, 음원, 테스트, 수업 기수 판단 등)은 safe()로 감싸 실패하거나 4~5초를 넘기면 기본값으로 넘어가고 console.error로 함수 이름·오류만 남겨요(Next 내부 신호는 unstable_rethrow로 통과). 레이아웃 공지는 한 요청에 한 번만 계산(react cache). 30분 자동 취소 점검은 입금 대기만 읽고, 학생 화면에서는 1분에 한 번만 돌아요.
 - Next.js(App Router) + Supabase(DB, Storage) + Vercel(main에 push하면 자동 배포). 주소: vellatoeic.vercel.app
 - Vercel 환경변수: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ADMIN_PASSWORD, (선택) SESSION_SECRET, (선택) DEPOSIT_WEBHOOK_TOKEN(입금 문자 자동 확인). 키 값은 코드나 채팅에 절대 쓰지 말 것.
 - DB는 서버에서 service_role로만 접근. RLS 켜고 정책 없음(학생 브라우저에서 직접 조회 불가).

@@ -4,6 +4,7 @@ import { depositDeadline, expireUnpaid, ruleFrom } from "@/lib/cancellations";
 import DepositCountdown from "@/components/DepositCountdown";
 import CancelledNotice from "@/components/CancelledNotice";
 import { YBM_BANK, won } from "@/lib/config";
+import { safe } from "@/lib/safe";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "교재 신청 · vella_toeic", robots: { index: false } };
@@ -12,7 +13,7 @@ export const metadata = { title: "교재 신청 · vella_toeic", robots: { index
 export default async function YbmOrderDone({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ again?: string }> }) {
   const { id } = await params;
   const { again } = await searchParams;
-  await expireUnpaid(); // 30분 지난 입금 대기는 먼저 자동 취소
+  await safe("expireUnpaid", () => expireUnpaid(Date.now()), null); // 30분 지난 입금 대기는 먼저 자동 취소
   const o = await getYbmOrder(id);
   if (!o) notFound();
   if (o.status === "cancelled") {

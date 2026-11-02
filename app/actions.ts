@@ -32,6 +32,7 @@ import { syncSpecialDrafts, weekdayKey } from "@/lib/specialDrafts";
 import { altFixResult, altTrackError, findPrevAlt, planBooks } from "@/lib/altContinue";
 import { currentAltIssues } from "@/lib/altIssuesServer";
 import { adjustedBooks } from "@/lib/manualLink";
+import { safe } from "@/lib/safe";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
 } from "@/lib/auth";
@@ -102,7 +103,7 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   if (plan.error) return { error: plan.error };
   const { continuing, books } = plan;
 
-  await expireUnpaid(); // 30분 지난 입금 대기는 취소돼서 아래 중복 검사에서 빠져요 (다시 신청 가능)
+  await safe("expireUnpaid", () => expireUnpaid(Date.now()), null); // 30분 지난 입금 대기는 취소돼서 아래 중복 검사에서 빠져요 (다시 신청 가능)
   // 같은 달에 같은 이름 + 같은 비밀번호로 이미 낸 신청이 있으면 새로 만들지 않고 그 신청 화면으로 보내요.
   // 이름이 같아도 비밀번호가 다르면 동명이인으로 보고 새로 받아요.
   const mine = (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash) && isActive(a));
@@ -163,7 +164,7 @@ export async function studentLogin(_: FormState, fd: FormData): Promise<FormStat
   const pin = clean(fd.get("pin"));
   if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 비밀번호 4자리를 입력해 주세요." };
   // 환불·삭제된 수강생은 로그인할 수 없어요.
-  await expireUnpaid(); // 30분 지난 입금 대기는 먼저 취소 처리
+  await safe("expireUnpaid", () => expireUnpaid(), null); // 30분 지난 입금 대기는 먼저 취소 처리 (실패해도 로그인은 계속)
   const result = loginApps(await findByName(name), (a) => checkPin(pin, a.pin_hash));
   if (result.cancelledId) redirect(`/my/${result.cancelledId}`); // 취소된 신청만 있으면 취소 안내 화면으로
   if (!result.apps) {
@@ -490,7 +491,7 @@ export async function createYbmOrderAction(_: FormState, fd: FormData): Promise<
   if (!["image/jpeg", "image/png", "image/webp"].includes(proof.type)) return { error: "수강증은 사진(JPG·PNG) 파일로 올려 주세요." };
   if (proof.size > 4 * 1024 * 1024) return { error: "사진이 너무 커요. 다시 골라 주세요." };
   // 같은 이름·연락처로 아직 발송 전 주문이 있으면 새로 만들지 않고 그 주문으로 보내요.
-  await expireUnpaid();
+  await safe("expireUnpaid", () => expireUnpaid(Date.now()), null);
   const existing = (await listYbmOrders()).find((o) => o.status !== "shipped" && o.status !== "cancelled" && o.name === name && o.phone === phone);
   if (existing) redirect(`/ybm/${existing.id}?again=1`);
   const id = await createYbmOrder({ name, phone, address, depositor, amount: YBM_ORDER_AMOUNT }, { data: Buffer.from(await proof.arrayBuffer()), type: proof.type });
@@ -823,7 +824,7 @@ export async function specialLogin(_: FormState, fd: FormData): Promise<FormStat
   const name = clean(fd.get("name"));
   const pin = clean(fd.get("pin"));
   if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 강의실 비밀번호 4자리를 입력해 주세요." };
-  await expireUnpaid(); // 30분 지난 입금 대기는 먼저 취소 처리
+  await safe("expireUnpaid", () => expireUnpaid(), null); // 30분 지난 입금 대기는 먼저 취소 처리 (실패해도 로그인은 계속)
   const result = loginApps(await findByName(name), (a) => checkPin(pin, a.pin_hash));
   if (result.cancelledId) redirect(`/my/${result.cancelledId}`); // 취소된 신청만 있으면 취소 안내 화면으로
   if (!result.apps) {

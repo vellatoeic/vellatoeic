@@ -36,6 +36,7 @@ import CancelledNotice from "@/components/CancelledNotice";
 import { viewInfo } from "@/lib/viewWindowServer";
 import { dayLabelKo, viewPhase } from "@/lib/viewWindow";
 import { signupMonths } from "@/lib/signupMonthsServer";
+import { safe } from "@/lib/safe";
 
 const nextMonthOf = (today: string) => shiftMonth(today.slice(0, 7), 1);
 
@@ -43,12 +44,12 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "강의실 · vella_toeic", robots: { index: false } };
 
 export default async function ClassRoom({ searchParams }: { searchParams: Promise<{ t?: string; expired?: string }> }) {
-  await expireUnpaid(); // 30분 지난 입금 대기는 먼저 자동 취소
+  await safe("expireUnpaid", () => expireUnpaid(), null); // 30분 지난 입금 대기는 먼저 자동 취소 (1분에 한 번, 실패해도 강의실은 열려요)
   const { loggedIn, apps } = await activeStudentApps();
   if (!loggedIn) return <StudentLogin />;
   // 환불·삭제된 수강생은 아무것도 볼 수 없어요. 취소된 신청만 있으면 취소 안내를 보여줘요.
   if (apps.length === 0) {
-    const cancelled = (await getApplications(await getStudentIds())).filter((a) => a.status === "cancelled").sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    const cancelled = (await safe("cancelledApps", async () => getApplications(await getStudentIds()), [])).filter((a) => a.status === "cancelled").sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
     if (cancelled) return <CancelledNotice reason={cancelled.cancel_reason} retryHref={`/guide/${cancelled.kind}`} kakao={await getSetting("kakao_channel_url")} />;
     return (
       <div className="pt-12">
@@ -67,27 +68,27 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
   // 스티커판: 같은 기수·같은 수업 학생들의 출석 날짜 = 수업일
   // 수업 기수(날짜 기준): 모집 기수를 다음 달로 바꿔도 이번 달 라이브·테스트는 그대로 열려요
-  const { cohort } = await classAppsFor(paid);
+  const { cohort } = await safe("classAppsFor", () => classAppsFor(paid), { cohort: paid[0]?.cohort ?? null, apps: paid });
   const [cafeUrl, account, chatUrl, chatCode] = await Promise.all([getSetting("cafe_homework_url"), getSetting("bank_account"), getSetting("chat_url"), getSetting("chat_code")]);
   const pending = apps.filter((a) => a.status === "pending");
   const today = todayKST();
   // 🎁 스티커판 완성 선물: 수업 기수 신청 기준, 학생 1명당 기수마다 1번 (격일반은 선물 없이 축하만)
   const giftApps = paid.filter((a) => a.cohort === cohort);
-  const [giftBoards, kakaoChannel] = await Promise.all([boardsFor(giftApps, today), getSetting("kakao_channel_url")]);
-  const myDraw = cohort && giftApps.length ? await getGiftDraw(cohort, studentKeyOf(giftApps)) : null;
+  const [giftBoards, kakaoChannel] = await Promise.all([safe("boardsFor", () => boardsFor(giftApps, today), []), safe("kakaoChannel", () => getSetting("kakao_channel_url"), "")]);
+  const myDraw = cohort && giftApps.length ? await safe("getGiftDraw", () => getGiftDraw(cohort, studentKeyOf(giftApps)), null) : null;
   const giftDone = giftBoards.find((b) => b.eligible && b.status.complete);
   const showGift = !!myDraw || (!!giftDone && giftWindowOpen(giftDone.status.last, today));
-  const stamps = await listStamps(paid.map((a) => a.id));
-  const missions = await listMissions(apps.map((a) => a.id));
+  const stamps = await safe("listStamps", () => listStamps(paid.map((a) => a.id)), { attendance: [], homework: [] });
+  const missions = await safe("listMissions", () => listMissions(apps.map((a) => a.id)), []);
   // LC 음원: 본인 반 첫 수업일부터 14일 동안만 보여요.
-  const audioBoxes = new Map(await Promise.all(paid.filter((a) => audioBooksFor(a).length > 0).map(async (a) => {
+  const audioBoxes = new Map(await safe("audioBoxes", () => Promise.all(paid.filter((a) => audioBooksFor(a).length > 0).map(async (a) => {
     const period = await studentAudioWindow(a);
     const books = audioBooksFor(a);
     const list = period && today >= period.start && today <= period.end
       ? (await listAudios(a.cohort)).filter((x) => books.includes(x.book))
       : [];
     return [a.id, { period, list }] as const;
-  })));
+  })), []));
   // 지금 다운로드 기간인 음원 (배너·팝업은 첫 번째 것 기준)
   const audioNow = paid.map((a) => ({ a, box: audioBoxes.get(a.id) }))
     .find((x) => x.box?.period && today >= x.box.period.start && today <= x.box.period.end && x.box.list.length > 0);
@@ -109,16 +110,17 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
   // 문풀반·속성반 데일리 테스트 (이번 달 납부 완료 신청)
   const testApp = paid.find((a) => a.cohort === cohort && takesTests(a));
-  const myTests = testApp ? await studentTests(testApp, today) : null;
+  const myTests = testApp ? await safe("studentTests", () => studentTests(testApp, today), null) : null;
 
   // 맨 위 탭 [☀️ 오전반 | 🌙 저녁반]: 본인 시간대가 먼저 선택되고, 교차 수강을 위해 다른 시간대로 바꿔 볼 수 있어요.
   // 열람 기간: 공식 '종강일까지', 실제 '다음 달 개강 전날까지' (lib/viewWindow.ts). 지난 신청은 기록(스티커판 등)만 보여요.
-  const view = await viewInfo(paid);
+  // 계산에 실패하면 막지 않고 모두 열어 둬요 (지난 강의·라이브가 반드시 보이게)
+  const view = await safe("viewInfo", () => viewInfo(paid), new Map(paid.map((a) => [a.id, { end: "9999-12-31", until: "9999-12-31" }])));
   const viewable = (a: (typeof paid)[number]) => today <= (view.get(a.id)?.until ?? "");
   const nextMonth = nextMonthOf(today);
   // 그 신청의 다음 달 신청이 있는지 (연장 안내에서 '다음 달 수업도 함께해요' 버튼을 띄울지)
   const hasNextOf = (a: (typeof paid)[number]) => apps.some((x) => x.cohort === shiftMonth(a.cohort, 1));
-  const signupMonth = (await signupMonths())[0] ?? null;
+  const signupMonth = (await safe("signupMonths", () => signupMonths(), []))[0] ?? null;
   // 열람 가능한 신청이 없고 이번 달·다음 달 신청도 없으면 맨 위에 '열람 기간이 끝났어요'
   const allClosed = paid.length > 0 && !paid.some(viewable) && !apps.some((x) => x.cohort === today.slice(0, 7) || x.cohort === nextMonth);
   const lastClosed = [...paid].sort((x, y) => y.cohort.localeCompare(x.cohort))[0];
@@ -129,7 +131,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
   // 맨 위 "🔴 라이브 입장": 고른 시간대 수업 10분 전 ~ 종료까지 빨간색, 그 외엔 다음 라이브 안내
   // 다가오는 특강 신청 (취소 제외) → 라이브 버튼 아래 작은 카드
-  const [mySpecialRegs, specialEvents] = await Promise.all([getSpecialRegistrationsFor(apps.map((x) => x.id)), listSpecialLectures().then(publicSpecials)]);
+  const [mySpecialRegs, specialEvents] = await safe("mySpecials", () => Promise.all([getSpecialRegistrationsFor(apps.map((x) => x.id)), listSpecialLectures().then(publicSpecials)]), [[], []] as [Awaited<ReturnType<typeof getSpecialRegistrationsFor>>, Awaited<ReturnType<typeof listSpecialLectures>>]);
   const mySpecials = mySpecialRegs
     .filter((r) => r.deposit !== "cancelled")
     .map((r) => ({ r, e: specialEvents.find((e) => e.id === r.special_lecture_id) }))

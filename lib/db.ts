@@ -1363,3 +1363,21 @@ export async function deleteYbmOrders(ids: string[]) {
   mem.ybmOrders = mem.ybmOrders.filter((o) => !ok.includes(o.id));
   for (const e of mem.depositEvents) if (e.ybm_order_id && ok.includes(e.ybm_order_id)) e.ybm_order_id = null;
 }
+
+// 입금 대기 신청·주문만 (30분 자동 취소 점검용, 전체를 읽지 않아 가벼워요)
+export async function listPendingApplications(): Promise<Application[]> {
+  if (sb) {
+    const db = sb;
+    return allRows<Application>((from, to) => db.from("applications").select("*").eq("status", "pending").order("created_at").order("id").range(from, to));
+  }
+  return mem.apps.filter((a) => a.status === "pending");
+}
+
+export async function listPendingYbmOrders(): Promise<YbmOrder[]> {
+  if (sb) {
+    const { data, error } = await sb.from("ybm_orders").select("*").eq("status", "pending");
+    if (error) throw error;
+    return data as YbmOrder[];
+  }
+  return mem.ybmOrders.filter((o) => o.status === "pending");
+}
