@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BOOKS, COURSES, KINDS, TIME_SLOTS, TRACKS, bookStatusLabel, cohortLabel, todayKST, won } from "@/lib/config";
+import { BOOKS, COURSES, KINDS, TRACKS, classSlotLabel, bookStatusLabel, cohortLabel, todayKST, won } from "@/lib/config";
 import { getApplication, getSpecialRegistrationsFor, isPreview, listApplications, listMissions, listSpecialLectures, listStamps, listTestResults } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
@@ -76,7 +76,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
       <section className="card space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-sm text-slate-500">{cohortLabel(a.cohort)} · {COURSES[a.course].label} {TRACKS[a.track]} · {a.slot ? TIME_SLOTS[a.slot] : "시간 미정"} · {KINDS[a.kind].short}</p>
+            <p className="text-sm text-slate-500">{cohortLabel(a.cohort)} · {classSlotLabel(a)} · {KINDS[a.kind].short}</p>
             <h2 className="font-jua text-3xl text-sky-ink">{a.name}</h2>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -168,8 +168,8 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
               <ul className="mt-2 divide-y divide-sky-soft">
                 {history.map((h) => (
                   <li key={h.id} className="py-2">
-                    {h.id === a.id ? <b className="text-sky-ink">▶ {cohortLabel(h.cohort)} {COURSES[h.course].label} {TRACKS[h.track]} · {KINDS[h.kind].short} (지금 보는 신청)</b> : (
-                      <Link href={`/admin/students/${h.id}`} className="text-sky-deep underline">{cohortLabel(h.cohort)} {COURSES[h.course].label} {TRACKS[h.track]} · {KINDS[h.kind].short}</Link>
+                    {h.id === a.id ? <b className="text-sky-ink">▶ {cohortLabel(h.cohort)} {classSlotLabel(h)} · {KINDS[h.kind].short} (지금 보는 신청)</b> : (
+                      <Link href={`/admin/students/${h.id}`} className="text-sky-deep underline">{cohortLabel(h.cohort)} {classSlotLabel(h)} · {KINDS[h.kind].short}</Link>
                     )}
                     <span className="ml-2 text-xs text-slate-400">{STATUS[h.status]}</span>
                   </li>

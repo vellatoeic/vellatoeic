@@ -1,5 +1,5 @@
 import { adminAlerts } from "@/lib/adminAlerts";
-import { BOOKS, COURSES, KINDS, TRACKS, TIME_SLOTS, bookStatusLabel, cohortLabel, roundOf, thisMonthKST, won, type BookId, type CourseId, type TimeSlot, type Track } from "@/lib/config";
+import { BOOKS, COURSES, KINDS, TRACKS, TRACK_ORDER, slotTag, bookStatusLabel, cohortLabel, roundOf, thisMonthKST, won, type BookId, type CourseId, type TimeSlot } from "@/lib/config";
 import { listApplications, listDepositEvents, listWaitingDepositEvents, listYbmOrders, listMissions, getSetting, currentCohort, roundFor, isPreview, type Application, type Mission } from "@/lib/db";
 import { missionCount } from "@/lib/mission";
 import { summariesFor } from "@/lib/studentSummary";
@@ -28,7 +28,6 @@ type Filters = { k: string; p: string; b: string; t: string; q: string; c: strin
 
 const KIND_FILTERS = [["all", "전체"], ["onsite", "현장"], ["online", "불라방"]] as const;
 const PAY_FILTERS = [["all", "전체"], ["pending", "미납"], ["paid", "납부 완료"], ["refunded", "환불"], ["cancelled", "취소"]] as const;
-const TIME_FILTERS = [["all", "전체"], ["am", "오전반"], ["pm", "저녁반"]] as const;
 const isPaid = (a: Application) => a.status === "paid" || a.status === "shipped";
 const SLOT_ORDER: (TimeSlot | null)[] = ["am", "pm", null];
 const BOOK_FILTERS = [["all", "전체"], ["todo", "수령·발송 대기"], ["done", "수령·발송 완료"]] as const;
@@ -238,18 +237,19 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   const withCancelled = c === "all" ? everything : everything.filter((a) => a.cohort === c);
   const all = withCancelled.filter((a) => a.status !== "cancelled"); // 숫자 카드는 취소 제외
 
-  const list = withCancelled.filter((a) => {
+  // 수강 시간 탭(t)을 빼고 거른 목록: 탭의 오전반·저녁반 인원수
+  const beforeSlot = withCancelled.filter((a) => {
     if (p === "cancelled" ? a.status !== "cancelled" : a.status === "cancelled") return false;
     if (k !== "all" && a.kind !== k) return false;
     if (p === "pending" && a.status !== "pending") return false;
     if (p === "paid" && !isPaid(a)) return false;
     if (p === "refunded" && a.status !== "refunded") return false;
-    if (t !== "all" && a.slot !== t) return false;
     if (b === "todo" && !bookTodo(a)) return false;
     if (b === "done" && !(a.kind === "online" && a.status === "shipped")) return false;
     if (q && !`${a.name} ${a.depositor} ${a.phone ?? ""}`.includes(q)) return false;
     return true;
   });
+  const list = t === "all" ? beforeSlot : beforeSlot.filter((a) => a.slot === t);
 
   const count = (fn: (a: Application) => boolean) => all.filter(fn).length;
   const missions = new Map((await listMissions(list.map((a) => a.id))).map((m) => [m.app_id, m]));
@@ -263,17 +263,19 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
     return `/admin?${params}`;
   };
 
-  // 반 → 시간(오전·저녁·미정) 순서로 묶어요.
-  const groups = (Object.keys(COURSES) as CourseId[]).flatMap((co) =>
-    (Object.keys(TRACKS) as Track[]).flatMap((tr) =>
-      SLOT_ORDER.map((slot) => {
+  // 시간대(☀️ 오전 → 🌙 저녁 → 🕒 미정) → 반 → 과정 순서로 묶어요. 각 묶음 안은 최신 신청이 위.
+  const slotSections = SLOT_ORDER.map((slot) => {
+    const sk = slot ?? "none";
+    const groups = (Object.keys(COURSES) as CourseId[]).flatMap((co) =>
+      TRACK_ORDER.map((tr) => {
         const items = list
           .filter((a) => a.course === co && a.track === tr && (a.slot ?? null) === slot)
-          .sort((x, y) => y.created_at.localeCompare(x.created_at)); // 최신 신청이 위
-        return { key: `${co}-${tr}-${slot ?? "none"}`, title: `${COURSES[co].label} ${TRACKS[tr]}`, slot, items };
+          .sort((x, y) => y.created_at.localeCompare(x.created_at));
+        return { key: `${sk}-${co}-${tr}`, title: `${COURSES[co].label} ${TRACKS[tr]}`, items };
       }),
-    ).filter((g) => g.items.length > 0),
-  );
+    ).filter((g) => g.items.length > 0);
+    return { slot, sk, groups, total: groups.reduce((n, g) => n + g.items.length, 0) };
+  }).filter((x) => x.total > 0);
 
   const chip = (on: boolean) => `rounded-full px-3 py-1.5 text-sm font-bold ${on ? "bg-sky-deep text-white" : "bg-white text-sky-ink"}`;
 
@@ -548,7 +550,6 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
       <div className="card space-y-2 !p-4 text-sm">
         {[
           { name: "수강 형태", key: "k" as const, value: k, items: KIND_FILTERS },
-          { name: "수강 시간", key: "t" as const, value: t, items: TIME_FILTERS },
           { name: "납부", key: "p" as const, value: p, items: PAY_FILTERS },
           { name: "불라방 교재", key: "b" as const, value: b, items: BOOK_FILTERS },
         ].map((row) => (
@@ -567,6 +568,15 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
           <input name="q" defaultValue={q} placeholder="이름·입금자·번호" className="input !w-48 !py-2 text-sm" />
           {q && <a href={link({ q: "" })} className="text-slate-400 underline">지우기</a>}
         </form>
+      </div>
+
+      {/* 수강 시간 탭: 수강 형태·납부 필터와 같이 써요 (예: 현장 + 오전반) */}
+      <div className="grid grid-cols-3 gap-2">
+        {([["am", "☀️ 오전반"], ["pm", "🌙 저녁반"], ["all", "전체"]] as const).map(([v, label]) => (
+          <a key={v} href={link({ t: v })} className={`rounded-2xl px-3 py-3 text-center font-jua text-lg ${t === v ? "bg-sky-deep text-white shadow" : "bg-white text-sky-ink ring-1 ring-sky-main"}`}>
+            {label} <span className="text-base">{v === "all" ? beforeSlot.length : beforeSlot.filter((a) => a.slot === v).length}명</span>
+          </a>
+        ))}
       </div>
 
       {list.length === 0 && <p className="card text-center text-slate-500">해당하는 신청이 없어요.</p>}
@@ -634,27 +644,33 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
         </CloseOnSubmitForm>
       )}
 
-      {groups.map((g) => {
-        const pending = g.items.filter((a) => a.status === "pending").length;
-        const onsite = g.items.filter((a) => a.kind === "onsite").length;
-        return (
-          <section key={g.key} className="card !p-4">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-sky-main pb-2">
-              <label className="flex items-center gap-2">
-                <SelectAll group={g.key} />
-                <h3 className="font-jua text-xl text-sky-ink">
-                  {g.title} · <span className={g.slot ? "" : "text-amber-600"}>{g.slot ? TIME_SLOTS[g.slot] : "시간 미정"}</span>
-                </h3>
-              </label>
-              <span className="text-sm text-slate-500">{g.items.length}명 · 현장 {onsite} · 불라방 {g.items.length - onsite}</span>
-              {pending > 0 && <Badge tone="amber">미납 {pending}명</Badge>}
-            </div>
-            <ul className="divide-y divide-sky-soft">
-              {g.items.map((a) => <Row key={a.id} a={a} group={g.key} mission={missions.get(a.id)} fresh={a.created_at > alerts.since} sum={sums.get(a.id)} back={link({})} bookOptions={classBookOptions(a, listRounds.get(a.cohort) ?? 1)} />)}
-            </ul>
-          </section>
-        );
-      })}
+      {slotSections.map((sec) => (
+        <div key={sec.sk} className="space-y-3">
+          <label className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${sec.slot ? "bg-sky-soft" : "bg-amber-50"}`}>
+            <SelectAll group={`${sec.sk}-`} prefix />
+            <h2 className={`font-jua text-2xl ${sec.slot ? "text-sky-ink" : "text-amber-700"}`}>{slotTag(sec.slot)} <span className="text-lg">({sec.total}명)</span></h2>
+          </label>
+          {sec.groups.map((g) => {
+            const pending = g.items.filter((a) => a.status === "pending").length;
+            const onsite = g.items.filter((a) => a.kind === "onsite").length;
+            return (
+              <section key={g.key} className="card !p-4">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-sky-main pb-2">
+                  <label className="flex items-center gap-2">
+                    <SelectAll group={g.key} />
+                    <h3 className="font-jua text-xl text-sky-ink">{g.title}</h3>
+                  </label>
+                  <span className="text-sm text-slate-500">{g.items.length}명 · 현장 {onsite} · 불라방 {g.items.length - onsite}</span>
+                  {pending > 0 && <Badge tone="amber">미납 {pending}명</Badge>}
+                </div>
+                <ul className="divide-y divide-sky-soft">
+                  {g.items.map((a) => <Row key={a.id} a={a} group={g.key} mission={missions.get(a.id)} fresh={a.created_at > alerts.since} sum={sums.get(a.id)} back={link({})} bookOptions={classBookOptions(a, listRounds.get(a.cohort) ?? 1)} />)}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }

@@ -238,6 +238,13 @@ export function klassLabel(a: { course: CourseId; track: Track; slot: TimeSlot |
   return `${COURSES[a.course].label} ${TRACKS[a.track]}${a.slot ? ` · ${TIME_SLOTS[a.slot]}` : ""}`;
 }
 
+// 관리 화면 시간대 표시: "☀️ 오전반" · "🌙 저녁반" · "🕒 시간 미정"
+export const slotTag = (slot: TimeSlot | null | undefined) => (slot === "am" ? "☀️ 오전반" : slot === "pm" ? "🌙 저녁반" : "🕒 시간 미정");
+// 예: "시작반 주 4일(종합반) · ☀️ 오전반" (관리 화면에서 반 옆에 시간대를 항상 같이)
+export const classSlotLabel = (a: { course: CourseId; track: Track; slot: TimeSlot | null }) => `${COURSES[a.course].label} ${TRACKS[a.track]} · ${slotTag(a.slot)}`;
+// 관리 명단에서 반 안 과정 순서: 종합 → 격일 월수 → 격일 화목 → 단과
+export const TRACK_ORDER: Track[] = ["all", "alt_mw", "alt_tt", "alt", "rc", "lc"];
+
 // 예: "오전반 10:00~12:10"
 export function slotLabel(a: { course: CourseId; track: Track }, slot: TimeSlot) {
   const s = KLASS_TIME[klassOf(a)][slot === "am" ? 0 : 1];

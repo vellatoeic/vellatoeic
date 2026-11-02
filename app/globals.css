@@ -61,3 +61,11 @@ b, strong, .font-bold, .btn, .btn-ghost, .label { font-family: var(--font-jua); 
 @keyframes gift-fall {
   to { transform: translateY(520px) rotate(220deg); opacity: 0; }
 }
+
+/* 첫날 교재 지급 명단: [오전반만 인쇄]·[저녁반만 인쇄] — 다른 시간대 칸은 인쇄에서 숨겨요 */
+@media print {
+  html[data-printing="am"] [data-slot-part]:not([data-slot-part="am"]),
+  html[data-printing="pm"] [data-slot-part]:not([data-slot-part="pm"]) {
+    display: none !important;
+  }
+}

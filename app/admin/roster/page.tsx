@@ -1,4 +1,4 @@
-import { BOOKS, CLASSROOM, COURSES, TIME_SLOTS, TRACKS, cohortLabel, type BookId, type CourseId, type TimeSlot, type Track } from "@/lib/config";
+import { BOOKS, CLASSROOM, COURSES, TRACKS, TRACK_ORDER, cohortLabel, slotTag, type BookId, type CourseId, type TimeSlot } from "@/lib/config";
 import { listApplications, currentCohort, isPreview, type Application } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import LoginForm from "../LoginForm";
@@ -10,6 +10,8 @@ import { isActive } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
+
+const SLOTS: TimeSlot[] = ["am", "pm"];
 
 function bookCount(apps: Application[]) {
   const n: Partial<Record<BookId, number>> = {};
@@ -66,35 +68,53 @@ export default async function Roster() {
           <p className="text-slate-500">{cohortLabel(cohort)}</p>
           <h2 className="font-jua text-3xl text-sky-ink">첫날 {CLASSROOM} 교재 지급 명단</h2>
         </div>
-        <PrintButton />
+        <div className="flex flex-wrap justify-end gap-2">
+          <PrintButton slot="am" label="☀️ 오전반만 인쇄" />
+          <PrintButton slot="pm" label="🌙 저녁반만 인쇄" />
+          <PrintButton label="전체 인쇄" />
+        </div>
       </div>
 
-      <div className="card">
-        <p className="font-jua text-lg text-sky-ink">준비할 교재 (현장 · 납부 완료 기준)</p>
+      <div className="card" data-slot-part="other">
+        <p className="font-jua text-lg text-sky-ink">준비할 교재 전체 (현장 · 납부 완료 기준)</p>
         <p className="mt-1 text-slate-700">{bookCount(onsite.filter((a) => a.status !== "pending")).join(" · ") || "아직 없어요"}</p>
         <p className="mt-2 text-sm text-amber-700">
           미납 {onsite.filter((a) => a.status === "pending").length}명은 노란색으로 표시돼요.<br />납부 확인 후 지급하세요.
         </p>
       </div>
 
-      {(Object.keys(COURSES) as CourseId[]).flatMap((co) =>
-        (Object.keys(TRACKS) as Track[]).flatMap((t) =>
-          ([...Object.keys(TIME_SLOTS), null] as (TimeSlot | null)[]).map((slot) => {
-            const list = onsite.filter((a) => a.course === co && a.track === t && (a.slot ?? null) === slot);
-            if (list.length === 0) return null;
-            return (
-              <section key={`${co}${t}${slot}`} className="card break-inside-avoid">
-                <h3 className="font-jua text-xl text-sky-ink">
-                  {COURSES[co].label} {TRACKS[t]} · {slot ? TIME_SLOTS[slot] : "시간 미정"} <span className="text-base text-slate-400">· {list.length}명</span>
-                </h3>
-                <Table apps={list} />
-              </section>
-            );
-          }),
-        ),
-      )}
+      {/* 시간대(☀️ 오전 → 🌙 저녁 → 🕒 미정)로 크게 나누고, 그 안은 반 → 과정 순서 */}
+      {([...SLOTS, null] as (TimeSlot | null)[]).map((slot) => {
+        const inSlot = onsite.filter((a) => (a.slot ?? null) === slot);
+        if (inSlot.length === 0) return null;
+        const paid = inSlot.filter((a) => a.status !== "pending");
+        return (
+          <div key={slot ?? "none"} data-slot-part={slot ?? "none"} className="space-y-4">
+            <div className={`rounded-3xl p-5 break-inside-avoid ${slot ? "bg-sky-soft" : "bg-amber-50"}`}>
+              <h2 className={`font-jua text-3xl ${slot ? "text-sky-ink" : "text-amber-700"}`}>{slotTag(slot)} <span className="text-xl">({inSlot.length}명)</span></h2>
+              <p className="mt-1 font-bold text-slate-700">📚 {bookCount(paid).join(" · ") || "납부 완료 학생이 아직 없어요"}</p>
+              <p className="text-xs text-slate-500">납부 완료 {paid.length}명 기준{inSlot.length > paid.length ? ` · 미납 ${inSlot.length - paid.length}명은 빼고 셌어요` : ""}</p>
+            </div>
+            {(Object.keys(COURSES) as CourseId[]).flatMap((co) =>
+              TRACK_ORDER.map((t) => {
+                const list = inSlot.filter((a) => a.course === co && a.track === t);
+                if (list.length === 0) return null;
+                return (
+                  <section key={`${co}${t}`} className="card break-inside-avoid">
+                    <h3 className="font-jua text-xl text-sky-ink">
+                      {COURSES[co].label} {TRACKS[t]} <span className="text-base text-slate-400">· {list.length}명</span>
+                    </h3>
+                    <Table apps={list} />
+                  </section>
+                );
+              }),
+            )}
+          </div>
+        );
+      })}
       {onsite.length === 0 && <p className="card text-center text-slate-500">이번 기수 현장 신청자가 아직 없어요.</p>}
 
+      <div data-slot-part="other" className="space-y-6">
       <h2 className="font-jua pt-4 text-3xl text-sky-ink">불라방 교재 수령 명단</h2>
       <section className="card break-inside-avoid">
         <h3 className="font-jua text-xl text-sky-ink">
@@ -133,6 +153,7 @@ export default async function Roster() {
       <p className="card text-sm text-slate-600 print:hidden">
         택배 수령 {delivery.length}명의 이름·연락처·주소는 <Link href="/admin/delivery" className="font-bold text-sky-deep underline">[택배 발송]</Link> 탭에서 볼 수 있어요.
       </p>
+      </div>
     </div>
   );
 }

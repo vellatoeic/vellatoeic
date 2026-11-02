@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { COURSES, KINDS, TIME_SLOTS, TRACKS, cohortLabel } from "@/lib/config";
+import { KINDS, classSlotLabel, cohortLabel } from "@/lib/config";
 import { isPreview, listApplications } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { summariesFor } from "@/lib/studentSummary";
@@ -44,7 +44,7 @@ export default async function StudentSearch({ searchParams }: { searchParams: Pr
                 return (
                   <tr key={a.id} className="border-b border-sky-soft">
                     <td className="whitespace-nowrap py-2 pr-3"><Link href={`/admin/students/${a.id}`} className="font-bold text-sky-ink underline decoration-sky-main underline-offset-2">{a.name}</Link></td>
-                    <td className="whitespace-nowrap pr-3 text-slate-600">{cohortLabel(a.cohort)} · {COURSES[a.course].label} {TRACKS[a.track]} · {a.slot ? TIME_SLOTS[a.slot] : "미정"} <span className="text-xs text-slate-400">{KINDS[a.kind].short}</span></td>
+                    <td className="whitespace-nowrap pr-3 text-slate-600">{cohortLabel(a.cohort)} · {classSlotLabel(a)} <span className="text-xs text-slate-400">{KINDS[a.kind].short}</span></td>
                     <td className={`whitespace-nowrap pr-3 font-bold ${a.status === "pending" ? "text-amber-600" : a.status === "refunded" || a.status === "cancelled" ? "text-slate-400" : "text-emerald-600"}`}>{a.status === "cancelled" && a.cancel_reason === "timeout" ? "자동 취소됨" : STATUS[a.status]}{a.books_adjusted ? " · 교재 조정" : ""}</td>
                     <td className="pr-3 text-center text-sky-deep">{s ? `${s.attended}/${s.past}` : "-"}</td>
                     <td className={`pr-3 text-center ${s && s.absent >= 3 ? "font-bold text-red-500" : "text-slate-500"}`}>{s ? s.absent : "-"}</td>
