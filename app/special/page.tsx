@@ -2,7 +2,7 @@ import { activeStudentApps } from "@/lib/student";
 import { expireSpecialDeposits, getSetting, getSpecialRegistrationsFor, listSpecialLectures, listSpecialMaterials } from "@/lib/db";
 import { CLASSROOM, DEPOSIT_MINUTES, SPECIAL_DEPOSIT, won } from "@/lib/config";
 import { specialLogout } from "@/app/actions";
-import { canSeeSpecialMaterials, deadlineBadge, specialRegistrationOpen, specialWhen } from "@/lib/special";
+import { canSeeSpecialMaterials, deadlineBadge, specialRegistrationOpen, specialReplay, specialStarted, specialWhen } from "@/lib/special";
 import { todayKST } from "@/lib/config";
 import SpecialForm from "./SpecialForm";
 import { cohortUntil, viewInfo } from "@/lib/viewWindowServer";
@@ -41,7 +41,8 @@ export default async function SpecialPage({ searchParams }: { searchParams: Prom
         const event = eventById.get(registration.special_lecture_id)!;
         const w = await windowOf(registration, event);
         const canSee = canSeeSpecialMaterials(registration, event.event_date, today, w.until);
-        return { registration, event, canSee, w, materials: canSee ? await listSpecialMaterials(registration.special_lecture_id) : [] };
+        // started: 특강 시작 뒤 / past: 시작 2시간 뒤부터 '다시 보기' 단계
+        return { registration, event, canSee, w, started: specialStarted(event), past: specialReplay(event), materials: canSee ? await listSpecialMaterials(registration.special_lecture_id) : [] };
       }),
   )).filter((row) => today <= row.w.until);
   // 다가오는 특강이 먼저(가까운 순), 지난 특강은 그 아래(최근 순)
@@ -67,9 +68,9 @@ export default async function SpecialPage({ searchParams }: { searchParams: Prom
       {myRows.length > 0 ? (
         <section className="space-y-3">
           <h2 className="font-jua text-2xl text-sky-ink">내 특강 신청</h2>
-          {myRows.map(({ registration, event, materials, canSee, w }) => (
+          {myRows.map(({ registration, event, materials, canSee, w, started, past }) => (
             <div key={registration.id} className="card space-y-3">
-              {event.event_date >= today && (() => {
+              {!past && (() => {
                 // 다가오는 특강: 신청 상태를 카드 맨 위에 크게
                 const d = registration.deposit ?? "pending";
                 const banner = registration.mode === "online"
@@ -91,7 +92,7 @@ export default async function SpecialPage({ searchParams }: { searchParams: Prom
                 <p className="font-jua text-xl text-sky-ink">{event.title} · {registration.mode === "onsite" ? "현장" : "불라방"}</p>
                 <p className="text-sm text-slate-500">{registration.name}</p>
               </div>
-              {registration.mode === "onsite" && event.event_date >= today ? (
+              {registration.mode === "onsite" && !started ? (
                 <div className="space-y-3">
                   {registration.deposit === "paid" ? (
                     <p className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-800">
@@ -119,7 +120,7 @@ export default async function SpecialPage({ searchParams }: { searchParams: Prom
                 <p className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-600">보증금이 확인된 신청만 지난 특강 자료와 영상을 볼 수 있어요.</p>
               ) : (
                 <div className="space-y-3">
-                  {event.event_date < today && (
+                  {past && (
                     <p className="rounded-2xl bg-emerald-50 p-3 text-center text-sm font-bold text-emerald-700">📚 지난 특강 · {viewPhase(w.end, w.until, today) === "extended" ? `${dayLabelKo(w.until)}까지` : `종강일(${dayLabelKo(w.end)})까지`} 다시 볼 수 있어요</p>
                   )}
                   {event.material_note && (
@@ -138,11 +139,11 @@ export default async function SpecialPage({ searchParams }: { searchParams: Prom
                       ))}
                     </div>
                   ) : (
-                    <p className="rounded-2xl bg-sky-soft p-4 text-sm text-slate-700">{event.event_date < today ? "올라온 자료가 없어요." : "자료는 특강 하루 전에 이 페이지에 올라와요."}</p>
+                    <p className="rounded-2xl bg-sky-soft p-4 text-sm text-slate-700">{past ? "올라온 자료가 없어요." : "자료는 특강 하루 전에 이 페이지에 올라와요."}</p>
                   )}
                   {event.youtube_id ? (
-                    <a href={`https://youtu.be/${event.youtube_id}`} target="_blank" rel="noreferrer" className="btn block w-full text-center">{event.event_date < today ? "📺 특강 다시 보기 ↗" : "🎤 특강 입장하기 ↗"}</a>
-                  ) : event.event_date < today ? (
+                    <a href={`https://youtu.be/${event.youtube_id}`} target="_blank" rel="noreferrer" className="btn block w-full text-center">{past ? "📺 특강 다시 보기 ↗" : "🎤 특강 입장하기 ↗"}</a>
+                  ) : past ? (
                     <p className="rounded-2xl bg-sky-soft p-4 text-center text-sm text-slate-600">특강 영상이 준비되면 이곳에 올라와요.</p>
                   ) : (
                     <p className="rounded-2xl bg-sky-soft p-4 text-center text-sm font-bold text-sky-ink">

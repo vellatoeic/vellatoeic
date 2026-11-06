@@ -44,10 +44,20 @@ export function specialWhen(event: { event_date: string; starts_at: string; ends
 
 // ── 지난 특강 다시 보기 ──
 // 공식: 종강일까지 / 실제: 그 특강 달 기수의 열람 마감일(until = 다음 달 개강 전날)까지 (lib/viewWindow.ts)
-// 불라방 신청자: 특강 전부터 / 현장 신청자: 보증금 확인(paid)된 경우 특강 다음 날부터
+// 불라방 신청자: 특강 전부터 / 현장 신청자: 보증금 확인(paid)된 경우 특강 당일부터. 자동 취소된 신청은 제외.
 type ViewReg = { mode: "onsite" | "online"; deposit: string | null };
 export function canSeeSpecialMaterials(reg: ViewReg, eventDate: string, today: string, until: string) {
   if (today > until) return false;
+  if (reg.deposit === "cancelled") return false;
   if (reg.mode === "online") return true;
-  return reg.deposit === "paid" && eventDate < today;
+  return reg.deposit === "paid" && eventDate <= today;
 }
+
+// 특강 시작 시각(한국 시간)
+type StartEvent = { event_date: string; starts_at: string };
+export const specialStartMs = (e: StartEvent) => Date.parse(`${e.event_date}T${e.starts_at.slice(0, 5)}:00+09:00`);
+// 특강이 시작됐는지 (현장 신청자: 시작 뒤에는 '703호로 와주세요' 대신 자료·영상 칸)
+export const specialStarted = (e: StartEvent, nowMs = Date.now()) => nowMs >= specialStartMs(e);
+// 다시 보기 단계: 특강 시작 2시간 뒤부터 '📺 특강 다시 보기' + '📚 지난 특강' 안내
+export const REPLAY_AFTER_MS = 2 * 3600 * 1000;
+export const specialReplay = (e: StartEvent, nowMs = Date.now()) => nowMs >= specialStartMs(e) + REPLAY_AFTER_MS;

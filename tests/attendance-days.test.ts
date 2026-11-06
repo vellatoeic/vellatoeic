@@ -45,7 +45,7 @@ test("마감 배지: 24시간 넘게 남음 / 24시간 이내 / 1시간 이내 /
   assert.equal(deadlineBadge(e, Date.parse("2026-10-16T17:30:00+09:00")), null);
 });
 
-import { canSeeSpecialMaterials } from "@/lib/special";
+import { canSeeSpecialMaterials, specialReplay, specialStarted } from "@/lib/special";
 
 const UNTIL = "2026-11-01"; // 10월 기수 열람 마감일 (11/2 개강 전날)
 
@@ -56,11 +56,29 @@ test("지난 특강: 불라방은 열람 마감일(다음 달 개강 전날)까�
   assert.equal(canSeeSpecialMaterials(online, "2026-10-17", "2026-11-02", UNTIL), false);
 });
 
-test("지난 특강: 현장은 보증금 확인된 신청만, 특강 다음 날부터 마감일까지", () => {
+test("지난 특강: 현장은 보증금 확인된 신청만, 특강 당일부터 마감일까지", () => {
   const paid = { mode: "onsite" as const, deposit: "paid" };
-  assert.equal(canSeeSpecialMaterials(paid, "2026-10-17", "2026-10-17", UNTIL), false);
+  assert.equal(canSeeSpecialMaterials(paid, "2026-10-17", "2026-10-16", UNTIL), false);
+  assert.equal(canSeeSpecialMaterials(paid, "2026-10-17", "2026-10-17", UNTIL), true);
   assert.equal(canSeeSpecialMaterials(paid, "2026-10-17", "2026-10-18", UNTIL), true);
   assert.equal(canSeeSpecialMaterials(paid, "2026-10-17", "2026-11-02", UNTIL), false);
   assert.equal(canSeeSpecialMaterials({ mode: "onsite", deposit: "cancelled" }, "2026-10-17", "2026-10-19", UNTIL), false);
   assert.equal(canSeeSpecialMaterials({ mode: "onsite", deposit: "pending" }, "2026-10-17", "2026-10-19", UNTIL), false);
+});
+
+test("특강 다시 보기: 현장 paid는 당일 열람, 자동 취소 신청은 현장·불라방 모두 제외", () => {
+  assert.equal(canSeeSpecialMaterials({ mode: "onsite", deposit: "paid" }, "2026-11-06", "2026-11-06", "2026-11-29"), true);
+  assert.equal(canSeeSpecialMaterials({ mode: "onsite", deposit: "cancelled" }, "2026-11-06", "2026-11-06", "2026-11-29"), false);
+  assert.equal(canSeeSpecialMaterials({ mode: "online", deposit: "cancelled" }, "2026-11-06", "2026-11-06", "2026-11-29"), false);
+  assert.equal(canSeeSpecialMaterials({ mode: "onsite", deposit: "pending" }, "2026-11-06", "2026-11-06", "2026-11-29"), false);
+});
+
+test("특강 당일: 시작 뒤 자료 칸, 시작 2시간 뒤부터 '다시 보기'", () => {
+  const e = { event_date: "2026-11-06", starts_at: "10:00:00" };
+  const at = (hm: string) => Date.parse(`2026-11-06T${hm}:00+09:00`);
+  assert.equal(specialStarted(e, at("09:59")), false);
+  assert.equal(specialStarted(e, at("10:00")), true);
+  assert.equal(specialReplay(e, at("11:59")), false);
+  assert.equal(specialReplay(e, at("12:00")), true);
+  assert.equal(specialReplay(e, Date.parse("2026-11-07T00:00:00+09:00")), true);
 });
