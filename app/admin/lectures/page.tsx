@@ -7,15 +7,23 @@ import AdminTabs from "../AdminTabs";
 import UploadForm from "./UploadForm";
 import CloseOnSubmitForm from "../CloseOnSubmitForm";
 import { classCohortNow } from "@/lib/classCohort";
+import { cohortUntil } from "@/lib/viewWindowServer";
+import { todayKST } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
 
-export default async function Lectures() {
+export default async function Lectures({ searchParams }: { searchParams: Promise<{ old?: string }> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
+  const { old } = await searchParams;
   const now = await classCohortNow(); // 강의는 지금 수업 중인 기수가 기본
   const all = await listLectures();
-  const cohorts = [...new Set([now, ...all.map((l) => l.cohort)])].sort().reverse();
+  const today = todayKST();
+  const allCohorts = [...new Set([now, ...all.map((l) => l.cohort)])].sort().reverse();
+  // 열람 마감(다음 달 개강 전날)이 지난 기수는 기본으로 숨겨요 (기록은 보관, '지난 기수 보기'로만)
+  const pastSet = new Set((await Promise.all(allCohorts.map(async (c) => (c !== now && (await cohortUntil(c)) < today ? c : null)))).filter((c): c is string => !!c));
+  const pastCount = all.filter((l) => pastSet.has(l.cohort)).length;
+  const cohorts = old ? allCohorts : allCohorts.filter((c) => !pastSet.has(c));
 
   return (
     <div className="space-y-6 pt-8">
@@ -30,6 +38,13 @@ export default async function Lectures() {
       </div>
 
       <UploadForm defaultCohort={now} />
+
+      {pastSet.size > 0 && (
+        <p className="flex flex-wrap items-center gap-2 rounded-2xl bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
+          📦 열람 기간이 끝난 지난 기수 {pastSet.size}개 (강의 {pastCount}개) {old ? "도 함께 보고 있어요" : "는 숨겨 뒀어요"}
+          <a href={old ? "/admin/lectures" : "/admin/lectures?old=1"} className="ml-auto font-bold text-sky-deep underline">{old ? "지난 기수 숨기기" : "지난 기수 보기"}</a>
+        </p>
+      )}
 
       {cohorts.map((c) => {
         const ls = all.filter((l) => l.cohort === c);

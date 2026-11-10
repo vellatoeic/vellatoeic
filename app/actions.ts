@@ -2,13 +2,14 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import {
   BOOKS, COURSES, PARTS, LECTURE_COURSES, DEPOSIT_MINUTES, YBM_ORDER_AMOUNT, booksFor, isAlt, isTimeSlot, calcAmount, youtubeId, todayKST,
   type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
 } from "@/lib/config";
 import {
   createApplication, listApplications, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, setHomeworkStar, drawGift, getGiftDraw, saveGiftItem, deleteGiftItem, setGiftSent, type GiftDraw, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  saveMission, type Mission, createYbmOrder, listYbmOrders, updateYbmOrders, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, setTestDouble, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, listDepositEvents, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture,
+  saveMission, type Mission, createYbmOrder, listYbmOrders, updateYbmOrders, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, setTestDouble, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, listDepositEvents, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture, cleanupOrphanSpecialFiles,
 } from "@/lib/db";
 import { canWatch, isActive, loginApps } from "@/lib/access";
 import { parseBankSms } from "@/lib/bankSms";
@@ -164,7 +165,7 @@ export async function studentLogin(_: FormState, fd: FormData): Promise<FormStat
   const pin = clean(fd.get("pin"));
   if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 비밀번호 4자리를 입력해 주세요." };
   // 환불·삭제된 수강생은 로그인할 수 없어요.
-  await safe("expireUnpaid", () => expireUnpaid(), null); // 30분 지난 입금 대기는 먼저 취소 처리 (실패해도 로그인은 계속)
+  after(() => safe("expireUnpaid", () => expireUnpaid(), null)); // 30분 지난 입금 대기 자동 취소는 응답 뒤에 (로그인은 기다리지 않아요)
   const result = loginApps(await findByName(name), (a) => checkPin(pin, a.pin_hash));
   if (result.cancelledId) redirect(`/my/${result.cancelledId}`); // 취소된 신청만 있으면 취소 안내 화면으로
   if (!result.apps) {
@@ -474,6 +475,13 @@ export async function cleanupExpiredAudios() {
     if (end && end < today) await deleteAudios(all.filter((a) => a.cohort === cohort));
   }
   revalidatePath("/admin/audio");
+}
+
+// [특강 관리] 보관함 정리: 지운 특강의 자료 파일을 Supabase 보관함에서도 지워요.
+export async function cleanupSpecialFiles() {
+  if (!(await isAdmin())) return;
+  const n = await cleanupOrphanSpecialFiles();
+  redirect(`/admin/special?cleaned=${n}`);
 }
 
 // ── YBM 인강생 교재 주문 (개념 zip, 택배만) ─────────
@@ -824,7 +832,7 @@ export async function specialLogin(_: FormState, fd: FormData): Promise<FormStat
   const name = clean(fd.get("name"));
   const pin = clean(fd.get("pin"));
   if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 강의실 비밀번호 4자리를 입력해 주세요." };
-  await safe("expireUnpaid", () => expireUnpaid(), null); // 30분 지난 입금 대기는 먼저 취소 처리 (실패해도 로그인은 계속)
+  after(() => safe("expireUnpaid", () => expireUnpaid(), null)); // 30분 지난 입금 대기 자동 취소는 응답 뒤에 (로그인은 기다리지 않아요)
   const result = loginApps(await findByName(name), (a) => checkPin(pin, a.pin_hash));
   if (result.cancelledId) redirect(`/my/${result.cancelledId}`); // 취소된 신청만 있으면 취소 안내 화면으로
   if (!result.apps) {

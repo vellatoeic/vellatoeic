@@ -1,4 +1,5 @@
 import "server-only";
+import { forget, memo } from "./requestMemo";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { TestDouble, TestKind, TestOverride } from "./tests";
 import type { Notice } from "./notices";
@@ -241,6 +242,7 @@ async function inChunks<T>(ids: string[], run: (chunk: string[]) => Promise<T[]>
 
 // ── 신청 ───────────────────────────────────────
 export async function createApplication(a: NewApplication): Promise<string> {
+  forget("apps:");
   if (sb) {
     const { data, error } = await sb.from("applications").insert(a).select("id").single();
     if (error) throw error;
@@ -260,8 +262,12 @@ export async function getApplication(id: string): Promise<Application | null> {
   return mem.apps.find((x) => x.id === id) ?? null;
 }
 
-export async function getApplications(ids: string[]): Promise<Application[]> {
+// 한 요청 안에서 같은 id 묶음은 한 번만 읽어요 (강의실·레이아웃 공지·팝업이 함께 써요)
+export function getApplications(ids: string[]): Promise<Application[]> {
   const ok = ids.filter(isUuid);
+  return memo(`apps:ids:${[...ok].sort().join(",")}`, () => getApplicationsRaw(ok));
+}
+async function getApplicationsRaw(ok: string[]): Promise<Application[]> {
   if (ok.length === 0) return [];
   if (sb) {
     const db = sb;
@@ -283,7 +289,8 @@ export async function findApplicationsByName(name: string): Promise<Application[
   return mem.apps.filter((x) => x.name === name);
 }
 
-export async function listApplications(): Promise<Application[]> {
+export const listApplications = () => memo("apps:list", listApplicationsRaw);
+async function listApplicationsRaw(): Promise<Application[]> {
   if (sb) {
     const db = sb;
     return allRows<Application>((from, to) => db.from("applications").select("*").order("created_at", { ascending: false }).order("id").range(from, to));
@@ -298,6 +305,7 @@ export async function updateApplication(id: string, patch: ApplicationPatch) {
 }
 
 export async function deleteApplication(id: string) {
+  forget("apps:");
   if (!isUuid(id)) return;
   if (sb) {
     const { error } = await sb.from("applications").delete().eq("id", id);
@@ -309,6 +317,7 @@ export async function deleteApplication(id: string) {
 
 // ── 명단에서 체크한 여러 건 한 번에 ───────────────
 export async function updateApplications(ids: string[], patch: ApplicationPatch) {
+  forget("apps:");
   const ok = ids.filter(isUuid);
   if (ok.length === 0) return;
   if (sb) {
@@ -332,6 +341,7 @@ export async function updateApplications(ids: string[], patch: ApplicationPatch)
 }
 
 export async function deleteApplications(ids: string[]) {
+  forget("apps:");
   const ok = ids.filter(isUuid);
   if (ok.length === 0) return;
   if (sb) {
@@ -349,7 +359,8 @@ export async function deleteApplications(ids: string[]) {
 }
 
 // ── 강의 ───────────────────────────────────────
-export async function listLectures(cohort?: string): Promise<Lecture[]> {
+export const listLectures = (cohort?: string) => memo(`lectures:${cohort ?? "*"}`, () => listLecturesRaw(cohort));
+async function listLecturesRaw(cohort?: string): Promise<Lecture[]> {
   if (sb) {
     let q = sb.from("lectures").select("*").order("created_at", { ascending: true });
     if (cohort) q = q.eq("cohort", cohort);
@@ -370,6 +381,7 @@ export async function getLecture(id: string): Promise<Lecture | null> {
 }
 
 export async function addLecture(l: Omit<Lecture, "id" | "created_at">) {
+  forget("lectures:");
   if (sb) {
     const { error } = await sb.from("lectures").insert(l);
     if (error) throw error;
@@ -379,6 +391,7 @@ export async function addLecture(l: Omit<Lecture, "id" | "created_at">) {
 }
 
 export async function updateLecture(id: string, patch: Omit<Lecture, "id" | "created_at">) {
+  forget("lectures:");
   if (!isUuid(id)) return;
   if (sb) {
     const { error } = await sb.from("lectures").update(patch).eq("id", id);
@@ -390,6 +403,7 @@ export async function updateLecture(id: string, patch: Omit<Lecture, "id" | "cre
 }
 
 export async function deleteLecture(id: string) {
+  forget("lectures:");
   if (sb) {
     const { error } = await sb.from("lectures").delete().eq("id", id);
     if (error) throw error;
@@ -491,7 +505,8 @@ export async function cleanupYbmOrders(days = 90) {
 export type NoticeRead = { notice_id: string; app_id: string; read_at: string; cohort?: string | null };
 export type NoticeFields = Omit<Notice, "id" | "created_at">;
 
-export async function listNotices(): Promise<Notice[]> {
+export const listNotices = () => memo("notices", listNoticesRaw);
+async function listNoticesRaw(): Promise<Notice[]> {
   if (sb) {
     const { data, error } = await sb.from("site_notices").select("*").order("created_at", { ascending: false });
     if (error) throw error;
@@ -501,6 +516,7 @@ export async function listNotices(): Promise<Notice[]> {
 }
 
 export async function createNotice(n: NoticeFields) {
+  forget("notices");
   if (sb) {
     const { error } = await sb.from("site_notices").insert(n);
     if (error) throw error;
@@ -510,6 +526,7 @@ export async function createNotice(n: NoticeFields) {
 }
 
 export async function updateNotice(id: string, n: Partial<NoticeFields>) {
+  forget("notices");
   if (!isUuid(id)) return;
   if (sb) {
     const { error } = await sb.from("site_notices").update(n).eq("id", id);
@@ -521,6 +538,7 @@ export async function updateNotice(id: string, n: Partial<NoticeFields>) {
 }
 
 export async function deleteNotice(id: string) {
+  forget("notices");
   if (!isUuid(id)) return;
   if (sb) {
     const { error } = await sb.from("site_notices").delete().eq("id", id);
@@ -843,7 +861,8 @@ export async function saveMission(mission: Omit<Mission, "updated_at">) {
 const SPECIAL_BUCKET = "special-lecture-materials";
 type SpecialLectureFields = Pick<SpecialLecture, "event_date" | "title" | "starts_at" | "ends_at" | "registration_deadline"> & { material_note?: string | null; published?: boolean };
 
-export async function listSpecialLectures(): Promise<SpecialLecture[]> {
+export const listSpecialLectures = () => memo("specials", listSpecialLecturesRaw);
+async function listSpecialLecturesRaw(): Promise<SpecialLecture[]> {
   if (sb) {
     const { data, error } = await sb.from("special_lectures").select("*").order("event_date").order("starts_at");
     if (error) throw error;
@@ -863,6 +882,7 @@ export async function getSpecialLecture(id: string): Promise<SpecialLecture | nu
 }
 
 export async function createSpecialLecture(fields: SpecialLectureFields) {
+  forget("specials");
   if (sb) {
     const { error } = await sb.from("special_lectures").insert(fields);
     if (error) throw error;
@@ -872,6 +892,7 @@ export async function createSpecialLecture(fields: SpecialLectureFields) {
 }
 
 export async function updateSpecialLecture(id: string, patch: Partial<SpecialLectureFields & Pick<SpecialLecture, "youtube_id">>) {
+  forget("specials");
   if (!isUuid(id)) return;
   if (sb) {
     const { error } = await sb.from("special_lectures").update(patch).eq("id", id);
@@ -884,6 +905,7 @@ export async function updateSpecialLecture(id: string, patch: Partial<SpecialLec
 
 // 특강을 지우면 신청 명단과 자료 파일도 함께 지워져요.
 export async function deleteSpecialLecture(id: string) {
+  forget("specials");
   if (!isUuid(id)) return;
   const paths = (await listSpecialMaterials(id)).map((material) => material.storage_path);
   if (sb) {
@@ -1084,6 +1106,42 @@ export async function deleteSpecialMaterial(id: string) {
   mem.specialMaterials = mem.specialMaterials.filter((item) => item.id !== id);
 }
 
+// 보관함 정리: 지운 특강(폴더 이름 = 특강 id)의 자료 파일을 보관함에서 지워요. 지운 파일 수를 돌려줘요.
+// (특강 표에서 지운 뒤 남은 파일. 지금 있는 특강의 파일은 건드리지 않아요)
+export async function cleanupOrphanSpecialFiles(): Promise<number> {
+  if (!sb) {
+    const live = new Set(mem.specialLectures.map((e) => e.id));
+    const orphans = Object.keys(mem.photos).filter((p) => /^[0-9a-f-]{36}\//i.test(p) && !live.has(p.split("/")[0]) && !mem.specialMaterials.some((m) => m.storage_path === p));
+    for (const p of orphans) delete mem.photos[p];
+    return orphans.length;
+  }
+  const db = sb;
+  const bucket = db.storage.from(SPECIAL_BUCKET);
+  const listAll = async (prefix: string) => {
+    const out: string[] = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await bucket.list(prefix, { limit: 1000, offset });
+      if (error) throw error;
+      out.push(...(data ?? []).map((x) => x.name));
+      if ((data ?? []).length < 1000) return out;
+    }
+  };
+  const { data: events, error } = await db.from("special_lectures").select("id");
+  if (error) throw error;
+  const live = new Set((events ?? []).map((e) => e.id as string));
+  const folders = (await listAll("")).filter((name) => isUuid(name) && !live.has(name));
+  let removed = 0;
+  for (const folder of folders) {
+    const paths = (await listAll(folder)).map((name) => `${folder}/${name}`);
+    for (let i = 0; i < paths.length; i += 100) {
+      const { error: removeError } = await bucket.remove(paths.slice(i, i + 100));
+      if (removeError) throw removeError;
+    }
+    removed += paths.length;
+  }
+  return removed;
+}
+
 export async function specialMaterialUrl(path: string, fileName: string): Promise<string | null> {
   if (sb) {
     const { data, error } = await sb.storage.from(SPECIAL_BUCKET).createSignedUrl(path, 60 * 10, { download: fileName });
@@ -1094,15 +1152,26 @@ export async function specialMaterialUrl(path: string, fileName: string): Promis
 }
 
 // ── 설정 ───────────────────────────────────────
+// 설정은 한 요청에 한 번 전부 읽어 두고 꺼내 써요 (getSetting을 여러 번 불러도 DB는 한 번)
+export function allSettings(): Promise<Record<string, string>> {
+  return memo("settings", async () => {
+    if (!sb) return { ...mem.settings };
+    const db = sb;
+    const rows = await allRows<{ key: string; value: string | null }>((from, to) => db.from("settings").select("key,value").order("key").range(from, to));
+    return Object.fromEntries(rows.map((r) => [r.key, r.value ?? ""]));
+  });
+}
+
 export async function getSetting(k: string): Promise<string> {
-  if (sb) {
-    const { data } = await sb.from("settings").select("value").eq("key", k).maybeSingle();
-    return (data?.value as string) ?? "";
+  try {
+    return (await allSettings())[k] ?? "";
+  } catch {
+    return ""; // 예전처럼 읽기에 실패하면 빈 값
   }
-  return mem.settings[k] ?? "";
 }
 
 export async function setSetting(k: string, v: string) {
+  forget("settings");
   if (sb) {
     const { error } = await sb.from("settings").upsert({ key: k, value: v });
     if (error) throw error;

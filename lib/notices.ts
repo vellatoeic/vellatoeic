@@ -79,7 +79,10 @@ export function sortNotices<N extends Notice>(list: N[]) {
   return [...list].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.created_at.localeCompare(a.created_at));
 }
 
-// 공지 목록(🔔): 시작한 공지 중 본인 대상 (지난 공지도 다시 볼 수 있어요)
+// 끝난 일반 공지 (게시 기간이 지남). 매달 반복 공지는 끝나지 않아요.
+export const noticeEnded = (n: Pick<Notice, "ends_on" | "repeat_monthly">, today: string) => !n.repeat_monthly && n.ends_on < today;
+
+// 공지 목록(🔔): 시작했고 아직 끝나지 않은 공지 중 본인 대상 (끝난 일반 공지는 안 보여요, 기록은 보관)
 export function myNotices<N extends Notice>(all: N[], students: Student[], today: string) {
-  return sortNotices(all.filter((n) => n.starts_on <= today && noticeMatches(n, students)));
+  return sortNotices(all.filter((n) => n.starts_on <= today && !noticeEnded(n, today) && noticeMatches(n, students)));
 }

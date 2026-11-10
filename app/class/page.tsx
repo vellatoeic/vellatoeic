@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { after } from "next/server";
 import { BOOKS, COURSES, PARTS, TIME_SLOTS, TRACKS, TRACK_PARTS, cohortLabel, todayKST, won } from "@/lib/config";
 import { liveState } from "@/lib/live";
 import AddToHome from "@/components/AddToHome";
@@ -45,7 +46,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "강의실 · vella_toeic", robots: { index: false } };
 
 export default async function ClassRoom({ searchParams }: { searchParams: Promise<{ t?: string; expired?: string }> }) {
-  await safe("expireUnpaid", () => expireUnpaid(), null); // 30분 지난 입금 대기는 먼저 자동 취소 (1분에 한 번, 실패해도 강의실은 열려요)
+  after(() => safe("expireUnpaid", () => expireUnpaid(), null)); // 30분 지난 입금 대기 자동 취소는 화면을 보낸 뒤에 (1분에 한 번, 실패해도 강의실은 열려요)
   const { loggedIn, apps } = await activeStudentApps();
   if (!loggedIn) return <StudentLogin />;
   // 환불·삭제된 수강생은 아무것도 볼 수 없어요. 취소된 신청만 있으면 취소 안내를 보여줘요.

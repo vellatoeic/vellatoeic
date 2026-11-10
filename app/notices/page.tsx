@@ -1,6 +1,6 @@
 import { listNoticeReads, listNotices } from "@/lib/db";
 import { noticeIdentity, withLinks } from "@/lib/noticeView";
-import { isForEveryone, isLive, myNotices, sortNotices } from "@/lib/notices";
+import { isForEveryone, isLive, myNotices, noticeEnded, sortNotices } from "@/lib/notices";
 import { todayKST } from "@/lib/config";
 import { specialDay } from "@/lib/special";
 import { readNotice } from "@/app/actions";
@@ -9,13 +9,13 @@ import { NoticeBody } from "@/components/notices/NoticeContent";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "공지 · vella_toeic", robots: { index: false } };
 
-// 🔔 공지 목록: 본인 대상 공지만 (지난 공지도 다시 볼 수 있어요)
+// 🔔 공지 목록: 본인 대상 공지만 (끝난 일반 공지는 숨겨요)
 export default async function NoticesPage() {
   const today = todayKST();
   const [{ loggedIn, apps }, all] = await Promise.all([noticeIdentity(), listNotices()]);
   const mine = await withLinks(loggedIn && apps.length
     ? myNotices(all, apps, today)
-    : sortNotices(all.filter((n) => isForEveryone(n) && n.starts_on <= today)));
+    : sortNotices(all.filter((n) => isForEveryone(n) && n.starts_on <= today && !noticeEnded(n, today))));
   const reads = new Set((await listNoticeReads({ appIds: apps.map((a) => a.id) })).map((r) => r.notice_id));
 
   return (

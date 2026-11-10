@@ -1,6 +1,6 @@
 import { isAdmin } from "@/lib/auth";
 import { listApplications, expireSpecialDeposits, listDepositEvents, listSpecialLectures, listSpecialMaterials, listSpecialRegistrations, listWaitingDeposits, isPreview, type SpecialLecture, type SpecialRegistration } from "@/lib/db";
-import { publishSpecials, markDepositRefunded, addSpecialLecture, bulkSpecialOnsite, removeSpecialLecture, removeSpecialMaterial, removeSpecialRegistration, resolveDepositEvent, saveSpecialLecture } from "@/app/actions";
+import { cleanupSpecialFiles, publishSpecials, markDepositRefunded, addSpecialLecture, bulkSpecialOnsite, removeSpecialLecture, removeSpecialMaterial, removeSpecialRegistration, resolveDepositEvent, saveSpecialLecture } from "@/app/actions";
 import { DEPOSIT_MINUTES, DEPOSIT_LABEL, SPECIAL_DEPOSIT, won, type DepositStatus } from "@/lib/config";
 import SmsTest from "./SmsTest";
 import SelectAll from "../SelectAll";
@@ -10,6 +10,8 @@ import AdminTabs from "../AdminTabs";
 import LoginForm from "../LoginForm";
 import CloseOnSubmitForm from "../CloseOnSubmitForm";
 import MaterialUpload from "./MaterialUpload";
+import { cohortUntil } from "@/lib/viewWindowServer";
+import { todayKST } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "특강 관리 · vella_toeic", robots: { index: false } };
@@ -81,15 +83,21 @@ function Roster({ title, items, onsiteForm, refunded }: { title: string; items: 
   );
 }
 
-export default async function SpecialAdminPage() {
+export default async function SpecialAdminPage({ searchParams }: { searchParams: Promise<{ old?: string; cleaned?: string }> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
+  const { old, cleaned } = await searchParams;
   await expireSpecialDeposits(DEPOSIT_MINUTES);
   const [events, depositEvents, waitingDeposits, apps, refundsDue] = await Promise.all([listSpecialLectures(), listDepositEvents(20), listWaitingDeposits(), listApplications(), specialRefundsDue()]);
   const refunded = new Set(apps.filter((a) => a.status === "refunded").map((a) => a.id));
   const drafts = events.filter((e) => e.published === false);
   const toCheck = depositEvents.filter((e) => e.target === "special" && (e.result === "review" || e.result === "unmatched"));
   const webhookOn = (process.env.DEPOSIT_WEBHOOK_TOKEN ?? "").length >= 16;
-  const rows = await Promise.all(events.map(async (event) => ({
+  // 열람 마감(그 특강 달 기수의 다음 달 개강 전날)이 지난 특강은 기본으로 숨겨요 (기록은 보관)
+  const today = todayKST();
+  const untilOf = new Map(await Promise.all([...new Set(events.map((e) => e.event_date.slice(0, 7)))].map(async (c) => [c, await cohortUntil(c)] as const)));
+  const isPast = (e: SpecialLecture) => (untilOf.get(e.event_date.slice(0, 7)) ?? e.event_date) < today;
+  const pastCount = events.filter(isPast).length;
+  const rows = await Promise.all(events.filter((e) => old || !isPast(e)).map(async (event) => ({
     event,
     registrations: await listSpecialRegistrations(event.id),
     materials: await listSpecialMaterials(event.id),
@@ -217,7 +225,14 @@ export default async function SpecialAdminPage() {
         </CloseOnSubmitForm>
       </details>
 
-      {rows.length === 0 && <p className="card text-center text-slate-500">등록된 특강이 없어요.</p>}
+      {cleaned !== undefined && <p className="card !bg-emerald-50 text-center font-bold text-emerald-700">🧹 보관함에서 지운 특강의 자료 파일 {Number(cleaned) || 0}개를 정리했어요</p>}
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
+        {pastCount > 0 && <span>📦 열람 기간이 끝난 특강 {pastCount}개 {old ? "도 함께 보고 있어요" : "는 숨겨 뒀어요 (기록은 보관)"}</span>}
+        {pastCount > 0 && <a href={old ? "/admin/special" : "/admin/special?old=1"} className="font-bold text-sky-deep underline">{old ? "숨기기" : "지난 특강 보기"}</a>}
+        <form action={cleanupSpecialFiles} className="ml-auto"><button className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-300">🧹 지운 특강의 자료 파일 보관함 정리</button></form>
+      </div>
+
+      {rows.length === 0 && <p className="card text-center text-slate-500">{events.length === 0 ? "등록된 특강이 없어요." : "다가오거나 열람 중인 특강이 없어요."}</p>}
 
       {rows.map(({ event, registrations, materials }) => {
         const onsite = registrations.filter((r) => r.mode === "onsite");

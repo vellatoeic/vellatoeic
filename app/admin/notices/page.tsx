@@ -2,7 +2,7 @@ import { isAdmin } from "@/lib/auth";
 import { currentCohort, isPreview, listApplications, listNoticeReads, listNotices } from "@/lib/db";
 import { COURSES, TRACKS, KINDS, TIME_SLOTS, todayKST } from "@/lib/config";
 import { isActive } from "@/lib/access";
-import { isLive, noticeMatches, sortNotices, TRACK_GROUP_LABEL, type NoticeTarget } from "@/lib/notices";
+import { isLive, noticeEnded, noticeMatches, sortNotices, TRACK_GROUP_LABEL, type NoticeTarget } from "@/lib/notices";
 import { specialDay } from "@/lib/special";
 import { deleteNoticeAction } from "@/app/actions";
 import AdminTabs from "../AdminTabs";
@@ -26,7 +26,8 @@ function describe(targets: NoticeTarget[]) {
   ].filter(Boolean).join(" ")).join("  또는  ");
 }
 
-export default async function NoticesAdmin() {
+export default async function NoticesAdmin({ searchParams }: { searchParams: Promise<{ old?: string }> }) {
+  const { old } = await searchParams;
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
   const today = todayKST();
   const [y, m] = today.split("-").map(Number);
@@ -35,6 +36,9 @@ export default async function NoticesAdmin() {
   const [notices, apps, reads] = await Promise.all([listNotices(), listApplications(), listNoticeReads()]);
   // 대상 인원: 수업 기수의 환불되지 않은 신청 (학생 1명 = 신청 1건)
   const people = apps.filter((a) => a.cohort === cohort && isActive(a));
+  // 끝난 일반 공지는 기본으로 숨겨요 (기록은 보관, '지난 공지 보기'로만)
+  const ended = notices.filter((n) => noticeEnded(n, today));
+  const shown = old ? notices : notices.filter((n) => !noticeEnded(n, today));
 
   return (
     <div className="space-y-5 pt-8">
@@ -45,9 +49,16 @@ export default async function NoticesAdmin() {
         <div className="mt-4"><NoticeEditor today={today} monthEnd={monthEnd} /></div>
       </details>
 
-      {notices.length === 0 && <p className="card text-center text-slate-500">아직 공지가 없어요.</p>}
+      {ended.length > 0 && (
+        <p className="flex flex-wrap items-center gap-2 rounded-2xl bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
+          📦 끝난 공지 {ended.length}개 {old ? "도 함께 보고 있어요" : "는 숨겨 뒀어요 (기록은 보관)"}
+          <a href={old ? "/admin/notices" : "/admin/notices?old=1"} className="ml-auto font-bold text-sky-deep underline">{old ? "끝난 공지 숨기기" : "지난 공지 보기"}</a>
+        </p>
+      )}
 
-      {sortNotices(notices).map((n) => {
+      {shown.length === 0 && <p className="card text-center text-slate-500">{notices.length === 0 ? "아직 공지가 없어요." : "게시 중이거나 예정된 공지가 없어요."}</p>}
+
+      {sortNotices(shown).map((n) => {
         const audience = people.filter((a) => noticeMatches(n, [a]));
         // 매달 반복 공지는 이번 기수에 확인한 기록만 세요
         const readSet = new Set(reads.filter((r) => r.notice_id === n.id && (!n.repeat_monthly || r.cohort === cohort)).map((r) => r.app_id));

@@ -1,7 +1,8 @@
 // 공지 대상 자동 테스트 (가짜 학생, DB 없이)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { noticeMatches, popupNotices, type Notice, type NoticeTarget } from "@/lib/notices";
+import { myNotices, noticeEnded, noticeMatches, popupNotices, type Notice, type NoticeTarget } from "@/lib/notices";
+import { forget, memo } from "@/lib/requestMemo";
 
 // supabase/17_notices.sql 첫 공지 2개와 같은 대상 (SQL을 고치면 여기도 같이 고쳐요)
 // ① 문풀반(종합·격일·RC 단과) 현장 + 속성반 저녁반 현장
@@ -87,4 +88,22 @@ test("SQL 파일(17_notices.sql)의 첫 공지 대상이 위 테스트 대상과
   assert.deepEqual(found, [NOTICE1, NOTICE2]);
   assert.match(sql, /'실전속성반 오전 · 불라방 수강생 안내'/);
   assert.match(sql, /'📚 다음 수업부터 스터디 시작! \(온라인 참여\)'/);
+});
+
+test("🔔 목록: 끝난 일반 공지는 숨기고, 매달 반복 공지는 계속 보여요", () => {
+  const s = st("solve", "all", "onsite");
+  const repeat = mk("r1", NOTICE1, { repeat_monthly: true, repeat_days: 25, starts_on: "2026-10-01", ends_on: "2099-12-31" });
+  assert.equal(noticeEnded(n1, "2026-10-31"), false);
+  assert.equal(noticeEnded(n1, "2026-11-01"), true);
+  assert.equal(noticeEnded(repeat, "2026-11-01"), false);
+  assert.deepEqual(myNotices([n1, repeat], [s], "2026-10-31").map((n) => n.id).sort(), ["n1", "r1"]);
+  assert.deepEqual(myNotices([n1, repeat], [s], "2026-11-01").map((n) => n.id), ["r1"]);
+});
+
+test("요청 안 조회 기억: 화면을 그리는 중이 아니면 매번 새로 읽어요 (테스트·입금 문자 처리)", async () => {
+  let n = 0;
+  await memo("x", async () => ++n);
+  await memo("x", async () => ++n);
+  forget("x");
+  assert.equal(n, 2);
 });

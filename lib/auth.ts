@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { forget, memo } from "./requestMemo";
 import { createHmac, scryptSync, timingSafeEqual, randomBytes } from "crypto";
 import { isPreview } from "./db";
 
@@ -46,13 +47,20 @@ export function checkPin(pin: string, stored: string | null) {
 
 // ── 학생 로그인 (신청 id 목록을 서명해서 쿠키에 저장) ──
 export async function setStudent(ids: string[]) {
+  forget("student:");
+  forget("apps:active");
   (await cookies()).set("vella_student", seal(ids.join(",")), cookieOpts);
 }
-export async function getStudentIds(): Promise<string[]> {
-  const v = unseal((await cookies()).get("vella_student")?.value);
-  return v ? v.split(",").filter(Boolean) : [];
+// 한 요청 안에서는 쿠키를 한 번만 풀어요
+export function getStudentIds(): Promise<string[]> {
+  return memo("student:ids", async () => {
+    const v = unseal((await cookies()).get("vella_student")?.value);
+    return v ? v.split(",").filter(Boolean) : [];
+  });
 }
 export async function clearStudent() {
+  forget("student:");
+  forget("apps:active");
   (await cookies()).delete("vella_student");
 }
 
