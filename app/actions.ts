@@ -9,7 +9,7 @@ import {
 } from "@/lib/config";
 import {
   createApplication, listApplications, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, setHomeworkStar, drawGift, getGiftDraw, saveGiftItem, deleteGiftItem, setGiftSent, type GiftDraw, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  saveMission, type Mission, createYbmOrder, listYbmOrders, updateYbmOrders, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, setTestDouble, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudio, setAudioOrder, deleteAudios, audioUploadUrl, uploadedAudioSize, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, listDepositEvents, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture, cleanupOrphanSpecialFiles,
+  saveMission, type Mission, createYbmOrder, listYbmOrders, updateYbmOrders, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, setTestDouble, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudioLink, setAudioOrder, deleteAudios, createSpecialMaterialLink, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, listDepositEvents, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture, cleanupOrphanSpecialFiles,
 } from "@/lib/db";
 import { canWatch, isActive, loginApps } from "@/lib/access";
 import { parseBankSms } from "@/lib/bankSms";
@@ -21,7 +21,8 @@ import { activeStudentApps } from "@/lib/student";
 import { SCHEDULE_CLASSES, holidayKey, homeworkAssignmentDays, isHomeworkStickerEligible, parseHolidays, parseSchoolDays, previousMonth, scheduleKey, scheduleClassFor, schoolDaysFor, shiftSchoolDays, type ScheduleClass } from "@/lib/schedule";
 import { specialRegistrationOpen } from "@/lib/special";
 import { MISSION_STEPS, studentMission, type MissionStep } from "@/lib/mission";
-import { AUDIO_MAX_BYTES, audioExpiresOn, autoCleanupAudios, isAudioBook } from "@/lib/audio";
+import { audioExpiresOn, autoCleanupAudios, isAudioBook } from "@/lib/audio";
+import { cleanMaterialLink, cleanMaterialTitle } from "@/lib/materialLink";
 import { classAppsFor, classCohortNow } from "@/lib/classCohort";
 import { boardsFor, giftCode, kindText, klassText, studentKeyOf } from "@/lib/gifts";
 import { giftWindowOpen } from "@/lib/stickerComplete";
@@ -400,36 +401,23 @@ export async function removeLecture(fd: FormData) {
   revalidatePath("/admin/lectures");
 }
 
-// ── LC 음원 zip (관리자) ───────────────────────
-// 1단계: 브라우저가 Supabase 보관함으로 바로 올릴 서명된 주소를 받아요. (Vercel 서버를 거치지 않아요)
-export async function prepareAudioUpload(input: { cohort: string; book: string; fileName: string; size: number }): Promise<{ error?: string; path?: string; url?: string | null }> {
+// ── LC 음원 (관리자): 제목 + 구글 드라이브 공유 링크 ─────────
+// 파일은 드라이브에 두고 링크만 저장해요. (Supabase 보관함 전송량을 쓰지 않아요)
+export async function addAudioLink(_: FormState, fd: FormData): Promise<FormState> {
   if (!(await isAdmin())) return { error: "관리자 로그인이 필요해요." };
-  if (!validCohort(input.cohort) || !isAudioBook(input.book)) return { error: "기수와 LC 교재를 다시 골라 주세요." };
-  if (!/\.zip$/i.test(input.fileName)) return { error: "zip 파일만 올릴 수 있어요." };
-  if (input.size > AUDIO_MAX_BYTES) return { error: "파일 하나가 50MB를 넘으면 올릴 수 없어요. 나눠서 압축해 주세요." };
-  const path = `${input.cohort}/${input.book}/${crypto.randomUUID()}.zip`;
-  return { path, url: await audioUploadUrl(path) };
-}
-
-// 2단계: 올라간 파일을 확인하고 목록에 추가해요. 제목은 파일 이름에서 .zip을 뺀 것이에요.
-export async function finishAudioUpload(input: { cohort: string; book: string; path: string; fileName: string; size: number }): Promise<{ error?: string }> {
-  if (!(await isAdmin())) return { error: "관리자 로그인이 필요해요." };
-  const { cohort, book, path } = input;
-  if (!validCohort(cohort) || !isAudioBook(book) || !path.startsWith(`${cohort}/${book}/`)) return { error: "잘못된 요청이에요." };
-  const size = await uploadedAudioSize(path);
-  if (size === null) return { error: "파일이 올라가지 않았어요. 다시 시도해 주세요." };
+  const cohort = clean(fd.get("cohort"));
+  const book = clean(fd.get("book"));
+  if (!validCohort(cohort) || !isAudioBook(book)) return { error: "기수와 LC 교재를 다시 골라 주세요." };
+  const title = cleanMaterialTitle(clean(fd.get("title")));
+  const link = cleanMaterialLink(clean(fd.get("link")));
+  if (!title) return { error: "제목을 입력해 주세요. (예: PART 1)" };
+  if (!link) return { error: "링크는 https://로 시작하는 공유 링크를 붙여 넣어 주세요." };
   const same = (await listAudios(cohort)).filter((a) => a.book === book);
-  await createAudio({
-    cohort,
-    book,
-    title: input.fileName.replace(/\.zip$/i, "").trim().slice(0, 200) || "LC 음원",
-    storage_path: path,
-    size_bytes: size || input.size,
-    sort_order: same.reduce((max, a) => Math.max(max, a.sort_order), 0) + 1,
-  });
-  await autoCleanupAudios(); // 기간이 끝나고 7일 지난 기수 음원은 새로 올릴 때 자동으로 지워요
+  await createAudioLink({ cohort, book, title, link_url: link, sort_order: same.reduce((max, a) => Math.max(max, a.sort_order), 0) + 1 });
+  await autoCleanupAudios(); // 기간이 끝나고 7일 지난 기수 음원은 새로 등록할 때 자동으로 지워요
   revalidatePath("/admin/audio");
-  return {};
+  revalidatePath("/class");
+  return { ok: `'${title}' 음원 링크를 등록했어요.` };
 }
 
 export async function moveAudio(fd: FormData) {
@@ -968,6 +956,21 @@ export async function removeSpecialRegistration(fd: FormData) {
   await deleteSpecialRegistration(clean(fd.get("id")));
   revalidatePath("/admin/special");
   revalidatePath("/special");
+}
+
+// 특강 자료 (관리자): 제목 + 구글 드라이브 공유 링크
+export async function addSpecialMaterialLink(_: FormState, fd: FormData): Promise<FormState> {
+  if (!(await isAdmin())) return { error: "관리자 로그인이 필요해요." };
+  const event = await getSpecialLecture(clean(fd.get("event_id")));
+  if (!event) return { error: "특강을 찾을 수 없어요." };
+  const title = cleanMaterialTitle(clean(fd.get("title")));
+  const link = cleanMaterialLink(clean(fd.get("link")));
+  if (!title) return { error: "자료 제목을 입력해 주세요." };
+  if (!link) return { error: "링크는 https://로 시작하는 공유 링크를 붙여 넣어 주세요." };
+  await createSpecialMaterialLink(event.id, title, link);
+  revalidatePath("/admin/special");
+  revalidatePath("/special");
+  return { ok: `'${title}' 자료 링크를 등록했어요.` };
 }
 
 export async function removeSpecialMaterial(fd: FormData) {

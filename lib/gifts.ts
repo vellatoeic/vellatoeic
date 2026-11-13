@@ -1,6 +1,6 @@
 import "server-only";
 import { COURSES, KINDS, TIME_SLOTS, TRACKS, todayKST } from "./config";
-import { listApplications, listStamps, type Application } from "./db";
+import { listCohortApplications, listStamps, type Application } from "./db";
 import { canWatch } from "./access";
 import { classDaysOf, holidaysOf } from "./classCalendar";
 import { studentDays } from "./studentDays";
@@ -30,7 +30,7 @@ export async function boardsFor(apps: Application[], today = todayKST()): Promis
 }
 
 export async function cohortBoards(cohort: string, today = todayKST()) {
-  return boardsFor((await listApplications()).filter((a) => a.cohort === cohort), today);
+  return boardsFor(await listCohortApplications(cohort), today);
 }
 
 // 학생 1명(같은 로그인) = 그 기수 본인 신청 중 가장 작은 id

@@ -1,5 +1,5 @@
 import { isAdmin } from "@/lib/auth";
-import { currentCohort, isPreview, listApplications, listNoticeReads, listNotices } from "@/lib/db";
+import { currentCohort, isPreview, listCohortApplications, listNoticeReads, listNotices } from "@/lib/db";
 import { COURSES, TRACKS, KINDS, TIME_SLOTS, todayKST } from "@/lib/config";
 import { isActive } from "@/lib/access";
 import { isLive, noticeEnded, noticeMatches, sortNotices, TRACK_GROUP_LABEL, type NoticeTarget } from "@/lib/notices";
@@ -33,9 +33,9 @@ export default async function NoticesAdmin({ searchParams }: { searchParams: Pro
   const [y, m] = today.split("-").map(Number);
   const monthEnd = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
   const cohort = await classCohortNow(); // 공지 대상: 지금 수업 중인 기수
-  const [notices, apps, reads] = await Promise.all([listNotices(), listApplications(), listNoticeReads()]);
+  const [notices, apps, reads] = await Promise.all([listNotices(), listCohortApplications(cohort), listNoticeReads()]);
   // 대상 인원: 수업 기수의 환불되지 않은 신청 (학생 1명 = 신청 1건)
-  const people = apps.filter((a) => a.cohort === cohort && isActive(a));
+  const people = apps.filter(isActive);
   // 끝난 일반 공지는 기본으로 숨겨요 (기록은 보관, '지난 공지 보기'로만)
   const ended = notices.filter((n) => noticeEnded(n, today));
   const shown = old ? notices : notices.filter((n) => !noticeEnded(n, today));

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { COURSES, KINDS, TIME_SLOTS, TRACKS, cohortLabel, dayLabel, todayKST, type CourseId, type Track } from "@/lib/config";
-import { listApplications, listStamps, currentCohort, isPreview, type Application, type Attendance } from "@/lib/db";
+import { listCohortApplications, listStamps, currentCohort, isPreview, type Application, type Attendance } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { canWatch } from "@/lib/access";
 import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
@@ -37,7 +37,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
   const today = todayKST();
   const t = sp.t ?? "am";
 
-  const everyone = (await listApplications()).filter((a) => a.cohort === cohort && canWatch(a));
+  const everyone = (await listCohortApplications(cohort)).filter(canWatch);
   const holidays = await holidaysOf(cohort);
   const { attendance, homework } = await listStamps(everyone.map((a) => a.id));
   const rec = (id: string, day: string) => attendance.find((x) => x.app_id === id && x.day === day);

@@ -1,4 +1,4 @@
-import { listNoticeReads, listNotices } from "@/lib/db";
+import { listCurrentNotices, listNoticeReads } from "@/lib/db";
 import { noticeIdentity, withLinks } from "@/lib/noticeView";
 import { isForEveryone, isLive, myNotices, noticeEnded, sortNotices } from "@/lib/notices";
 import { todayKST } from "@/lib/config";
@@ -12,7 +12,7 @@ export const metadata = { title: "공지 · vella_toeic", robots: { index: false
 // 🔔 공지 목록: 본인 대상 공지만 (끝난 일반 공지는 숨겨요)
 export default async function NoticesPage() {
   const today = todayKST();
-  const [{ loggedIn, apps }, all] = await Promise.all([noticeIdentity(), listNotices()]);
+  const [{ loggedIn, apps }, all] = await Promise.all([noticeIdentity(), listCurrentNotices(today)]); // 게시 중인 공지만 읽어요
   const mine = await withLinks(loggedIn && apps.length
     ? myNotices(all, apps, today)
     : sortNotices(all.filter((n) => isForEveryone(n) && n.starts_on <= today && !noticeEnded(n, today))));

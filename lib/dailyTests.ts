@@ -1,5 +1,5 @@
 import "server-only";
-import { getSetting, listApplications, listTestDoubles, listTestOverrides, listTestResults, type Application, type TestResult } from "./db";
+import { getSetting, listCohortApplications, listTestDoubles, listTestOverrides, listTestResults, type Application, type TestResult } from "./db";
 import { canWatch } from "./access";
 import { scheduleClassFor, scheduleKey, schoolDaysFor, type ScheduleClass } from "./schedule";
 import { earlyTestDay, testPlan, testsForClassDay, type TestSpec } from "./tests";
@@ -58,8 +58,9 @@ const pct = (r: TestResult) => Math.round((r.score / r.questions) * 100);
 
 // 한 달(기수)의 테스트 대상 학생과 기록
 export async function cohortTestStats(cohort: string, today: string): Promise<{ stats: StudentTestStat[]; plan: Map<string, TestSpec[]>; classDays: Map<ScheduleClass, string[]> }> {
-  const [{ plan }, apps, results] = await Promise.all([planFor(cohort), listApplications(), listTestResults({ cohort })]);
-  const targets = apps.filter((a) => a.cohort === cohort && takesTests(a));
+  // 그 기수 신청만 읽어요 (오늘의 테스트 화면은 자주 새로고침해요)
+  const [{ plan }, apps, results] = await Promise.all([planFor(cohort), listCohortApplications(cohort), listTestResults({ cohort })]);
+  const targets = apps.filter(takesTests);
   const classDays = new Map<ScheduleClass, string[]>();
   for (const a of targets) {
     const k = scheduleClassFor(a.course, a.track);

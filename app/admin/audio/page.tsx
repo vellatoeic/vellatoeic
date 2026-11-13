@@ -2,17 +2,16 @@ import { isAdmin } from "@/lib/auth";
 import { currentCohort, isPreview, listAudios, roundFor } from "@/lib/db";
 import { BOOKS, cohortLabel, todayKST } from "@/lib/config";
 import { AUDIO_BOOKS, audioExpiresOn } from "@/lib/audio";
-import { cleanupExpiredAudios, moveAudio, removeAudio } from "@/app/actions";
+import { addAudioLink, cleanupExpiredAudios, moveAudio, removeAudio } from "@/app/actions";
+import { isDriveLink } from "@/lib/materialLink";
 import AdminTabs from "../AdminTabs";
 import LoginForm from "../LoginForm";
 import CloseOnSubmitForm from "../CloseOnSubmitForm";
-import AudioUploader from "./AudioUploader";
+import LinkForm from "../LinkForm";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "LC 음원 · vella_toeic", robots: { index: false } };
 
-const FREE_STORAGE = 1024 * 1024 * 1024; // Supabase 무료 요금제 보관함 1GB
-const mb = (n: number) => `${(n / 1024 / 1024).toFixed(1)}MB`;
 
 export default async function AudioAdmin({ searchParams }: { searchParams: Promise<{ c?: string; k?: string }> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
@@ -25,12 +24,7 @@ export default async function AudioAdmin({ searchParams }: { searchParams: Promi
   const list = all.filter((a) => a.cohort === cohort && a.book === book);
   const today = todayKST();
 
-  const usage = [...new Set(all.map((a) => a.cohort))].sort().reverse().map((co) => ({
-    cohort: co,
-    bytes: all.filter((a) => a.cohort === co).reduce((s, a) => s + Number(a.size_bytes), 0),
-    count: all.filter((a) => a.cohort === co).length,
-  }));
-  const total = usage.reduce((s, u) => s + u.bytes, 0);
+  const usage = [...new Set(all.map((a) => a.cohort))].sort().reverse().map((co) => ({ cohort: co, count: all.filter((a) => a.cohort === co).length }));
   const expired = (await Promise.all([...new Set(all.map((a) => a.cohort))].map(async (co) => {
     const end = await audioExpiresOn(co);
     return end && end < today ? all.filter((a) => a.cohort === co) : [];
@@ -58,13 +52,18 @@ export default async function AudioAdmin({ searchParams }: { searchParams: Promi
 
       <section className="card space-y-4">
         <h2 className="font-jua text-2xl text-sky-ink">{cohortLabel(cohort)} {BOOKS[book]} 음원 <span className="text-base text-slate-400">· {list.length}개</span></h2>
-        <AudioUploader cohort={cohort} book={book} />
-        {list.length === 0 ? <p className="text-sm text-slate-500">아직 올린 음원이 없어요.</p> : (
+        <LinkForm action={addAudioLink} hidden={{ cohort, book }} titlePlaceholder="제목 (예: PART 1)" />
+        {list.length === 0 ? <p className="text-sm text-slate-500">아직 등록한 음원이 없어요.</p> : (
           <ol className="divide-y divide-sky-soft">
             {list.map((a, i) => (
               <li key={a.id} className="flex items-center gap-2 py-2">
                 <span className="font-jua w-7 shrink-0 text-center text-sky-deep">{i + 1}</span>
-                <span className="min-w-0 flex-1 truncate">{a.title} <span className="text-xs text-slate-400">{mb(Number(a.size_bytes))}</span></span>
+                <span className="min-w-0 flex-1 truncate">
+                  {a.link_url
+                    ? <a href={a.link_url} target="_blank" rel="noreferrer" className="underline decoration-sky-main underline-offset-2">🔗 {a.title}</a>
+                    : <>{a.title} <span className="text-xs font-bold text-amber-600">예전 파일 (이사 후 없음 → 링크로 다시 등록하고 삭제해 주세요)</span></>}
+                  {a.link_url && !isDriveLink(a.link_url) && <span className="ml-1 text-xs text-amber-600">구글 드라이브 링크가 아니에요</span>}
+                </span>
                 <form action={moveAudio} className="flex gap-1">
                   <input type="hidden" name="id" value={a.id} />
                   <button name="dir" value="up" disabled={i === 0} className="rounded-lg bg-sky-soft px-2 py-1 text-sm disabled:opacity-30" aria-label="위로">▲</button>
@@ -84,17 +83,16 @@ export default async function AudioAdmin({ searchParams }: { searchParams: Promi
       </section>
 
       <section className="card space-y-3">
-        <h3 className="font-jua text-xl text-sky-ink">보관함 용량</h3>
-        <p className="text-sm text-slate-600">전체 {mb(total)} / 무료 1GB ({Math.round((total / FREE_STORAGE) * 100)}%)</p>
-        <div className="h-2.5 overflow-hidden rounded-full bg-sky-soft"><i className={`block h-full ${total > FREE_STORAGE * 0.8 ? "bg-red-400" : "bg-sky-deep"}`} style={{ width: `${Math.min(100, (total / FREE_STORAGE) * 100)}%` }} /></div>
+        <h3 className="font-jua text-xl text-sky-ink">기수별 음원</h3>
+        <p className="text-sm text-slate-600">음원 파일은 구글 드라이브에 있어요. 사이트에는 제목과 링크만 저장해요.</p>
         {usage.length > 0 && (
           <ul className="text-sm text-slate-600">
-            {usage.map((u) => <li key={u.cohort}>{cohortLabel(u.cohort)} · {u.count}개 · {mb(u.bytes)}</li>)}
+            {usage.map((u) => <li key={u.cohort}>{cohortLabel(u.cohort)} · {u.count}개</li>)}
           </ul>
         )}
         <form action={cleanupExpiredAudios} className="rounded-2xl bg-sky-soft p-3 text-sm">
-          <p className="text-slate-600">그 기수 모든 반의 다운로드 기간(첫 수업일부터 14일)이 끝난 음원 <b>{expired.length}개 · {mb(expired.reduce((s, a) => s + Number(a.size_bytes), 0))}</b></p>
-          <button disabled={expired.length === 0} className="btn mt-2 !py-2 !text-sm">기간 지난 음원 정리 (파일 삭제)</button>
+          <p className="text-slate-600">그 기수 모든 반의 다운로드 기간(첫 수업일부터 14일)이 끝난 음원 <b>{expired.length}개</b></p>
+          <button disabled={expired.length === 0} className="btn mt-2 !py-2 !text-sm">기간 지난 음원 목록 정리</button>
         </form>
       </section>
     </div>

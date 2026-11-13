@@ -27,7 +27,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     if (!regs.some((r) => canSeeSpecialMaterials(r, event.event_date, today, until))) return new NextResponse("특강 신청 확인 후 자료를 받을 수 있어요.", { status: 403 });
   }
 
-  const url = await specialMaterialUrl(material.storage_path, material.file_name);
+  // 지금 방식: 구글 드라이브 공유 링크로 보내요 (Supabase 전송량을 쓰지 않아요)
+  if (material.link_url) return NextResponse.redirect(material.link_url);
+  // 예전 방식(보관함 파일): 이사 후에는 파일이 없을 수 있어요
+  const url = material.storage_path ? await specialMaterialUrl(material.storage_path, material.file_name).catch(() => null) : null;
   if (!url) return new NextResponse("자료가 아직 준비되지 않았어요.", { status: 404 });
   if (url.startsWith("data:")) {
     const [head, base64] = url.split(",");

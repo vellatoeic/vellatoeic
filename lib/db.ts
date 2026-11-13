@@ -35,6 +35,9 @@ export type Application = {
 
 export type NewApplication = Omit<Application, "id" | "status" | "created_at">;
 
+// 신청 조회에 쓰는 칸 (비밀번호 해시 pin_hash는 로그인 확인 때만 읽어요)
+const APP_COLS = "id,cohort,kind,course,track,continuing,slot,pickup_date,pickup_time,books,pickup,name,phone,depositor,address,amount,status,created_at,paid_at,cancelled_at,cancel_reason,pending_from,books_adjusted,audio_extended_until";
+
 export type Lecture = {
   id: string;
   cohort: string;
@@ -102,7 +105,8 @@ export type LcAudio = {
   cohort: string;
   book: "lc1" | "lc2"; // LC 교재에 따라 음원이 달라요
   title: string;
-  storage_path: string;
+  storage_path: string | null; // 예전 방식(보관함 파일). 새 음원은 비어 있어요.
+  link_url?: string | null; // 구글 드라이브 공유 링크 (지금 방식)
   size_bytes: number;
   sort_order: number;
   created_at: string;
@@ -151,8 +155,9 @@ export type SpecialRegistration = {
 export type SpecialMaterial = {
   id: string;
   special_lecture_id: string;
-  file_name: string;
-  storage_path: string;
+  file_name: string; // 자료 제목
+  storage_path: string | null; // 예전 방식(보관함 파일). 새 자료는 비어 있어요.
+  link_url?: string | null; // 구글 드라이브 공유 링크 (지금 방식)
   created_at: string;
 };
 
@@ -256,7 +261,7 @@ export async function createApplication(a: NewApplication): Promise<string> {
 export async function getApplication(id: string): Promise<Application | null> {
   if (!isUuid(id)) return null;
   if (sb) {
-    const { data } = await sb.from("applications").select("*").eq("id", id).maybeSingle();
+    const { data } = await sb.from("applications").select(APP_COLS).eq("id", id).maybeSingle();
     return (data as Application) ?? null;
   }
   return mem.apps.find((x) => x.id === id) ?? null;
@@ -272,7 +277,7 @@ async function getApplicationsRaw(ok: string[]): Promise<Application[]> {
   if (sb) {
     const db = sb;
     return inChunks(ok, async (chunk) => {
-      const { data, error } = await db.from("applications").select("*").in("id", chunk);
+      const { data, error } = await db.from("applications").select(APP_COLS).in("id", chunk);
       if (error) throw error;
       return data as Application[];
     });
@@ -293,9 +298,19 @@ export const listApplications = () => memo("apps:list", listApplicationsRaw);
 async function listApplicationsRaw(): Promise<Application[]> {
   if (sb) {
     const db = sb;
-    return allRows<Application>((from, to) => db.from("applications").select("*").order("created_at", { ascending: false }).order("id").range(from, to));
+    return allRows<Application>((from, to) => db.from("applications").select(APP_COLS).order("created_at", { ascending: false }).order("id").range(from, to));
   }
   return mem.apps;
+}
+
+// 한 기수 신청만 (전체를 읽지 않아요)
+export const listCohortApplications = (cohort: string) => memo(`apps:cohort:${cohort}`, () => listCohortApplicationsRaw(cohort));
+async function listCohortApplicationsRaw(cohort: string): Promise<Application[]> {
+  if (sb) {
+    const db = sb;
+    return allRows<Application>((from, to) => db.from("applications").select(APP_COLS).eq("cohort", cohort).order("created_at", { ascending: false }).order("id").range(from, to));
+  }
+  return mem.apps.filter((a) => a.cohort === cohort);
 }
 
 type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "continuing" | "slot" | "books" | "amount" | "cohort" | "audio_extended_until" | "cancelled_at" | "cancel_reason" | "pending_from" | "books_adjusted">>;
@@ -359,16 +374,21 @@ export async function deleteApplications(ids: string[]) {
 }
 
 // ── 강의 ───────────────────────────────────────
-export const listLectures = (cohort?: string) => memo(`lectures:${cohort ?? "*"}`, () => listLecturesRaw(cohort));
-async function listLecturesRaw(cohort?: string): Promise<Lecture[]> {
+// cohort: 한 기수 또는 여러 기수 (비우면 전체 = 관리자용)
+export const listLectures = (cohort?: string | string[]) => {
+  const list = cohort === undefined ? undefined : [...new Set(typeof cohort === "string" ? [cohort] : cohort)].sort();
+  return memo(`lectures:${list ? list.join(",") : "*"}`, () => listLecturesRaw(list));
+};
+async function listLecturesRaw(cohorts?: string[]): Promise<Lecture[]> {
+  if (cohorts && cohorts.length === 0) return [];
   if (sb) {
-    let q = sb.from("lectures").select("*").order("created_at", { ascending: true });
-    if (cohort) q = q.eq("cohort", cohort);
+    let q = sb.from("lectures").select("id,cohort,course,part,slot,title,youtube_id,created_at").order("created_at", { ascending: true });
+    if (cohorts) q = q.in("cohort", cohorts);
     const { data, error } = await q;
     if (error) throw error;
     return data as Lecture[];
   }
-  return mem.lectures.filter((l) => !cohort || l.cohort === cohort);
+  return mem.lectures.filter((l) => !cohorts || cohorts.includes(l.cohort));
 }
 
 export async function getLecture(id: string): Promise<Lecture | null> {
@@ -502,7 +522,7 @@ export async function cleanupYbmOrders(days = 90) {
 }
 
 // ── 공지 ───────────────────────────────────────
-export type NoticeRead = { notice_id: string; app_id: string; read_at: string; cohort?: string | null };
+export type NoticeRead = { notice_id: string; app_id: string; read_at?: string; cohort?: string | null };
 export type NoticeFields = Omit<Notice, "id" | "created_at">;
 
 export const listNotices = () => memo("notices", listNoticesRaw);
@@ -514,6 +534,16 @@ async function listNoticesRaw(): Promise<Notice[]> {
   }
   return [...mem.notices].sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
+
+// 학생 화면용: 시작했고 아직 안 끝난 공지만 (매달 반복 공지는 항상)
+export const listCurrentNotices = (today: string) => memo(`notices:current:${today}`, async (): Promise<Notice[]> => {
+  if (sb) {
+    const { data, error } = await sb.from("site_notices").select("*").lte("starts_on", today).or(`repeat_monthly.eq.true,ends_on.gte.${today}`).order("created_at", { ascending: false });
+    if (error) throw error;
+    return data as Notice[];
+  }
+  return (await listNoticesRaw()).filter((n) => n.starts_on <= today && (n.repeat_monthly || n.ends_on >= today));
+});
 
 export async function createNotice(n: NoticeFields) {
   forget("notices");
@@ -555,7 +585,7 @@ export async function listNoticeReads(filter: { appIds?: string[] } = {}): Promi
   if (sb) {
     const db = sb;
     const run = (chunk?: string[]) => allRows<NoticeRead>((from, to) => {
-      let q = db.from("site_notice_reads").select("*").order("notice_id").order("app_id");
+      let q = db.from("site_notice_reads").select("notice_id,app_id,cohort").order("notice_id").order("app_id");
       if (chunk) q = q.in("app_id", chunk);
       return q.range(from, to);
     });
@@ -776,13 +806,14 @@ export async function getAudio(id: string): Promise<LcAudio | null> {
   return mem.audios.find((a) => a.id === id) ?? null;
 }
 
-export async function createAudio(audio: Pick<LcAudio, "cohort" | "book" | "title" | "storage_path" | "size_bytes" | "sort_order">) {
+// 음원 링크 추가 (제목 + 구글 드라이브 공유 링크)
+export async function createAudioLink(audio: Pick<LcAudio, "cohort" | "book" | "title" | "sort_order"> & { link_url: string }) {
   if (sb) {
-    const { error } = await sb.from("lc_audios").insert(audio);
+    const { error } = await sb.from("lc_audios").insert({ ...audio, storage_path: null, size_bytes: 0 });
     if (error) throw error;
     return;
   }
-  mem.audios.push({ ...audio, id: crypto.randomUUID(), created_at: new Date().toISOString() });
+  mem.audios.push({ ...audio, storage_path: null, size_bytes: 0, id: crypto.randomUUID(), created_at: new Date().toISOString() });
 }
 
 export async function setAudioOrder(id: string, sort_order: number) {
@@ -796,36 +827,21 @@ export async function setAudioOrder(id: string, sort_order: number) {
   if (audio) audio.sort_order = sort_order;
 }
 
-// 음원 기록과 보관함 파일을 함께 지워요.
+// 음원 기록을 지워요. 예전 방식 음원은 보관함 파일도 함께 지워요.
 export async function deleteAudios(list: LcAudio[]) {
   if (list.length === 0) return;
   const ids = list.map((a) => a.id);
   if (sb) {
-    const { error: removeError } = await sb.storage.from(AUDIO_BUCKET).remove(list.map((a) => a.storage_path));
-    if (removeError) throw removeError;
+    const paths = list.flatMap((a) => (a.storage_path ? [a.storage_path] : []));
+    if (paths.length) {
+      const { error: removeError } = await sb.storage.from(AUDIO_BUCKET).remove(paths);
+      if (removeError) throw removeError;
+    }
     const { error } = await sb.from("lc_audios").delete().in("id", ids);
     if (error) throw error;
     return;
   }
   mem.audios = mem.audios.filter((a) => !ids.includes(a.id));
-}
-
-// 브라우저가 바로 올릴 수 있는 서명된 업로드 주소 (2시간 유효). 미리보기에서는 없어요.
-export async function audioUploadUrl(path: string): Promise<string | null> {
-  if (!sb) return null;
-  const { data, error } = await sb.storage.from(AUDIO_BUCKET).createSignedUploadUrl(path);
-  if (error) throw error;
-  return data.signedUrl;
-}
-
-// 업로드가 실제로 끝났는지 보관함에서 확인하고 파일 크기를 돌려줘요.
-export async function uploadedAudioSize(path: string): Promise<number | null> {
-  if (!sb) return 0;
-  const slash = path.lastIndexOf("/");
-  const { data, error } = await sb.storage.from(AUDIO_BUCKET).list(path.slice(0, slash), { search: path.slice(slash + 1), limit: 1 });
-  if (error) throw error;
-  const file = data?.find((f) => f.name === path.slice(slash + 1));
-  return file ? Number((file.metadata as { size?: number } | null)?.size ?? 0) : null;
 }
 
 // 짧게 만료되는 다운로드 주소 (링크 공유 방지)
@@ -907,7 +923,7 @@ export async function updateSpecialLecture(id: string, patch: Partial<SpecialLec
 export async function deleteSpecialLecture(id: string) {
   forget("specials");
   if (!isUuid(id)) return;
-  const paths = (await listSpecialMaterials(id)).map((material) => material.storage_path);
+  const paths = (await listSpecialMaterials(id)).flatMap((material) => (material.storage_path ? [material.storage_path] : []));
   if (sb) {
     if (paths.length > 0) await sb.storage.from(SPECIAL_BUCKET).remove(paths);
     const { error } = await sb.from("special_lectures").delete().eq("id", id);
@@ -1076,33 +1092,27 @@ export async function getSpecialMaterial(id: string): Promise<SpecialMaterial | 
   return mem.specialMaterials.find((material) => material.id === id) ?? null;
 }
 
-export async function uploadSpecialMaterial(special_lecture_id: string, fileName: string, file: Buffer, contentType: string) {
-  const safeName = fileName.replace(/[^A-Za-z0-9._-]/g, "_").slice(-120) || "material";
-  const storagePath = `${special_lecture_id}/${crypto.randomUUID()}-${safeName}`;
+// 특강 자료 링크 추가 (제목 + 구글 드라이브 공유 링크)
+export async function createSpecialMaterialLink(special_lecture_id: string, title: string, link_url: string) {
+  const row = { special_lecture_id, file_name: title.slice(0, 200), storage_path: null, link_url };
   if (sb) {
-    const upload = await sb.storage.from(SPECIAL_BUCKET).upload(storagePath, file, { contentType, upsert: false });
-    if (upload.error) throw upload.error;
-    const { error } = await sb.from("special_lecture_materials").insert({ special_lecture_id, file_name: fileName.slice(0, 200), storage_path: storagePath });
-    if (error) {
-      await sb.storage.from(SPECIAL_BUCKET).remove([storagePath]);
-      throw error;
-    }
+    const { error } = await sb.from("special_lecture_materials").insert(row);
+    if (error) throw error;
     return;
   }
-  mem.photos[storagePath] = `data:${contentType};base64,${file.toString("base64")}`;
-  mem.specialMaterials.push({ id: crypto.randomUUID(), special_lecture_id, file_name: fileName.slice(0, 200), storage_path: storagePath, created_at: new Date().toISOString() });
+  mem.specialMaterials.push({ ...row, id: crypto.randomUUID(), created_at: new Date().toISOString() });
 }
 
 export async function deleteSpecialMaterial(id: string) {
   const material = await getSpecialMaterial(id);
   if (!material) return;
   if (sb) {
-    await sb.storage.from(SPECIAL_BUCKET).remove([material.storage_path]);
+    if (material.storage_path) await sb.storage.from(SPECIAL_BUCKET).remove([material.storage_path]);
     const { error } = await sb.from("special_lecture_materials").delete().eq("id", id);
     if (error) throw error;
     return;
   }
-  delete mem.photos[material.storage_path];
+  if (material.storage_path) delete mem.photos[material.storage_path];
   mem.specialMaterials = mem.specialMaterials.filter((item) => item.id !== id);
 }
 
@@ -1285,6 +1295,21 @@ export async function listStamps(appIds: string[]): Promise<{ attendance: Attend
   };
 }
 
+// 출석 기록만 (숙제는 읽지 않아요). from을 주면 그날 이후만.
+export async function listAttendance(appIds: string[], from?: string): Promise<Attendance[]> {
+  const ok = appIds.filter(isUuid);
+  if (ok.length === 0) return [];
+  if (sb) {
+    const db = sb;
+    return inChunks(ok, (chunk) => allRows<Attendance>((f, t) => {
+      let q = db.from("attendance").select("app_id, day").in("app_id", chunk);
+      if (from) q = q.gte("day", from);
+      return q.order("app_id").order("day").range(f, t);
+    }));
+  }
+  return mem.attendance.filter((x) => ok.includes(x.app_id) && (!from || x.day >= from));
+}
+
 const BUCKET = "homework";
 
 export async function photoUrl(path: string): Promise<string | null> {
@@ -1444,7 +1469,7 @@ export async function deleteYbmOrders(ids: string[]) {
 export async function listPendingApplications(): Promise<Application[]> {
   if (sb) {
     const db = sb;
-    return allRows<Application>((from, to) => db.from("applications").select("*").eq("status", "pending").order("created_at").order("id").range(from, to));
+    return allRows<Application>((from, to) => db.from("applications").select(APP_COLS).eq("status", "pending").order("created_at").order("id").range(from, to));
   }
   return mem.apps.filter((a) => a.status === "pending");
 }

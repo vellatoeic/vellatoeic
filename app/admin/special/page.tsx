@@ -1,6 +1,6 @@
 import { isAdmin } from "@/lib/auth";
 import { listApplications, expireSpecialDeposits, listDepositEvents, listSpecialLectures, listSpecialMaterials, listSpecialRegistrations, listWaitingDeposits, isPreview, type SpecialLecture, type SpecialRegistration } from "@/lib/db";
-import { cleanupSpecialFiles, publishSpecials, markDepositRefunded, addSpecialLecture, bulkSpecialOnsite, removeSpecialLecture, removeSpecialMaterial, removeSpecialRegistration, resolveDepositEvent, saveSpecialLecture } from "@/app/actions";
+import { addSpecialMaterialLink, cleanupSpecialFiles, publishSpecials, markDepositRefunded, addSpecialLecture, bulkSpecialOnsite, removeSpecialLecture, removeSpecialMaterial, removeSpecialRegistration, resolveDepositEvent, saveSpecialLecture } from "@/app/actions";
 import { DEPOSIT_MINUTES, DEPOSIT_LABEL, SPECIAL_DEPOSIT, won, type DepositStatus } from "@/lib/config";
 import SmsTest from "./SmsTest";
 import SelectAll from "../SelectAll";
@@ -9,7 +9,7 @@ import { specialRefundsDue } from "@/lib/specialRefunds";
 import AdminTabs from "../AdminTabs";
 import LoginForm from "../LoginForm";
 import CloseOnSubmitForm from "../CloseOnSubmitForm";
-import MaterialUpload from "./MaterialUpload";
+import LinkForm from "../LinkForm";
 import { cohortUntil } from "@/lib/viewWindowServer";
 import { todayKST } from "@/lib/config";
 
@@ -284,7 +284,9 @@ export default async function SpecialAdminPage({ searchParams }: { searchParams:
                 <ul className="mt-2 space-y-1">
                   {materials.map((material) => (
                     <li key={material.id} className="flex items-center justify-between gap-2 text-sm">
-                      <a href={`/special/material/${material.id}`} className="text-sky-deep underline">📄 {material.file_name}</a>
+                      {material.link_url
+                        ? <a href={material.link_url} target="_blank" rel="noreferrer" className="text-sky-deep underline">🔗 {material.file_name}</a>
+                        : <span>📄 {material.file_name} <span className="text-xs font-bold text-amber-600">예전 파일 (이사 후 없음 → 링크로 다시 등록하고 삭제해 주세요)</span></span>}
                       <form action={removeSpecialMaterial}>
                         <input type="hidden" name="id" value={material.id} />
                         <button className="text-red-400 underline">자료 삭제</button>
@@ -292,8 +294,8 @@ export default async function SpecialAdminPage({ searchParams }: { searchParams:
                     </li>
                   ))}
                 </ul>
-              ) : <p className="mt-2 text-sm text-slate-500">아직 올린 자료가 없어요.</p>}
-              <MaterialUpload eventId={event.id} />
+              ) : <p className="mt-2 text-sm text-slate-500">아직 등록한 자료가 없어요.</p>}
+              <div className="mt-3"><LinkForm action={addSpecialMaterialLink} hidden={{ event_id: event.id }} titlePlaceholder="자료 제목 (예: PART 5 액기스 자료)" /></div>
             </div>
 
             <div>

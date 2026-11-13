@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { getSetting, getSpecialRegistrationsFor, listNoticeReads, listNotices, listSpecialLectures, type Application } from "./db";
+import { getSetting, getSpecialRegistrationsFor, listCurrentNotices, listNoticeReads, listSpecialLectures, type Application } from "./db";
 import { specialDeadlineNotices } from "./specialPopups";
 import { courseEndNotices, type CourseEndInput } from "./courseEndPopups";
 import { viewInfo } from "./viewWindowServer";
@@ -30,7 +30,7 @@ export async function withLinks(list: Notice[]) {
 // 홈·강의실·🔔에서 쓰는 공지 묶음
 export async function noticeSummary() {
   const today = todayKST();
-  const [{ loggedIn, apps }, all] = await Promise.all([noticeIdentity(), listNotices()]);
+  const [{ loggedIn, apps }, all] = await Promise.all([noticeIdentity(), listCurrentNotices(today)]); // 게시 중인 공지만 읽어요
   if (!loggedIn || apps.length === 0) {
     // 로그인 안 한 방문자: '전체' 공지만, 기기당 한 번 (확인 여부는 브라우저에 저장)
     // (매달 반복 공지는 개강일을 알 수 없는 방문자에게는 띄우지 않아요)

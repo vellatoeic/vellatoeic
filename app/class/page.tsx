@@ -66,7 +66,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
   const name = apps[0].name;
   const paid = apps.filter(canWatch).sort((a, b) => b.cohort.localeCompare(a.cohort));
-  const lectures = paid.length ? await listLectures() : [];
+  const lectures = paid.length ? await listLectures(paid.map((a) => a.cohort)) : []; // 내 신청 기수 강의만
 
   // 스티커판: 같은 기수·같은 수업 학생들의 출석 날짜 = 수업일
   // 수업 기수(날짜 기준): 모집 기수를 다음 달로 바꿔도 이번 달 라이브·테스트는 그대로 열려요

@@ -18,10 +18,10 @@ export default function AudioList({ cohort, items }: { cohort: string; items: { 
         const done = got.includes(x.id);
         return (
           <li key={x.id}>
-            <a href={`/class/audio/${x.id}`} onClick={() => markGot(cohort, x.id)}
+            <a href={`/class/audio/${x.id}`} target="_blank" rel="noreferrer" onClick={() => markGot(cohort, x.id)}
               className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[15px] ${done ? "bg-emerald-50 text-slate-600" : "bg-white text-slate-800"}`}>
               <span className="flex-1">{x.title}</span>
-              {done ? <span className="text-sm font-bold text-emerald-600">받음 ✓</span> : <span className="text-sm text-sky-deep">zip 받기 ↓</span>}
+              {done ? <span className="text-sm font-bold text-emerald-600">받음 ✓</span> : <span className="text-sm text-sky-deep">받기 ↓</span>}
             </a>
           </li>
         );

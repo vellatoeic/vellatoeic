@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { todayKST } from "@/lib/config";
-import { addAttendance, listStamps } from "@/lib/db";
+import { addAttendance, listAttendance } from "@/lib/db";
 import { activeStudentApps } from "@/lib/student";
 import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
 import { isClassDay, nextClassDay } from "@/lib/attendanceDays";
@@ -65,10 +65,11 @@ export default async function Check() {
   let already = false;
   try {
     // 출석은 하루 한 번이면 돼요. 이미 찍었으면 그대로 두고 안내만 해요.
-    already = (await listStamps(classToday.map((a) => a.id))).attendance.some((x) => x.day === today);
+    // 이번 달 출석 기록만 한 번 읽어요 (숙제 기록은 읽지 않아요)
+    const attendance = await listAttendance(classToday.map((a) => a.id), `${today.slice(0, 7)}-01`);
+    already = attendance.some((x) => x.day === today);
     if (!already) await Promise.all(classToday.map((a) => addAttendance(a.id, today)));
-    const { attendance } = await listStamps(classToday.map((a) => a.id));
-    days = new Set(attendance.map((a) => a.day));
+    days = new Set([...attendance.map((a) => a.day), today]);
   } catch (e) {
     // 원인을 바로 알 수 있게 오류 내용을 작게 보여줘요. (학생이 캡처해서 Vella에게 보내면 돼요)
     const detail = e instanceof Error ? e.message : typeof e === "object" && e ? JSON.stringify(e) : String(e);

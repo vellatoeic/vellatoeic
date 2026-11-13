@@ -110,10 +110,9 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
     const tvSlots = tv === "1" ? slotsShown : [tv as "am" | "pm"];
     return (
       <div className="space-y-8 pt-6">
-        <AutoRefresh />
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="font-jua text-4xl text-sky-ink">📝 {specialDay(d)} 오늘의 테스트{tv !== "1" ? ` · ${slotName(tv as "am" | "pm")}` : ""}</p>
-          <Link href={link({ tv: "" })} className="text-sm text-slate-400 underline">관리 화면으로</Link>
+          <div className="flex items-center gap-3"><AutoRefresh /><Link href={link({ tv: "" })} className="text-sm text-slate-400 underline">관리 화면으로</Link></div>
         </div>
         {specs.length === 0 && <p className="font-jua text-3xl text-slate-400">오늘은 테스트가 없어요</p>}
         <div className="grid gap-6 lg:grid-cols-2">
@@ -145,11 +144,10 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
 
   return (
     <div className="space-y-5 pt-8">
-      <AutoRefresh />
       <AdminTabs active="tests" />
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <p className="text-sm text-slate-500">5초마다 자동으로 새로고침돼요{dayNo ? ` · 문풀 종합 DAY ${dayNo}` : ""}</p>
+          {dayNo ? <p className="text-sm text-slate-500">문풀 종합 DAY {dayNo}</p> : null}
           <h2 className="font-jua text-2xl text-sky-ink">📝 {specialDay(d)} 오늘의 테스트</h2>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -159,6 +157,7 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
           <Link href={link({ view: "students" })} className="btn-ghost !py-2 text-sm">학생별 기록</Link>
         </div>
       </div>
+      <AutoRefresh />
       <div className="flex flex-wrap gap-2">{GROUPS.map(([k, l]) => <Link key={k} href={link({ g: k })} className={`rounded-full px-3 py-1.5 text-sm font-bold ${g === k ? "bg-sky-deep text-white" : "bg-white text-sky-ink"}`}>{l}</Link>)}</div>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="font-bold text-slate-500">학생 점수 순서</span>

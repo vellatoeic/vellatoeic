@@ -1,5 +1,5 @@
 import { BOOKS, CLASSROOM, COURSES, TRACKS, TRACK_ORDER, cohortLabel, slotTag, type BookId, type CourseId, type TimeSlot } from "@/lib/config";
-import { listApplications, currentCohort, isPreview, type Application } from "@/lib/db";
+import { listCohortApplications, currentCohort, isPreview, type Application } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
@@ -54,7 +54,7 @@ function Table({ apps }: { apps: Application[] }) {
 export default async function Roster() {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
   const cohort = await currentCohort();
-  const apps = (await listApplications()).filter((a) => a.cohort === cohort && isActive(a));
+  const apps = (await listCohortApplications(cohort)).filter(isActive);
   const onsite = apps.filter((a) => a.kind === "onsite");
   const desk = apps.filter((a) => a.kind === "online" && a.pickup === "classroom");
   const delivery = apps.filter((a) => a.kind === "online" && a.pickup === "delivery");

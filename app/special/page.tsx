@@ -135,7 +135,7 @@ export default async function SpecialPage({ searchParams }: { searchParams: Prom
                   {materials.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {materials.map((material) => (
-                        <a key={material.id} href={`/special/material/${material.id}`} className="btn-ghost !py-2 text-sm">📄 {material.file_name}</a>
+                        <a key={material.id} href={`/special/material/${material.id}`} target="_blank" rel="noreferrer" className="btn-ghost !py-2 text-sm">📄 {material.file_name}</a>
                       ))}
                     </div>
                   ) : (

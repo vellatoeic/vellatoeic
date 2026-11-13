@@ -1,12 +1,11 @@
 import "server-only";
-import { deleteAudios, getSetting, listApplications, listAudios, type Application, type LcAudio } from "./db";
+import { deleteAudios, getSetting, listCohortApplications, listAudios, type Application, type LcAudio } from "./db";
 import { canWatch, audioBooksFor as booksOf } from "./access";
 import { todayKST } from "./config";
 import { kstDate } from "./studentDays";
 import { SCHEDULE_CLASSES, scheduleClassFor, scheduleKey, schoolDaysFor, type ScheduleClass } from "./schedule";
 
 export const AUDIO_DAYS = 14; // 첫 수업일부터 다운로드할 수 있는 날 수
-export const AUDIO_MAX_BYTES = 50 * 1024 * 1024; // Supabase 무료 요금제 파일 한 개 최대 크기
 export const AUDIO_BOOKS = ["lc1", "lc2"] as const;
 export const isAudioBook = (v: string): v is LcAudio["book"] => v === "lc1" || v === "lc2";
 
@@ -41,7 +40,7 @@ export async function studentAudioWindow(app: Application) {
 // 이 기수 음원을 받을 수 있는 마지막 날: 모든 반 기간과 모든 학생 기간(연장 포함) 중 가장 늦은 날.
 export async function audioExpiresOn(cohort: string) {
   const windows = await Promise.all((Object.keys(SCHEDULE_CLASSES) as ScheduleClass[]).map((k) => classWindow(cohort, k)));
-  const apps = (await listApplications()).filter((a) => a.cohort === cohort && canWatch(a) && booksOf(a).length > 0);
+  const apps = (await listCohortApplications(cohort)).filter((a) => canWatch(a) && booksOf(a).length > 0);
   const students = await Promise.all(apps.map((a) => studentAudioWindow(a)));
   return [...windows, ...students].reduce<string>((last, w) => (w && w.end > last ? w.end : last), "");
 }
