@@ -35,7 +35,7 @@ import { getApplications } from "@/lib/db";
 import { getStudentIds } from "@/lib/auth";
 import CancelledNotice from "@/components/CancelledNotice";
 import { viewInfo } from "@/lib/viewWindowServer";
-import { dayLabelKo, viewPhase } from "@/lib/viewWindow";
+import { dayLabelKo, viewPhase, viewableCohorts } from "@/lib/viewWindow";
 import { signupMonths } from "@/lib/signupMonthsServer";
 import { safe } from "@/lib/safe";
 import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
@@ -66,7 +66,6 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
   const name = apps[0].name;
   const paid = apps.filter(canWatch).sort((a, b) => b.cohort.localeCompare(a.cohort));
-  const lectures = paid.length ? await listLectures(paid.map((a) => a.cohort)) : []; // 내 신청 기수 강의만
 
   // 스티커판: 같은 기수·같은 수업 학생들의 출석 날짜 = 수업일
   // 수업 기수(날짜 기준): 모집 기수를 다음 달로 바꿔도 이번 달 라이브·테스트는 그대로 열려요
@@ -119,6 +118,9 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
   // 계산에 실패하면 막지 않고 모두 열어 둬요 (지난 강의·라이브가 반드시 보이게)
   const view = await safe("viewInfo", () => viewInfo(paid), new Map(paid.map((a) => [a.id, { end: "9999-12-31", until: "9999-12-31" }])));
   const viewable = (a: (typeof paid)[number]) => today <= (view.get(a.id)?.until ?? "");
+  // 강의는 열람 가능한 신청의 기수만 읽어요 (연장 기간 포함, 끝난 기수는 읽지 않아요)
+  const lectureCohorts = viewableCohorts(paid, view, today);
+  const lectures = lectureCohorts.length ? await listLectures(lectureCohorts) : [];
   const nextMonth = nextMonthOf(today);
   // 그 신청의 다음 달 신청이 있는지 (연장 안내에서 '다음 달 수업도 함께해요' 버튼을 띄울지)
   const hasNextOf = (a: (typeof paid)[number]) => apps.some((x) => x.cohort === shiftMonth(a.cohort, 1));

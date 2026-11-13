@@ -36,6 +36,10 @@ Vella가 Supabase SQL Editor에서 실행했다고 확인한 SQL 파일만 기�
 | `30_books_adjusted.sql` | 완료 | 신청에 교재 직접 수정 표시 칸(books_adjusted, 기존 신청 모두 false) 추가 |
 | `31_round_auto.sql` | 완료 | 교재 회차 완전 자동(홀수달 1·짝수달 2)으로 바꾸며 settings의 round_% 덮어쓰기 값 삭제(다른 설정 그대로) |
 | `32_study_notices.sql` | 완료 | 스터디 공지 4개 추가(insert만): 11월 현장(802호)·온라인 참여 공지(11/9~11/26, 팝업·상단 고정), 12월부터 매달 반복 현장·온라인 공지(개강일부터 25일) |
+| `34_material_links.sql` | 완료 | 새 프로젝트(서울)로 이사한 뒤 새 DB에 실행(이사 스크립트 `--apply`, Vella 확인). LC 음원·특강 자료에 링크 칸(link_url) 추가, 파일 경로(storage_path)를 비워둘 수 있게 변경(데이터 그대로) |
+
+> 2026-11-13 새 Supabase 프로젝트(서울)로 이사: `scripts/migrate-db.mjs --run`으로 옛 DB의 public 구조·데이터·권한·RLS·보관함 설정을 그대로 복사했어요. 위 기록(1~32)은 새 DB에도 그대로 들어 있어요.
+> `33_speed_cleanup.sql`: 옛 DB 확인 결과 ①인덱스 4개만 들어 있고 ②10월 이전 정리는 실행되지 않은 상태로 이사됐어요(완료로 기록하지 않음). 정리는 `35_october_cleanup.sql`로 따로 해요.
 
 ## 기록 갱신 규칙
 

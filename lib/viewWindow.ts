@@ -15,6 +15,12 @@ export function viewUntil(nextFirstDay: string | null, lastClassDays: string[]):
 
 export const viewOpen = (until: string, today: string) => today <= until;
 
+// 강의실에서 강의를 읽을 기수: 오늘 열람 가능한 신청(종강 후 다음 달 개강 전날까지 연장 포함)의 기수만
+// (마감일을 모르는 신청은 닫힌 것으로 봐요. 강의실 화면의 viewable과 같은 규칙)
+export function viewableCohorts(apps: { id: string; cohort: string }[], windows: Map<string, { until: string }>, today: string): string[] {
+  return [...new Set(apps.filter((a) => viewOpen(windows.get(a.id)?.until ?? "", today)).map((a) => a.cohort))].sort();
+}
+
 // 종강일 연장 공지·안내 단계: before(종강일 전) / endDay(종강일 당일) / extended(종강일 다음 날 ~ 마감일) / closed(마감 후)
 export function viewPhase(end: string, until: string, today: string): "before" | "endDay" | "extended" | "closed" {
   if (today > until) return "closed";

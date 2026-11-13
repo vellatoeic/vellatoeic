@@ -1,7 +1,7 @@
 // 강의·특강 열람 기간 · 종강일 연장 공지 테스트
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { courseEndPopupOpen, viewOpen, viewPhase, viewUntil } from "@/lib/viewWindow";
+import { courseEndPopupOpen, viewOpen, viewPhase, viewUntil, viewableCohorts } from "@/lib/viewWindow";
 import { courseEndNotices } from "@/lib/courseEndPopups";
 import { canSeeSpecialMaterials } from "@/lib/special";
 import { cohortUntil, studentEnd } from "@/lib/viewWindowServer";
@@ -69,4 +69,19 @@ test("특강 다시 보기도 같은 마감일 기준", () => {
   const online = { mode: "online" as const, deposit: null };
   assert.equal(canSeeSpecialMaterials(online, "2026-10-23", "2026-11-01", "2026-11-01"), true);
   assert.equal(canSeeSpecialMaterials(online, "2026-10-23", "2026-11-02", "2026-11-01"), false);
+});
+
+test("강의실 강의 기수: 열람 가능한 신청 기수만 (종강 후 다음 달 개강 전날까지 포함)", () => {
+  const apps = [{ id: "sep", cohort: "2026-09" }, { id: "oct", cohort: "2026-10" }, { id: "nov", cohort: "2026-11" }, { id: "nov2", cohort: "2026-11" }];
+  const w = new Map([["sep", { until: "2026-10-04" }], ["oct", { until: "2026-11-01" }], ["nov", { until: "2026-12-06" }], ["nov2", { until: "2026-12-06" }]]);
+  // 10/30 종강 뒤 연장 기간: 10월 기수도 읽어요 (9월은 끝남)
+  assert.deepEqual(viewableCohorts(apps, w, "2026-10-30"), ["2026-10", "2026-11"]);
+  // 마감일 당일까지 포함
+  assert.deepEqual(viewableCohorts(apps, w, "2026-11-01"), ["2026-10", "2026-11"]);
+  // 다음 달 개강일부터 지난 기수는 빼요
+  assert.deepEqual(viewableCohorts(apps, w, "2026-11-02"), ["2026-11"]);
+  // 마감일을 모르면 닫힌 것으로 (강의실 viewable과 같은 규칙)
+  assert.deepEqual(viewableCohorts([{ id: "x", cohort: "2026-11" }], new Map(), "2026-11-02"), []);
+  // 계산 실패 시 강의실은 모두 열어 둬요 (9999-12-31)
+  assert.deepEqual(viewableCohorts(apps, new Map(apps.map((a) => [a.id, { until: "9999-12-31" }])), "2026-11-13"), ["2026-09", "2026-10", "2026-11"]);
 });
