@@ -81,7 +81,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
   const showGift = !!myDraw || (!!giftDone && giftWindowOpen(giftDone.status.last, today));
   const stamps = await safe("listStamps", () => listStamps(paid.map((a) => a.id)), { attendance: [], homework: [] });
   const missions = await safe("listMissions", () => listMissions(apps.map((a) => a.id)), []);
-  // LC 음원: 본인 반 첫 수업일부터 14일 동안만 보여요.
+  // LC 음원: 본인 반 첫 수업일(또는 납부일)부터 종강일까지 보여요. (종강 직전 납부는 최소 7일)
   const audioBoxes = new Map(await safe("audioBoxes", () => Promise.all(paid.filter((a) => audioBooksFor(a).length > 0).map(async (a) => {
     const period = await studentAudioWindow(a);
     const books = audioBooksFor(a);
@@ -351,13 +351,13 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
               const left = dayDiff(today, box.period.end);
               if (today < box.period.start) {
                 const [, sm, sd] = box.period.start.split("-").map(Number);
-                return <p className="mt-4 rounded-2xl bg-sky-soft p-4 text-sm text-slate-600">🎧 LC 음원은 {sm}/{sd}부터 14일 동안 받을 수 있어요.</p>;
+                return <p className="mt-4 rounded-2xl bg-sky-soft p-4 text-sm text-slate-600">🎧 LC 음원은 {sm}/{sd}부터 종강일({m}/{d})까지 받을 수 있어요.</p>;
               }
               return (
                 // 다운로드 기간에는 항상 펼쳐 둬요. 누른 파일은 '받음 ✓' (이 기기에 기록)
                 <div id="lc-audio" className="mt-4 scroll-mt-4 rounded-2xl bg-sky-soft p-4">
                   <p className="font-jua text-lg text-sky-ink">🎧 LC 음원 <span className="text-sm text-slate-500">({audioBooksFor(a).map((b) => BOOKS[b]).join(", ")} 교재 · {box.list.length}개)</span></p>
-                  <p className={`text-sm font-bold ${left <= 3 ? "text-red-500" : "text-sky-deep"}`}>{m}/{d}까지 다운로드 가능 ({left === 0 ? "D-DAY" : `D-${left}`}) · 기간이 지나면 다시 받을 수 없어요</p>
+                  <p className={`text-sm font-bold ${left <= 3 ? "text-red-500" : "text-sky-deep"}`}>{m}/{d}까지 다운로드 가능 ({left === 0 ? "D-DAY" : `D-${left}`}) · 종강일이 지나면 다시 받을 수 없어요</p>
                   {box.list.length === 0 ? <p className="mt-2 text-sm text-slate-500">음원이 올라오면 여기에 보여요.</p> : (
                     <AudioList cohort={a.cohort} items={box.list.map((x) => ({ id: x.id, title: x.title }))} />
                   )}

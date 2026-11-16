@@ -52,6 +52,7 @@ export default async function AudioAdmin({ searchParams }: { searchParams: Promi
 
       <section className="card space-y-4">
         <h2 className="font-jua text-2xl text-sky-ink">{cohortLabel(cohort)} {BOOKS[book]} 음원 <span className="text-base text-slate-400">· {list.length}개</span></h2>
+        <p className="rounded-2xl bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-800">📌 음원은 구글 드라이브 링크로만 등록 (공유: 링크가 있는 모든 사용자)</p>
         <LinkForm action={addAudioLink} hidden={{ cohort, book }} titlePlaceholder="제목 (예: PART 1)" />
         {list.length === 0 ? <p className="text-sm text-slate-500">아직 등록한 음원이 없어요.</p> : (
           <ol className="divide-y divide-sky-soft">
@@ -85,13 +86,14 @@ export default async function AudioAdmin({ searchParams }: { searchParams: Promi
       <section className="card space-y-3">
         <h3 className="font-jua text-xl text-sky-ink">기수별 음원</h3>
         <p className="text-sm text-slate-600">음원 파일은 구글 드라이브에 있어요. 사이트에는 제목과 링크만 저장해요.</p>
+        <p className="text-xs text-slate-500">학생은 반 첫 수업일(또는 납부일)부터 종강일까지 받아요. 종강 7일 전 이후에 납부한 학생은 납부일부터 7일. 모든 학생 기간이 끝나고 7일 뒤 목록이 자동 정리돼요.</p>
         {usage.length > 0 && (
           <ul className="text-sm text-slate-600">
             {usage.map((u) => <li key={u.cohort}>{cohortLabel(u.cohort)} · {u.count}개</li>)}
           </ul>
         )}
         <form action={cleanupExpiredAudios} className="rounded-2xl bg-sky-soft p-3 text-sm">
-          <p className="text-slate-600">그 기수 모든 반의 다운로드 기간(첫 수업일부터 14일)이 끝난 음원 <b>{expired.length}개</b></p>
+          <p className="text-slate-600">그 기수 모든 학생의 다운로드 기간(종강일까지, 연장 포함)이 끝난 음원 <b>{expired.length}개</b></p>
           <button disabled={expired.length === 0} className="btn mt-2 !py-2 !text-sm">기간 지난 음원 목록 정리</button>
         </form>
       </section>

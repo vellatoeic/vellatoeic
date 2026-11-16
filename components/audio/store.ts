@@ -1,7 +1,8 @@
 // LC 음원 '받음' 기록 (기기별 localStorage, 기수별). 실패해도 화면은 정상으로 보여요.
 const gotKey = (cohort: string) => `vella_audio_got:${cohort}`;
 const doneKey = (cohort: string) => `vella_audio_done:${cohort}`;
-export const popupKey = (cohort: string) => `vella_audio_popup:${cohort}`;
+// 마감일이 바뀌면(예: 14일 → 종강일까지) 팝업이 한 번 더 떠요
+export const popupKey = (cohort: string, end: string) => `vella_audio_popup:${cohort}:${end}`;
 export const AUDIO_EVENT = "vella-audio";
 
 export function readGot(cohort: string): string[] {

@@ -2,7 +2,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { secondWeekLastDay, signupMonthsFor } from "@/lib/signupMonths";
-import { audioWindowFor } from "@/lib/audio";
+import { audioWindowFor, studentAudioWindow } from "@/lib/audio";
+import { studentEnd } from "@/lib/viewWindowServer";
 import { liveFor, popupNotices, readKey, type Notice } from "@/lib/notices";
 import { createApplication, getApplication, isPreview, updateApplication } from "@/lib/db";
 import { hashPin } from "@/lib/auth";
@@ -37,18 +38,44 @@ test("A: 월초 개강 전(11/1) → 이번 달(11월)만, 다음 달은 15일�
   assert.deepEqual(signupMonthsFor("2026-11-01", ["2026-11-02", "2026-11-03", "2026-11-09", "2026-11-12"], []).map((m) => m.cohort), ["2026-11"]);
 });
 
-// ── C) LC 음원 기간 ──
-test("C: 개강 전에 납부하면 반 첫 수업일부터 14일", () => {
-  assert.deepEqual(audioWindowFor("2026-10-06", "2026-09-30T05:00:00Z", null), { start: "2026-10-06", end: "2026-10-19" });
+// ── C) LC 음원 기간: max(첫 수업일, 납부일) ~ 학생 반 종강일 (종강 7일 전 이후 납부는 최소 7일) ──
+test("C: 개강 전에 납부하면 반 첫 수업일부터 종강일까지", () => {
+  assert.deepEqual(audioWindowFor("2026-11-02", "2026-11-26", "2026-10-28T05:00:00Z", null), { start: "2026-11-02", end: "2026-11-26" });
 });
 
-test("C: 중간 등록생은 납부 확인일부터 14일 보장", () => {
-  assert.deepEqual(audioWindowFor("2026-10-06", "2026-10-13T05:00:00Z", null), { start: "2026-10-13", end: "2026-10-26" });
+test("C: 중간 등록생은 납부 확인일부터 종강일까지", () => {
+  assert.deepEqual(audioWindowFor("2026-11-02", "2026-11-26", "2026-11-10T05:00:00Z", null), { start: "2026-11-10", end: "2026-11-26" });
 });
 
-test("C: [음원 7일 다시 열기]로 늘어난 날까지", () => {
-  assert.equal(audioWindowFor("2026-10-06", null, "2026-10-30").end, "2026-10-30");
-  assert.equal(audioWindowFor("2026-10-06", null, "2026-10-10").end, "2026-10-19"); // 원래 기간보다 짧으면 그대로
+test("C: 종강 7일 전 이후 납부하면 납부일부터 최소 7일 보장", () => {
+  // 종강 11/26, 11/19 납부 → 11/19~11/26 (종강일이 더 늦어서 그대로 8일)
+  assert.deepEqual(audioWindowFor("2026-11-02", "2026-11-26", "2026-11-19T05:00:00Z", null), { start: "2026-11-19", end: "2026-11-26" });
+  // 11/23 납부 → 11/23~11/29 (7일 보장)
+  assert.deepEqual(audioWindowFor("2026-11-02", "2026-11-26", "2026-11-23T05:00:00Z", null), { start: "2026-11-23", end: "2026-11-29" });
+  // 한국 시간 기준: 11/22 23:30(KST) 납부 = 11/22
+  assert.equal(audioWindowFor("2026-11-02", "2026-11-26", "2026-11-22T14:30:00Z", null).end, "2026-11-28");
+});
+
+test("C: [음원 7일 다시 열기]는 더 늦은 날짜가 우선", () => {
+  assert.equal(audioWindowFor("2026-11-02", "2026-11-26", null, "2026-12-03").end, "2026-12-03");
+  assert.equal(audioWindowFor("2026-11-02", "2026-11-26", null, "2026-11-20").end, "2026-11-26"); // 종강일보다 빠르면 그대로
+  assert.equal(audioWindowFor("2026-11-02", "2026-11-26", "2026-11-25T05:00:00Z", "2026-11-28").end, "2026-12-01"); // 7일 보장이 더 늦음
+});
+
+test("C: 실제 반 수업일 기준 — 종합반 11/26, 격일반은 8회차 종강일", async () => {
+  const mk = async (track: "all" | "alt_mw" | "alt_tt") => {
+    const id = await createApplication({
+      cohort: "2026-11", kind: "online", course: "start", track, continuing: false, slot: "pm", pickup_date: null, pickup_time: null,
+      books: ["lc1"], pickup: "delivery", name: `음원${track}`, phone: null, depositor: "x", address: null, amount: 0, pin_hash: hashPin("1234"),
+    });
+    const a = (await getApplication(id))!;
+    return { w: (await studentAudioWindow(a))!, end: await studentEnd(a) };
+  };
+  const all = await mk("all"), mw = await mk("alt_mw"), tt = await mk("alt_tt");
+  assert.deepEqual(all.w, { start: "2026-11-02", end: "2026-11-26" });
+  assert.equal(mw.w.end, mw.end); // 격일반 = 학생 반 종강일(8회차)
+  assert.equal(tt.w.end, tt.end);
+  assert.ok(mw.w.end < "2026-11-26" || tt.w.end <= "2026-11-26", `${mw.w.end} ${tt.w.end}`);
 });
 
 // ── D) 매달 반복 공지 ──
