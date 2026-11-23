@@ -76,7 +76,7 @@ export function booksFor(course: CourseId, track: Track, round: 1 | 2, continuin
   return [solveRc, lc];
 }
 
-export const CLASSROOM = "703호"; // 현장 수업 강의실
+export const CLASSROOM = "801호"; // 현장 수업 강의실 (바꾸면 학생·관리 화면 전체에 반영돼요)
 // 특강 현장 신청 보증금 (참여하면 100% 환급)
 export const SPECIAL_DEPOSIT = 10000;
 export const DEPOSIT_MINUTES = 30; // 신청 후 이 시간(분) 안에 입금이 없으면 자동 취소

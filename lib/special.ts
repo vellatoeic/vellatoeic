@@ -56,7 +56,7 @@ export function canSeeSpecialMaterials(reg: ViewReg, eventDate: string, today: s
 // 특강 시작 시각(한국 시간)
 type StartEvent = { event_date: string; starts_at: string };
 export const specialStartMs = (e: StartEvent) => Date.parse(`${e.event_date}T${e.starts_at.slice(0, 5)}:00+09:00`);
-// 특강이 시작됐는지 (현장 신청자: 시작 뒤에는 '703호로 와주세요' 대신 자료·영상 칸)
+// 특강이 시작됐는지 (현장 신청자: 시작 뒤에는 '강의실(CLASSROOM)로 와주세요' 대신 자료·영상 칸)
 export const specialStarted = (e: StartEvent, nowMs = Date.now()) => nowMs >= specialStartMs(e);
 // 다시 보기 단계: 특강 시작 2시간 뒤부터 '📺 특강 다시 보기' + '📚 지난 특강' 안내
 export const REPLAY_AFTER_MS = 2 * 3600 * 1000;
