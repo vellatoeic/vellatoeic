@@ -7,6 +7,7 @@ import { signupMonths } from "@/lib/signupMonthsServer";
 import ApplyForm from "./ApplyForm";
 import HowToWatch from "@/components/HowToWatch";
 import Timetable from "@/components/Timetable";
+import { pageMeta } from "@/lib/seo";
 
 // 교재 회차가 기수마다 바뀌어서 매번 새로 읽어요
 export const dynamic = "force-dynamic";
@@ -26,6 +27,14 @@ const NOTICE: Record<Kind, string[]> = {
     "입금자명이 신청자 이름과 다르면 아래 '입금자명' 칸에 꼭 적어 주세요.",
   ],
 };
+
+// 검색·미리보기용 제목·설명
+export async function generateMetadata({ params }: { params: Promise<{ kind: string }> }) {
+  const { kind } = await params;
+  return kind === "online"
+    ? pageMeta("불라방(온라인 라이브) 필독 사항 · 교재비 신청 | 벨라토익", "벨라토익 토익 인강 라이브(불라방) 수강생 필독 사항과 교재비 신청. 유튜브 라이브로 서면 YBM 수업을 실시간으로 듣고, 교재는 1층 데스크 수령 또는 택배.", "/guide/online")
+    : pageMeta(`현장 수강 필독 사항 · 교재비 신청 | 벨라토익`, `부산 서면 YBM 벨라토익 현장(${CLASSROOM}) 수강생 필독 사항과 교재비 신청. 교재는 첫 수업 날 ${CLASSROOM}에서 일괄 지급해요.`, "/guide/onsite");
+}
 
 export default async function KindGuide({ params }: { params: Promise<{ kind: string }> }) {
   const { kind } = await params;

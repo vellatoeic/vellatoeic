@@ -4,6 +4,7 @@ import Cloud from "@/components/Cloud";
 import NoticePopupHost from "@/components/notices/NoticePopupHost";
 import { listSpecialLectures } from "@/lib/db";
 import { publicSpecials } from "@/lib/specialPlan";
+import { jsonLdHtml } from "@/lib/seo";
 import { deadlineBadge, specialDay, specialRegistrationOpen } from "@/lib/special";
 
 // 특강 모집 여부를 매번 확인해요.
@@ -46,6 +47,7 @@ export default async function Home() {
   return (
     // 휴대폰·태블릿: 한 줄로 쌓아요(태블릿은 조금 넓게). 컴퓨터: 왼쪽에 인사·수강 형태, 오른쪽에 메뉴를 나란히 놓아요.
     <>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml() }} />
     <NoticePopupHost />
     <div className="relative -mx-4 overflow-hidden px-4 pb-6 lg:mx-[calc(50%-min(32rem,50vw-1rem))] lg:pb-12">
       {CLOUDS.map((c) => <Cloud key={c} className={`pointer-events-none absolute opacity-85 ${c}`} />)}
@@ -73,6 +75,7 @@ export default async function Home() {
           <MenuItem href="/class" icon="☁️" bg="#e3f4fd" title="강의실" sub="출석 · 스티커판 · 강의 영상" />
           <MenuItem href="/mission" icon="✅" bg="#e8f8ef" title="첫 수업 미션" sub="첫 수업 시간에 다 같이 해요" />
           <MenuItem href="/faq" icon="❓" bg="#f3efff" title="자주 묻는 질문" sub="교재비 · 강의실 · 라이브 · 출석 · 숙제" />
+          <MenuItem href="/about" icon="🌤️" bg="#e8f8ef" title="벨라토익 소개" sub="반 구성 · 시간표 · 수강 신청 방법" />
           {open.length > 0 ? (
             <MenuItem href="/special" icon="🎤" bg="#fff5cc" title="특강 신청" sub={open.map((e) => specialDay(e.event_date)).join(" · ")} alert={deadlineBadge(open[0])} />
           ) : thisMonth.length > 0 && (

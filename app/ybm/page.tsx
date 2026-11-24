@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { YBM_ORDER_AMOUNT, won } from "@/lib/config";
 import OrderForm from "./OrderForm";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata = { title: "YBM 인강 교재 신청 · vella_toeic", description: "YBM 토익 단기공략 650+ 강의 벨라토익 '개념 zip' 교재 신청" };
+export const metadata = pageMeta("YBM 인강 교재 신청 · 개념 zip | 벨라토익", "YBM 토익 인강(단기공략 650+) 수강생을 위한 벨라토익 '개념 zip' 교재 신청. 교재비 1만 원 + 택배비 4천 원, 택배로 보내 드려요.", "/ybm");
 
 // YBM 공식 사이트·카톡 채널 링크로 들어오는 인강생 교재 신청 (첫 화면 메뉴에는 없어요)
 export default function YbmOrderPage() {

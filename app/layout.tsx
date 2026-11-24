@@ -4,13 +4,28 @@ import Cloud from "@/components/Cloud";
 import "@fontsource/jua";
 import "@fontsource/gowun-dodum";
 import "./globals.css";
-import { INSTAGRAM_URL } from "@/lib/config";
+import { INSTAGRAM_URL, SITE_URL } from "@/lib/config";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/seo";
 import Bell from "@/components/notices/Bell";
 import { safeNoticeSummary } from "@/lib/noticeView";
 
+// 검색 확인 태그: Vercel 환경변수에 코드를 넣으면 켜져요 (비우면 태그 없음)
+const naverVerification = process.env.NAVER_SITE_VERIFICATION?.trim();
+const googleVerification = process.env.GOOGLE_SITE_VERIFICATION?.trim();
+
 export const metadata: Metadata = {
-  title: "vella_toeic",
-  description: "부산 서면 토익, vella_toeic 수강 안내와 교재비 납부",
+  metadataBase: new URL(SITE_URL),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  keywords: ["부산 서면 토익", "서면 토익", "YBM 서면", "벨라토익", "vella_toeic", "토익 650", "토익 750", "토익 인강 라이브", "부산 토익 학원"],
+  alternates: { canonical: "/" },
+  openGraph: { title: SITE_TITLE, description: SITE_DESCRIPTION, url: "/", siteName: SITE_NAME, locale: "ko_KR", type: "website" },
+  twitter: { card: "summary_large_image", title: SITE_TITLE, description: SITE_DESCRIPTION },
+  verification: {
+    ...(googleVerification ? { google: googleVerification } : {}),
+    ...(naverVerification ? { other: { "naver-site-verification": naverVerification } } : {}),
+  },
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#9fd8f5" };

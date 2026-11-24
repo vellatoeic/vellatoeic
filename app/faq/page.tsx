@@ -1,7 +1,8 @@
 import { listFaq } from "@/lib/db";
+import { pageMeta } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "자주 묻는 질문 · vella_toeic" };
+export const metadata = pageMeta("자주 묻는 질문 | 벨라토익 부산 서면 토익", "벨라토익(YBM 서면 토익) 자주 묻는 질문: 교재비 납부, 교재 수령, 강의실 로그인, 라이브(불라방), 출석, 숙제, 특강, LC 음원 안내.", "/faq");
 
 export default async function FaqPage() {
   let items: Awaited<ReturnType<typeof listFaq>>;
