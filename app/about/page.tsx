@@ -15,16 +15,16 @@ const YBM_SIGNUP_URL = "https://www.ybmedu.com/seomyon/vellatoeic";
 
 const CLASSES = [
   { icon: "🌱", name: "시작반", goal: "토익 650 목표", body: "토익을 처음 시작하거나 다시 기초부터 잡고 싶은 분을 위한 개념반이에요. 개념집과 RC·LC 교재로 문법·어휘·듣기의 뼈대를 차근차근 쌓아요." },
-  { icon: "🔥", name: "문풀반", goal: "토익 750 목표", body: "개념을 아는 분을 위한 실전반이에요. 실전 문제 풀이와 매 수업 단어·RC 데일리 테스트로 점수를 끌어올려요." },
+  { icon: "🔥", name: "문풀반", goal: "토익 750 목표", body: "개념을 아는 분을 위한 실전반이에요. 점수가 오르는 풀이 감각을 집중해서 끌어올려요." },
   { icon: "⚡", name: "속성반", goal: "한 달 집중", body: "한 달 동안 시작반과 문풀반을 함께 듣는 주 4일 집중 과정이에요. 짧은 기간에 개념과 실전을 한 번에 끝내고 싶은 분께 맞아요." },
   { icon: "🗓️", name: "격일반", goal: "2달 완성", body: "월·수 또는 화·목, 주 2일씩 두 달 이어 들으면 한 과정이 완성돼요. 일정이 바쁜 직장인·대학생에게 좋아요." },
   { icon: "🎯", name: "단과", goal: "RC 또는 LC만", body: "RC만, 혹은 LC만 집중해서 듣고 싶을 때 골라요. LC는 시작반·문풀반 공통 수업이에요." },
 ];
 
 const CARE = [
-  { icon: "📝", title: "데일리 테스트", body: "문풀반·속성반은 수업일마다 단어 TEST와 RC TEST를 보고, 강의실에서 점수를 바로 기록해요. 내 점수 그래프로 성장을 확인할 수 있어요." },
+  { icon: "📝", title: "데일리 테스트", body: "매 수업 짧은 테스트로 실력이 쌓이는 걸 직접 확인해요." },
   { icon: "⭐", title: "출석·숙제 스티커판", body: "QR로 출석하고 숙제를 내면 스티커판에 별이 쌓여요. 한 달 스티커판을 다 채우면 작은 선물도 준비돼 있어요." },
-  { icon: "🎤", title: "특강", body: "매달 두 번 PART 5 액기스 특강과 적중 모의고사 + 풀이 특강이 열려요. 그 달 수강생이라면 현장 또는 라이브로 신청할 수 있어요." },
+  { icon: "🎤", title: "특강", body: "매달 두 번, 수강생만을 위한 특강이 열려요. 현장 또는 라이브로 참여할 수 있어요." },
   { icon: "📺", title: "강의 다시 보기", body: "놓친 수업은 강의실에서 종강일까지 다시 볼 수 있어요." },
 ];
 
@@ -99,17 +99,11 @@ export default async function AboutPage() {
 
       <section className="card space-y-4">
         <h2 className="font-jua text-2xl text-sky-ink">👥 함께하는 스터디</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl bg-sky-soft p-4">
-            <h3 className="font-jua text-xl text-sky-ink">현장 스터디</h3>
-            <p className="mt-1 text-[15px] leading-relaxed text-slate-700">수업 30분 전 스터디룸에서 함께해요. PART 5 숙제 답 단서를 돌아가며 설명하고, 문장 성분 보는 연습을 해요.</p>
-          </div>
-          <div className="rounded-2xl bg-sky-soft p-4">
-            <h3 className="font-jua text-xl text-sky-ink">불라방 셀프 스터디</h3>
-            <p className="mt-1 text-[15px] leading-relaxed text-slate-700">숙제를 마친 뒤 PART 5 답 단서를 직접 적어 보며 혼자 복습해요.</p>
-          </div>
+        <div className="space-y-1 rounded-2xl bg-sky-soft p-4 text-[15px] leading-relaxed text-slate-700">
+          <p className="font-jua text-lg text-sky-ink">혼자 하면 무너지는 토익, 스터디로 끝까지 함께 가요.</p>
+          <p>현장 수강생은 수업 전에 함께, 불라방 수강생은 셀프 스터디로 참여해요.</p>
+          <p className="text-slate-500">어떻게 진행하는지는 수업에서 함께 알려드릴게요 :)</p>
         </div>
-        <p className="text-sm text-slate-500">네이버 카페 문풀반 스터디 인증 게시판에 인증하면 스터디 완료!</p>
       </section>
 
       <section className="card space-y-4">
