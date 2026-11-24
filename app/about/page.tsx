@@ -25,7 +25,7 @@ const CARE = [
   { icon: "📝", title: "데일리 테스트", body: "문풀반·속성반은 수업일마다 단어 TEST와 RC TEST를 보고, 강의실에서 점수를 바로 기록해요. 내 점수 그래프로 성장을 확인할 수 있어요." },
   { icon: "⭐", title: "출석·숙제 스티커판", body: "QR로 출석하고 숙제를 내면 스티커판에 별이 쌓여요. 한 달 스티커판을 다 채우면 작은 선물도 준비돼 있어요." },
   { icon: "🎤", title: "특강", body: "매달 두 번 PART 5 액기스 특강과 적중 모의고사 + 풀이 특강이 열려요. 그 달 수강생이라면 현장 또는 라이브로 신청할 수 있어요." },
-  { icon: "🎧", title: "LC 음원·다시 보기", body: "LC 음원은 강의실에서 종강일까지 받고, 라이브 수업은 종강일까지 다시 볼 수 있어요." },
+  { icon: "📺", title: "강의 다시 보기", body: "놓친 수업은 강의실에서 종강일까지 다시 볼 수 있어요." },
 ];
 
 export default async function AboutPage() {
@@ -64,6 +64,8 @@ export default async function AboutPage() {
             </li>
           ))}
         </ul>
+        <a href={YBM_SIGNUP_URL} target="_blank" rel="noreferrer" className="btn w-full">✍️ 수강 신청하러 가기 ↗</a>
+        <p className="text-center text-sm text-slate-500">YBM 서면에서 수강 등록 후, 이 홈페이지에서 교재비를 신청해요.</p>
       </section>
 
       <Timetable />
@@ -93,6 +95,21 @@ export default async function AboutPage() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="card space-y-4">
+        <h2 className="font-jua text-2xl text-sky-ink">👥 함께하는 스터디</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl bg-sky-soft p-4">
+            <h3 className="font-jua text-xl text-sky-ink">현장 스터디</h3>
+            <p className="mt-1 text-[15px] leading-relaxed text-slate-700">수업 30분 전 스터디룸에서 함께해요. PART 5 숙제 답 단서를 돌아가며 설명하고, 문장 성분 보는 연습을 해요.</p>
+          </div>
+          <div className="rounded-2xl bg-sky-soft p-4">
+            <h3 className="font-jua text-xl text-sky-ink">불라방 셀프 스터디</h3>
+            <p className="mt-1 text-[15px] leading-relaxed text-slate-700">숙제를 마친 뒤 PART 5 답 단서를 직접 적어 보며 혼자 복습해요.</p>
+          </div>
+        </div>
+        <p className="text-sm text-slate-500">네이버 카페 문풀반 스터디 인증 게시판에 인증하면 스터디 완료!</p>
       </section>
 
       <section className="card space-y-4">
