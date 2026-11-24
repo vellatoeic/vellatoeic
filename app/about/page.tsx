@@ -6,8 +6,8 @@ import { jsonLdHtml, pageMeta } from "@/lib/seo";
 import Timetable from "@/components/Timetable";
 
 export const metadata = pageMeta(
-  "벨라토익 소개 · 반 구성과 시간표 | 부산 서면 토익 YBM",
-  `부산 서면 토익 벨라토익(vella_toeic) 소개. YBM 서면에서 토익 650 시작반, 토익 750 문풀반, 속성반·격일반·단과를 현장(${CLASSROOM})과 토익 인강 라이브(불라방)로 들어요. 시간표와 수강 신청 방법.`,
+  "벨라토익 소개·반 구성·시간표 | 부산 서면 토익",
+  "부산 서면 토익 벨라토익 소개. 시작반(650)·문풀반(750)·속성반 구성과 시간표, 현장·라이브 수강, 신청 방법을 안내해요.",
   "/about",
 );
 

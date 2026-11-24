@@ -2,8 +2,9 @@
 import { BLOG_URL, CLASSROOM, INSTAGRAM_URL, SITE_URL } from "./config";
 
 export const SITE_NAME = "벨라토익 vella_toeic";
-export const SITE_TITLE = "부산 서면 토익 벨라토익(vella_toeic) | YBM 서면 토익 강의";
-export const SITE_DESCRIPTION = `부산 서면 YBM 토익 벨라토익. 시작반(650 목표)·문풀반(750 목표)·속성반, 현장(${CLASSROOM})·온라인 라이브(불라방) 수강, 교재비 신청과 강의실.`;
+// 네이버 서치어드바이저 기준: 제목 40자·설명 80자 이내 (페이지별 제목·설명도 같은 기준, '부산 서면 토익' 넣기)
+export const SITE_TITLE = "부산 서면 토익 벨라토익(vella_toeic) | YBM 토익";
+export const SITE_DESCRIPTION = "부산 서면 토익 벨라토익. 혼토익에 지친 모두 드루와! 토익에 필요한 것만 빠르게! YBM X vella_toeic 최단 프로젝트";
 
 // 검색에 보여도 되는 공개 페이지 (sitemap.xml)
 export const PUBLIC_PATHS = ["/", "/about", "/guide", "/guide/onsite", "/guide/online", "/faq", "/ybm"] as const;
