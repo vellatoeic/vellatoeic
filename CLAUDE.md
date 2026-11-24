@@ -134,20 +134,21 @@
 - 핵심 화면 보호(lib/safe.ts): 로그인·강의실·레이아웃 공지에서 부가 기능(30분 자동 취소 점검, 열람 기간, 종강·특강 팝업, 선물, 음원, 테스트, 수업 기수 판단 등)은 safe()로 감싸 실패하거나 4~5초를 넘기면 기본값으로 넘어가고 console.error로 함수 이름·오류만 남겨요(Next 내부 신호는 unstable_rethrow로 통과). 레이아웃 공지는 한 요청에 한 번만 계산(react cache). 30분 자동 취소 점검은 입금 대기만 읽고, 학생 화면에서는 1분에 한 번만 돌아요.
 - Next.js(App Router) + Supabase(DB, Storage) + Vercel(main에 push하면 자동 배포). 주소: vellatoeic.vercel.app
 - 속도: vercel.json regions ["icn1"](Supabase와 같은 서울). 한 요청 안 같은 조회는 한 번만(lib/requestMemo.ts memo/forget, React cache 기반·요청마다 따로): listApplications·getApplications·listLectures·listNotices·listSpecialLectures·설정(allSettings로 settings 표 한 번에 읽고 getSetting은 거기서 꺼냄)·activeStudentApps·getStudentIds. 같은 표를 고치는 db.ts 함수는 forget으로 기억을 지워 다음 조회는 새로 읽어요(새 쓰기 함수도 꼭 forget). 화면을 그리는 중이 아니면(테스트·입금 문자) 매번 새로 읽어요. 학생 화면은 listApplications 전체 조회를 쓰지 않고 내 신청 id로만. 강의실·로그인의 30분 자동 취소 점검은 after()로 응답 뒤에.
-- Vercel 환경변수: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ADMIN_PASSWORD, (선택) SESSION_SECRET, (선택) DEPOSIT_WEBHOOK_TOKEN(입금 문자 자동 확인). 키 값은 코드나 채팅에 절대 쓰지 말 것.
-- 2026-11 Supabase 무료 전송량(egress) 초과로 새 무료 프로젝트(서울)로 이사. 옛 보관함 파일(음원·특강 자료·인강 수강증)은 옮기지 못함. 이사 스크립트 scripts/migrate-db.mjs, 연결 주소는 .env.migrate(커밋 금지).
+- Vercel 환경변수: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ADMIN_PASSWORD, (선택) SESSION_SECRET, (선택) DEPOSIT_WEBHOOK_TOKEN(입금 문자 자동 확인). 키 값은 코드나 채팅에 절대 쓰지 말 것. 로컬 전용 .env.local: SUPABASE_DB_URL(Session pooler URI, npm run sql용, Vercel에는 안 넣음). Claude는 .env·.env.* 파일을 읽거나 쓸 수 없게 막혀 있어서(.claude/settings.json) 값은 Vella가 직접 넣어요.
+- 2026-11 Supabase 무료 전송량(egress) 초과로 새 무료 프로젝트(서울)로 이사. 옛 보관함 파일(음원·특강 자료·인강 수강증)은 옮기지 못함. 이사 스크립트 scripts/migrate-db.mjs(연결 주소 파일 .env.migrate는 이사 뒤 삭제, 다시 쓰려면 새로 만들어야 해요).
 - 전송량 아끼기: 학생 화면은 필요한 행·칸만 조회(전체 신청서 조회 금지), 큰 파일은 Supabase 보관함에 두지 않아요.
 - DB는 서버에서 service_role로만 접근. RLS 켜고 정책 없음(학생 브라우저에서 직접 조회 불가).
-- 표를 추가하거나 바꾸면 supabase/ 폴더에 SQL 파일로 남기고, Vella가 Supabase SQL Editor에서 직접 실행해야 함 → push 전에 실행할 SQL을 먼저 안내.
+- 표를 추가하거나 바꾸면 supabase/ 폴더에 SQL 파일로 남기고 npm run sql로 실행해요(아래 작업 규칙).
 
 ## 작업 규칙
 - 코드 수정과 push는 VS Code에서만. Cowork의 Claude는 논의와 정리만 담당.
 - 수정 전에 git status로 최신 상태 확인. 남이 바꾼 내용을 덮어쓰지 말 것.
 - 작업이 끝나면 npm run build를 실행해 통과를 확인하고, 바로 commit해요. 실패하면 commit/push하지 말고 Vella에게 알려요.
 - DB 변경이 없으면 commit 후 바로 push해요.
-- DB 변경이 있으면 SQL 파일은 작업당 하나만 만들고, 재실행해도 안전하도록 가능한 DDL에 if not exists를 사용해요. 답변 맨 위에 크게 "⚠️ SQL 실행 필요"라고 표시하고, Vella가 "실행했어"라고 확인하기 전에는 push하지 않아요.
-- SQL에 DROP, DELETE, TRUNCATE, UPDATE가 있으면 실행 전에 별도로 "🔴 위험: 검토 필요"라고 표시하고, 어떤 기존 데이터/구조에 영향을 주는지 쉬운 말로 설명해요.
-- 새 작업을 시작하기 전에 supabase/APPLIED.md와 supabase/*.sql을 대조해 실행 완료 SQL이 기록에서 빠졌는지 확인해요. SQL 실행을 확인받으면 파일 이름과 실행 내용을 supabase/APPLIED.md에 기록해요.
+- DB 변경이 있으면 SQL 파일은 작업당 하나만 만들고, 재실행해도 안전하도록 가능한 DDL에 if not exists를 사용해요.
+- SQL이 필요한 요청 순서: ① supabase/에 SQL 파일 작성 → ② `npm run sql -- supabase/파일.sql`로 Claude가 직접 실행(scripts/run-sql.mjs: .env.local의 SUPABASE_DB_URL로 접속, 파일 내용을 먼저 보여주고 트랜잭션 하나로 실행, 실패하면 전부 되돌림, 파일 안 begin/commit은 자동으로 빼요, 주소·비밀번호는 출력 안 함) → ③ 결과(바뀐 행 수·select 결과)를 확인해 Vella에게 쉬운 말로 알려요 → ④ 그다음 npm run build·코드 commit·push. 실행이 실패하면 코드도 commit/push하지 않고 알려요. 접속만 확인: `npm run sql -- --check`(읽기 전용).
+- 삭제(drop · delete · truncate, alter … drop 포함: drop constraint로 규칙 교체, drop not null도 해당)가 들어간 SQL은 스크립트가 --confirm 없이는 실행을 거부해요. 실행 전에 "🔴 위험: 검토 필요"로 SQL 내용과 영향 받는 행 수(`npm run sql -- supabase/파일.sql --dry`: 똑같이 실행해 보고 전부 되돌림)를 Vella에게 보여주고 어떤 데이터/구조가 바뀌는지 쉬운 말로 설명한 뒤, Vella가 "실행해"라고 답할 때만 `--confirm`으로 실행해요. UPDATE만 있는 SQL은 확인 없이 실행하되 무엇이 몇 행 바뀌었는지 알려요.
+- 새 작업을 시작하기 전에 supabase/APPLIED.md와 supabase/*.sql을 대조해 실행 완료 SQL이 기록에서 빠졌는지 확인해요. npm run sql이 성공하면 APPLIED.md에 파일 이름·날짜·파일 첫 줄 설명이 자동으로 기록돼요(내용 칸은 필요하면 쉬운 말로 다듬어요). 이미 기록된 파일은 `--again` 없이는 다시 실행되지 않아요.
 - 관리 화면에서 접는 상자(details) 안의 저장·수정·삭제 칸은 app/admin/CloseOnSubmitForm으로 만들어, 누르면 상자가 바로 접히게 해요(따로 접는 수고가 없게).
 - 자주 묻는 질문(/faq, 첫 화면 메뉴): 큰 제목(카테고리)마다 접어 두고 누르면 질문이, 질문을 누르면 답이 펼쳐져요. 카테고리 이름은 관리 [FAQ]의 "카테고리 이름 바꾸기"로 한 번에 바꿔요. 관리 [FAQ]에서 추가·수정·공개/숨김·순서 변경. 질문함(여기 없는 질문 남기기)은 없앴어요: 학생 화면에 질문 칸·로그인 갈래·대신 넣는 안내 문구 없음, 질문 저장 서버 동작도 막음. 지난 질문은 삭제했고(SQL 26) 관리 [FAQ]의 '지난 질문함' 칸도 없앴어요.
 - 공개 필독 페이지에는 [☀️ 오전반 | 🌙 저녁반] 탭으로 바꿔 보는 수업 시간표가 있어요.
