@@ -31,12 +31,13 @@ export type Application = {
   pending_from?: string | null; // 30분 입금 타이머 시작 (비어 있으면 신청 시각, 관리자가 되살리면 그 시각)
   books_adjusted?: boolean; // 관리자가 교재를 직접 고른 신청 (회차 재계산·반 변경에서 교재를 자동으로 바꾸지 않아요)
   audio_extended_until?: string | null; // 관리자가 음원 기간을 다시 열어준 마지막 날
+  account_id?: string | null; // 구글·카카오 로그인으로 묶인 학생 번호 (연결 전 신청은 비어 있어요, SQL 39)
 };
 
 export type NewApplication = Omit<Application, "id" | "status" | "created_at">;
 
 // 신청 조회에 쓰는 칸 (비밀번호 해시 pin_hash는 로그인 확인 때만 읽어요)
-const APP_COLS = "id,cohort,kind,course,track,continuing,slot,pickup_date,pickup_time,books,pickup,name,phone,depositor,address,amount,status,created_at,paid_at,cancelled_at,cancel_reason,pending_from,books_adjusted,audio_extended_until";
+const APP_COLS = "id,cohort,kind,course,track,continuing,slot,pickup_date,pickup_time,books,pickup,name,phone,depositor,address,amount,status,created_at,paid_at,cancelled_at,cancel_reason,pending_from,books_adjusted,audio_extended_until,account_id";
 
 export type Lecture = {
   id: string;
@@ -194,9 +195,10 @@ type Mem = {
   notices: Notice[];
   noticeReads: NoticeRead[];
   ybmOrders: YbmOrder[];
+  loginLinks: LoginLink[];
 };
 const g = globalThis as unknown as { __vellaMem?: Mem };
-const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [], testResults: [], testOverrides: [], testDoubles: [], notices: [], noticeReads: [], ybmOrders: [] });
+const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [], testResults: [], testOverrides: [], testDoubles: [], notices: [], noticeReads: [], ybmOrders: [], loginLinks: [] });
 mem.specialLectures ??= [];
 mem.specialRegistrations ??= [];
 mem.specialMaterials ??= [];
@@ -214,6 +216,7 @@ mem.testOverrides ??= [];
 mem.notices ??= [];
 mem.noticeReads ??= [];
 mem.ybmOrders ??= [];
+mem.loginLinks ??= [];
 
 // 그 달 날짜 범위: 1일 이상 ~ 다음 달 1일 미만 (11월처럼 30일까지인 달에 '-31'을 만들면 DB 오류가 나요)
 export function monthRange(cohort: string) {
@@ -313,7 +316,7 @@ async function listCohortApplicationsRaw(cohort: string): Promise<Application[]>
   return mem.apps.filter((a) => a.cohort === cohort);
 }
 
-type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "continuing" | "slot" | "books" | "amount" | "cohort" | "audio_extended_until" | "cancelled_at" | "cancel_reason" | "pending_from" | "books_adjusted">>;
+type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "continuing" | "slot" | "books" | "amount" | "cohort" | "audio_extended_until" | "cancelled_at" | "cancel_reason" | "pending_from" | "books_adjusted" | "account_id">>;
 
 export async function updateApplication(id: string, patch: ApplicationPatch) {
   await updateApplications([id], patch);
@@ -1481,4 +1484,107 @@ export async function listPendingYbmOrders(): Promise<YbmOrder[]> {
     return data as YbmOrder[];
   }
   return mem.ybmOrders.filter((o) => o.status === "pending");
+}
+
+// ── 구글·카카오 로그인 연결 (SQL 39) ─────────────
+// provider + subject(구글 sub · 카카오 회원번호) → 학생 번호(account_id). 신청서 applications.account_id와 같은 번호예요.
+export type LoginLink = {
+  provider: "google" | "kakao";
+  subject: string;
+  account_id: string;
+  email: string | null;
+  nickname: string | null;
+  created_at: string;
+  last_login_at: string | null;
+};
+
+export async function getLoginLink(provider: LoginLink["provider"], subject: string): Promise<LoginLink | null> {
+  if (sb) {
+    const { data, error } = await sb.from("login_links").select("*").eq("provider", provider).eq("subject", subject).maybeSingle();
+    if (error) throw error;
+    return (data as LoginLink) ?? null;
+  }
+  return mem.loginLinks.find((l) => l.provider === provider && l.subject === subject) ?? null;
+}
+
+export async function listLoginLinks(accountIds: string[]): Promise<LoginLink[]> {
+  const ok = [...new Set(accountIds.filter(isUuid))];
+  if (ok.length === 0) return [];
+  if (sb) {
+    const db = sb;
+    return inChunks(ok, async (chunk) => {
+      const { data, error } = await db.from("login_links").select("*").in("account_id", chunk).order("created_at");
+      if (error) throw error;
+      return data as LoginLink[];
+    });
+  }
+  return mem.loginLinks.filter((l) => ok.includes(l.account_id));
+}
+
+// 연결 저장 (이미 있으면 학생 번호·이메일·별명만 바꿔요) + 마지막 로그인 시각
+export async function saveLoginLink(l: Pick<LoginLink, "provider" | "subject" | "account_id" | "email" | "nickname">) {
+  const row = { ...l, last_login_at: new Date().toISOString() };
+  if (sb) {
+    const { error } = await sb.from("login_links").upsert(row, { onConflict: "provider,subject" });
+    if (error) throw error;
+    return;
+  }
+  const old = mem.loginLinks.find((x) => x.provider === l.provider && x.subject === l.subject);
+  if (old) Object.assign(old, row);
+  else mem.loginLinks.push({ ...row, created_at: row.last_login_at });
+}
+
+export async function touchLoginLink(provider: LoginLink["provider"], subject: string, patch: Pick<LoginLink, "email" | "nickname">) {
+  const row = { ...patch, last_login_at: new Date().toISOString() };
+  if (sb) {
+    const { error } = await sb.from("login_links").update(row).eq("provider", provider).eq("subject", subject);
+    if (error) throw error;
+    return;
+  }
+  const old = mem.loginLinks.find((x) => x.provider === provider && x.subject === subject);
+  if (old) Object.assign(old, row);
+}
+
+export async function deleteLoginLink(provider: LoginLink["provider"], subject: string) {
+  if (sb) {
+    const { error } = await sb.from("login_links").delete().eq("provider", provider).eq("subject", subject);
+    if (error) throw error;
+    return;
+  }
+  mem.loginLinks = mem.loginLinks.filter((x) => !(x.provider === provider && x.subject === subject));
+}
+
+// 이 학생 번호로 묶인 신청 (로그인할 때만 읽어요)
+export async function appsByAccount(accountId: string): Promise<Application[]> {
+  if (!isUuid(accountId)) return [];
+  if (sb) {
+    const { data, error } = await sb.from("applications").select(APP_COLS).eq("account_id", accountId);
+    if (error) throw error;
+    return data as Application[];
+  }
+  return mem.apps.filter((a) => a.account_id === accountId);
+}
+
+// 신청을 학생 번호에 묶어요: attach = 번호가 없던 신청, mergeFrom = 이 번호로 합칠 다른 번호(신청·로그인 연결 모두 옮겨요)
+export async function linkAccount(accountId: string, attach: string[], mergeFrom: string[]) {
+  forget("apps:");
+  const ok = attach.filter(isUuid);
+  const from = mergeFrom.filter((x) => isUuid(x) && x !== accountId);
+  if (sb) {
+    const db = sb;
+    await inChunks(ok, async (chunk) => {
+      const { error } = await db.from("applications").update({ account_id: accountId }).in("id", chunk).is("account_id", null);
+      if (error) throw error;
+      return [];
+    });
+    for (const m of from) {
+      const a = await db.from("applications").update({ account_id: accountId }).eq("account_id", m);
+      if (a.error) throw a.error;
+      const b = await db.from("login_links").update({ account_id: accountId }).eq("account_id", m);
+      if (b.error) throw b.error;
+    }
+    return;
+  }
+  for (const a of mem.apps) if ((ok.includes(a.id) && !a.account_id) || (a.account_id && from.includes(a.account_id))) a.account_id = accountId;
+  for (const l of mem.loginLinks) if (from.includes(l.account_id)) l.account_id = accountId;
 }

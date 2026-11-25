@@ -7,7 +7,8 @@ import { registerSpecialLecture, type FormState } from "@/app/actions";
 
 type Option = { id: string; title: string; when: string; closed: boolean; badge: string | null };
 
-export default function SpecialForm({ events }: { events: Option[] }) {
+// needPin=false: 구글·카카오만 방식 (로그인한 학생 신청으로 확인해서 3번 칸이 없어요)
+export default function SpecialForm({ events, needPin = true }: { events: Option[]; needPin?: boolean }) {
   const [state, action, pending] = useActionState<FormState, FormData>(registerSpecialLecture, {});
   const [mode, setMode] = useState(""); // 신청 직후 제목: 불라방은 바로 확정, 현장은 보증금 입금 후 확정
 
@@ -55,12 +56,12 @@ export default function SpecialForm({ events }: { events: Option[] }) {
         </div>
       </div>
 
-      <div className="space-y-3">
+      {needPin && <div className="space-y-3">
         <p className="label">3. 강의실 로그인 정보</p>
         <input name="name" className="input" placeholder="이름" autoComplete="name" />
         <input name="pin" className="input tracking-[0.3em]" placeholder="강의실 비밀번호 4자리" inputMode="numeric" maxLength={4} type="password" />
         <p className="text-xs text-slate-500">교재비 신청할 때 정한 이름과 강의실 비밀번호를 입력해 주세요.</p>
-      </div>
+      </div>}
 
       {state.error && <p className="text-sm font-bold text-red-600">{state.error}</p>}
       <button className="btn w-full" disabled={pending || events.every((e) => e.closed)}>{pending ? "신청 중…" : events.every((e) => e.closed) ? "신청이 마감됐어요" : "특강 신청하기"}</button>

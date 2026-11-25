@@ -9,6 +9,8 @@ import { cohortUntil, viewInfo } from "@/lib/viewWindowServer";
 import { dayLabelKo, viewPhase } from "@/lib/viewWindow";
 import { publicSpecials } from "@/lib/specialPlan";
 import SpecialLogin from "./SpecialLogin";
+import SocialButtons from "@/components/SocialButtons";
+import { loginSetup } from "@/lib/socialServer";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "특강 신청 · vella_toeic", robots: { index: false } };
@@ -19,6 +21,10 @@ export default async function SpecialPage({ searchParams }: { searchParams: Prom
   const { apps: myApps } = await activeStudentApps();
   const [events, mine, info] = await Promise.all([listSpecialLectures().then(publicSpecials), getSpecialRegistrationsFor(myApps.map((a) => a.id)), viewInfo(myApps)]);
   const account = await getSetting("bank_account");
+  // 학생 로그인 방식: 구글·카카오만이면 이름·비밀번호 칸 없이 로그인한 학생으로 신청해요
+  const login = await loginSetup();
+  const socialOnly = login.mode === "social";
+  const loggedIn = myApps.length > 0;
   // 아직 열리지 않은(오늘 이후) 특강은 모두 보여주고, 마감된 것은 '신청이 마감됐어요'로 막아요.
   const today = todayKST();
   const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 24 * 3600 * 1000).toISOString().slice(0, 10);
@@ -61,9 +67,17 @@ export default async function SpecialPage({ searchParams }: { searchParams: Prom
         <p className="mt-2 text-slate-600">현장 또는 불라방으로 신청할 수 있어요.</p>
       </div>
 
-      {upcoming.length > 0
-        ? <SpecialForm events={upcoming.map((event) => ({ id: event.id, title: event.title, when: specialWhen(event), closed: !open.includes(event), badge: deadlineBadge(event) }))} />
-        : <p className="card text-center text-slate-500">지금 신청할 수 있는 특강이 없어요.</p>}
+      {upcoming.length === 0
+        ? <p className="card text-center text-slate-500">지금 신청할 수 있는 특강이 없어요.</p>
+        : socialOnly && !loggedIn
+          ? (
+            <div className="card space-y-3 text-center">
+              <p className="font-jua text-xl text-sky-ink">로그인하고 특강을 신청해요</p>
+              <p className="text-sm text-slate-600">강의실과 같은 구글·카카오 계정으로 로그인해 주세요.</p>
+              <SocialButtons providers={login.providers} next="/special" />
+            </div>
+          )
+          : <SpecialForm needPin={!socialOnly} events={upcoming.map((event) => ({ id: event.id, title: event.title, when: specialWhen(event), closed: !open.includes(event), badge: deadlineBadge(event) }))} />}
 
       {myRows.length > 0 ? (
         <section className="space-y-3">
@@ -158,8 +172,8 @@ export default async function SpecialPage({ searchParams }: { searchParams: Prom
             <button className="text-sm text-slate-500 underline">로그아웃 (다른 이름으로 확인하기)</button>
           </form>
         </section>
-      ) : (
-        <SpecialLogin />
+      ) : login.mode !== "pin" && loggedIn ? null : (
+        <SpecialLogin providers={login.providers} pin={login.pin} />
       )}
     </div>
   );

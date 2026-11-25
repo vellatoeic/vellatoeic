@@ -38,7 +38,9 @@ const choice = (on: boolean) =>
 
 type MonthOption = { cohort: string; label: string; range: string; round: 1 | 2; windows: Record<string, { first: string | null; last: string | null }> };
 
-export default function ApplyForm({ kind, months, today }: { kind: Kind; months: MonthOption[]; today: string }) {
+// account: 구글·카카오만 방식에서 로그인한 계정 이름 (있으면 비밀번호 칸이 없어요)
+export default function ApplyForm({ kind, months, today, account = null }: { kind: Kind; months: MonthOption[]; today: string; account?: string | null }) {
+  const pinFields = !account;
   const [state, action, pending] = useActionState<FormState, FormData>(submitApplication, {});
   // 수강 월: 하나뿐이면 자동, 둘이면 기본 선택 없이 꼭 고르기
   const [month, setMonth] = useState<string | null>(months.length === 1 ? months[0].cohort : null);
@@ -96,9 +98,9 @@ export default function ApplyForm({ kind, months, today }: { kind: Kind; months:
     else if (pickup === "delivery" && !manualAddress && !zip) error = "[주소 검색] 버튼으로 택배 받을 주소를 찾아 주세요.";
     else if (pickup === "delivery" && get("address_detail").length < 1) error = "동·호수 등 상세 주소를 입력해 주세요. (단독주택이면 '단독주택'이라고 적어 주세요)";
     else if (pickup === "delivery" && manualAddress && get("address_manual").length < 10) error = "택배 받을 주소를 정확히 입력해 주세요.";
-    else if (!/^\d{4}$/.test(get("pin"))) error = "강의실 비밀번호를 숫자 4자리로 정해 주세요.";
+    else if (pinFields && !/^\d{4}$/.test(get("pin"))) error = "강의실 비밀번호를 숫자 4자리로 정해 주세요.";
     else if (!month) error = "몇 월 수업인지 골라 주세요.";
-    else if (get("pin") !== get("pin2")) error = "비밀번호 확인이 맞지 않아요. 같은 숫자 4자리를 두 번 입력해 주세요.";
+    else if (pinFields && get("pin") !== get("pin2")) error = "비밀번호 확인이 맞지 않아요. 같은 숫자 4자리를 두 번 입력해 주세요.";
     else if (!fd.get("ybm_registered")) error = "YBM 학원 수강 등록을 먼저 마쳐 주세요. (등록했다면 체크)";
     else if (!fd.get("agree")) error = "필독 사항 확인에 체크해 주세요.";
     setCheckError(error);
@@ -262,14 +264,19 @@ export default function ApplyForm({ kind, months, today }: { kind: Kind; months:
           <span className="mb-1 block text-xs font-bold text-red-600">다른 이름으로 입금하면 꼭 적어 주세요 (안 적으면 자동 확인이 안 돼요)</span>
           <input name="depositor" className="input" placeholder="예: 홍길동(엄마)" />
         </label>
-        <label className="sm:col-span-2">
+        {account && (
+          <p className="rounded-2xl bg-sky-soft px-4 py-3 text-sm text-sky-ink sm:col-span-2">
+            🔗 <b>{account}</b> 계정으로 신청해요. 강의실·특강도 이 계정으로 들어와요.
+          </p>
+        )}
+        {pinFields && <label className="sm:col-span-2">
           <span className="label">강의실 비밀번호 <span className="font-normal text-slate-400">(숫자 4자리 · 강의 볼 때 사용)</span></span>
           <div className="grid grid-cols-2 gap-2">
             <input name="pin" className="input tracking-[0.4em]" placeholder="숫자 4자리" inputMode="numeric" maxLength={4} type="password" />
             <input name="pin2" className="input tracking-[0.4em]" placeholder="한 번 더" inputMode="numeric" maxLength={4} type="password" />
           </div>
           <span className="mt-1 block text-xs text-slate-500">강의실·특강 신청에 계속 쓰니 꼭 기억해 주세요. <b className="text-sky-deep">지난달에 신청했다면 같은 비밀번호를 써 주세요.</b></span>
-        </label>
+        </label>}
         {online && pickup === "classroom" && (
           <div className="space-y-2 sm:col-span-2">
             <span className="label">1층 데스크 교재 수령 희망 날짜·시간</span>

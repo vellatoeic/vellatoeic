@@ -1,3 +1,4 @@
+import LoginModeCard from "./LoginModeCard";
 import { adminAlerts } from "@/lib/adminAlerts";
 import { BOOKS, COURSES, KINDS, TRACKS, TRACK_ORDER, slotTag, bookStatusLabel, cohortLabel, roundOf, thisMonthKST, won, type BookId, type CourseId, type TimeSlot } from "@/lib/config";
 import { listApplications, listDepositEvents, listWaitingDepositEvents, listYbmOrders, listMissions, getSetting, currentCohort, roundFor, isPreview, type Application, type Mission } from "@/lib/db";
@@ -473,6 +474,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
         </ul>
         {!ra && alerts.recent.length > 30 && <a href={`${link({ ra: "1" })}#recent`} className="mt-2 block text-center text-sm text-sky-deep underline">더 보기 (최근 300건)</a>}
       </details>
+
+      <LoginModeCard />
 
       <details id="settings" className="card !p-4">
         <summary className="font-jua cursor-pointer text-lg text-sky-ink">⚙️ 기본 설정 (모집 기수 · 계좌 · 카페·블로그 주소)</summary>

@@ -15,6 +15,7 @@ import { depositDeadline, expireUnpaid, ruleFrom } from "@/lib/cancellations";
 import DepositCountdown from "@/components/DepositCountdown";
 import CancelledNotice from "@/components/CancelledNotice";
 import { safe } from "@/lib/safe";
+import { loginSetup } from "@/lib/socialServer";
 
 export const dynamic = "force-dynamic";
 
@@ -138,7 +139,7 @@ export default async function MyPage({ params, searchParams }: { params: Promise
 
       {deskWaiting && isMine && <BookReceived id={a.id} when={a.pickup_date ? `${specialDay(a.pickup_date)} ${a.pickup_time ?? ""}` : undefined} />}
 
-      {a.kind === "online" && <HowToWatch days={classDaysLabel(a)} times={classTimes(a)} />}
+      {a.kind === "online" && <HowToWatch days={classDaysLabel(a)} times={classTimes(a)} login={(await loginSetup()).mode} />}
 
       <section className="card">
         <h2 className="font-jua text-xl text-sky-ink">신청 내용</h2>

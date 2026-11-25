@@ -1,10 +1,12 @@
 import Link from "next/link";
+import type { LoginMode } from "@/lib/socialLogin";
 
 // 불라방 학생에게 보여주는 "수업 듣는 방법" 카드. 반 정보가 있으면 수업 요일·시간도 보여줘요.
-export default function HowToWatch({ days, times, beforeApply }: { days?: string; times?: { label: string; from: string; to: string }[]; beforeApply?: boolean }) {
+// login: 학생 로그인 방식 (관리 [기본 설정])에 맞춰 ② 문구가 바뀌어요
+export default function HowToWatch({ days, times, beforeApply, login = "pin" }: { days?: string; times?: { label: string; from: string; to: string }[]; beforeApply?: boolean; login?: LoginMode }) {
   const steps = [
     "수업 10분 전, 홈페이지 → 강의실",
-    "이름 + 비밀번호 4자리로 로그인",
+    login === "social" ? "카카오 또는 구글로 로그인" : login === "both" ? "카카오·구글 또는 이름 + 비밀번호로 로그인" : "이름 + 비밀번호 4자리로 로그인",
     "맨 위 \"🔴 라이브 입장\" 버튼 누르기",
   ];
   return (

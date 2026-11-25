@@ -61,7 +61,62 @@ export function getStudentIds(): Promise<string[]> {
 export async function clearStudent() {
   forget("student:");
   forget("apps:active");
-  (await cookies()).delete("vella_student");
+  const jar = await cookies();
+  jar.delete("vella_student");
+  jar.delete("vella_account");
+}
+
+// ── 구글·카카오 로그인 ──────────────────────────
+// 학생 번호(account_id): 구글·카카오로 로그인(또는 연결)한 기기에만 있어요. 구글·카카오만 방식의 신청서가 이 번호로 저장돼요.
+export async function setAccount(id: string) {
+  forget("student:");
+  (await cookies()).set("vella_account", seal(id), cookieOpts);
+}
+export function getAccountId(): Promise<string | null> {
+  return memo("student:account", async () => unseal((await cookies()).get("vella_account")?.value));
+}
+
+// 잠깐만 쓰는 쿠키: 만든 시각을 함께 서명해서, 정해진 시간이 지나면 서버에서도 무시해요
+function sealTimed(v: object) {
+  return seal(JSON.stringify({ ...v, t: Date.now() }));
+}
+function unsealTimed<T>(raw: string | undefined, maxMs: number): T | null {
+  const v = unseal(raw);
+  if (!v) return null;
+  try {
+    const o = JSON.parse(v) as T & { t?: number };
+    return typeof o.t === "number" && Date.now() - o.t >= 0 && Date.now() - o.t < maxMs ? o : null;
+  } catch {
+    return null;
+  }
+}
+
+// 구글·카카오로 보내기 전 확인값 (state, PKCE): 10분, 로그인 주소(/api/auth)에만 보내요
+// l = 강의실 [연결하기] 버튼에서 왔어요 (이미 로그인한 신청을 그대로 연결)
+export type OAuthState = { p: string; s: string; v: string; n: string; l?: boolean };
+const OAUTH_MS = 10 * 60 * 1000;
+export async function setOAuthState(st: OAuthState) {
+  (await cookies()).set("vella_oauth", sealTimed(st), { ...cookieOpts, path: "/api/auth", maxAge: OAUTH_MS / 1000 });
+}
+export async function takeOAuthState(): Promise<OAuthState | null> {
+  const jar = await cookies();
+  const st = unsealTimed<OAuthState>(jar.get("vella_oauth")?.value, OAUTH_MS);
+  jar.set("vella_oauth", "", { ...cookieOpts, path: "/api/auth", maxAge: 0 });
+  return st;
+}
+
+// 처음 로그인한 구글·카카오 계정: 이름+비밀번호로 내 신청을 찾을 때까지 20분 기억해요
+// none = 이미 연결된 계정인데 수강 신청이 하나도 없을 때
+export type PendingLink = { p: "google" | "kakao"; sub: string; email: string | null; nick: string | null; none?: boolean };
+const LINK_MS = 20 * 60 * 1000;
+export async function setPendingLink(l: PendingLink) {
+  (await cookies()).set("vella_link", sealTimed(l), { ...cookieOpts, maxAge: LINK_MS / 1000 });
+}
+export async function getPendingLink(): Promise<PendingLink | null> {
+  return unsealTimed<PendingLink>((await cookies()).get("vella_link")?.value, LINK_MS);
+}
+export async function clearPendingLink() {
+  (await cookies()).delete("vella_link");
 }
 
 // ── 관리자 ─────────────────────────────────────

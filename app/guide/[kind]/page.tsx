@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 import { CLASSROOM, KINDS, todayKST, type Kind } from "@/lib/config";
-import { getSetting, roundFor } from "@/lib/db";
+import { getSetting, listLoginLinks, roundFor } from "@/lib/db";
+import { getAccountId } from "@/lib/auth";
+import { loginSetup } from "@/lib/socialServer";
+import { PROVIDER_LABEL } from "@/lib/socialLogin";
+import SocialButtons from "@/components/SocialButtons";
 import { holidaysOf } from "@/lib/classCalendar";
 import { SCHEDULE_CLASSES, scheduleKey, schoolDaysFor, type ScheduleClass } from "@/lib/schedule";
 import { signupMonths } from "@/lib/signupMonthsServer";
@@ -50,6 +54,11 @@ export default async function KindGuide({ params }: { params: Promise<{ kind: st
     return Object.fromEntries(entries);
   };
   const months = await Promise.all((await signupMonths()).map(async (m) => ({ ...m, round: await roundFor(m.cohort), windows: await windowsOf(m.cohort) })));
+  // 구글·카카오만 방식: 로그인한 학생 번호로 신청해요 (로그인 전이면 신청서 대신 로그인 버튼)
+  const login = await loginSetup();
+  const accountId = login.mode === "social" ? await getAccountId() : null;
+  const link = accountId ? (await listLoginLinks([accountId])).sort((a, b) => (b.last_login_at ?? "").localeCompare(a.last_login_at ?? ""))[0] : null;
+  const accountLabel = accountId ? (link ? `${PROVIDER_LABEL[link.provider]}${link.email || link.nickname ? ` (${link.email ?? link.nickname})` : ""}` : "로그인한") : null;
 
   return (
     <div className="space-y-6 pt-8">
@@ -81,9 +90,17 @@ export default async function KindGuide({ params }: { params: Promise<{ kind: st
 
       <Timetable />
 
-      {kind === "online" && <HowToWatch beforeApply />}
+      {kind === "online" && <HowToWatch beforeApply login={login.mode} />}
 
-      <ApplyForm kind={kind} months={months} today={todayKST()} />
+      {login.mode === "social" && !accountId ? (
+        <section className="card space-y-3 text-center">
+          <p className="font-jua text-2xl text-sky-ink">✍️ 신청서 쓰기 전에 로그인해 주세요</p>
+          <p className="text-sm text-slate-600">카카오 또는 구글 계정으로 신청하면, 강의실·특강도 같은 버튼으로 들어와요.</p>
+          <SocialButtons providers={login.providers} next={`/guide/${kind}`} />
+        </section>
+      ) : (
+        <ApplyForm kind={kind} months={months} today={todayKST()} account={accountLabel} />
+      )}
     </div>
   );
 }

@@ -28,12 +28,14 @@ export function altTrackError(prev: Pick<Application, "track"> | null, chosen: T
 }
 
 export const NOT_FOUND_NOTICE = "지난달 격일반 기록을 찾지 못했어요. 처음 듣는 과정(교재 3권)으로 신청돼요. 지난달과 다른 비밀번호를 썼다면 지난달 비밀번호로 다시 입력해 주세요.";
+// 구글·카카오만 방식: 지난달 신청이 이 로그인에 연결돼 있지 않으면 못 찾아요
+export const NOT_FOUND_NOTICE_SOCIAL = "지난달 격일반 기록을 찾지 못했어요. 처음 듣는 과정(교재 3권)으로 신청돼요. 지난달에 이름+비밀번호로 신청했다면 강의실에서 그 신청을 먼저 연결해 주세요.";
 
 // 교재·금액 (서버 판단): 시작반 격일반은 지난달 기록이 있을 때만 이어듣기
-export function planBooks(p: { course: CourseId; track: Track; pickup: Pickup; round: 1 | 2; prev: Application | null; wantContinuing: boolean }) {
+export function planBooks(p: { course: CourseId; track: Track; pickup: Pickup; round: 1 | 2; prev: Application | null; wantContinuing: boolean; social?: boolean }) {
   const continuing = p.course === "start" && isAlt(p.track) && !!p.prev;
   const books = booksFor(p.course, p.track, p.round, continuing);
-  const notice = p.course === "start" && isAlt(p.track) && p.wantContinuing && !p.prev ? NOT_FOUND_NOTICE : null;
+  const notice = p.course === "start" && isAlt(p.track) && p.wantContinuing && !p.prev ? (p.social ? NOT_FOUND_NOTICE_SOCIAL : NOT_FOUND_NOTICE) : null;
   return { continuing, books, amount: calcAmount(books, p.pickup), notice };
 }
 

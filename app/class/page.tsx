@@ -21,6 +21,8 @@ import AudioList from "@/components/audio/AudioList";
 import AudioPopup from "@/components/audio/AudioPopup";
 import StudentLogin from "./StudentLogin";
 import StickerBoard from "./StickerBoard";
+import SocialButtons from "@/components/SocialButtons";
+import { loginSetup } from "@/lib/socialServer";
 import { defaultHolidays, holidayKey, parseHolidays, schoolDaysFor, scheduleClassFor, scheduleKey } from "@/lib/schedule";
 import { classAppsFor } from "@/lib/classCohort";
 import { studentDays } from "@/lib/studentDays";
@@ -65,6 +67,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
   }
 
   const name = apps[0].name;
+  const loginInfo = await safe("loginSetup", () => loginSetup(), { mode: "pin" as const, providers: [], pin: true });
   const paid = apps.filter(canWatch).sort((a, b) => b.cohort.localeCompare(a.cohort));
 
   // 스티커판: 같은 기수·같은 수업 학생들의 출석 날짜 = 수업일
@@ -316,6 +319,15 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
       )}
 
       <p className="rounded-2xl bg-sky-soft px-4 py-3 text-sm text-sky-deep">강의 영상은 개강일 이후부터 열람할 수 있어요.</p>
+
+      {/* 카카오·구글 연결 안내: 로그인 방식이 '둘 다'·'구글·카카오만'이고 아직 연결 안 한 학생에게만 */}
+      {loginInfo.providers.length > 0 && !apps.some((a) => a.account_id) && (
+        <section className="card space-y-3">
+          <p className="font-jua text-xl text-sky-ink">🔗 카카오·구글 계정 연결하기</p>
+          <p className="text-sm text-slate-600">한 번 연결하면 다음부터 이름·비밀번호 없이 버튼 하나로 들어와요.</p>
+          <SocialButtons providers={loginInfo.providers} next="/class" link />
+        </section>
+      )}
 
       {showGift && cohort && <GiftDraw initial={myDraw} month={Number(cohort.slice(5, 7))} channelUrl={kakaoChannel} />}
 

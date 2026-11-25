@@ -9,7 +9,9 @@ import { specialDay } from "@/lib/special";
 import { TEST_LABEL } from "@/lib/tests";
 import { missionCount } from "@/lib/mission";
 import { watchSummary } from "@/lib/watchlist";
-import { changeCohort, cycleAttendance, cycleHomework, extendAudio } from "@/app/actions";
+import { changeCohort, cycleAttendance, cycleHomework, extendAudio, unlinkLogin } from "@/app/actions";
+import { listLoginLinks } from "@/lib/db";
+import { PROVIDER_LABEL } from "@/lib/socialLogin";
 import { movableCohorts } from "@/lib/cohortMove";
 import { thisMonthKST } from "@/lib/config";
 import CloseOnSubmitForm from "../../CloseOnSubmitForm";
@@ -54,6 +56,8 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
   };
   const eventById = new Map(events.map((e) => [e.id, e]));
   const audioWin = audioBooksFor(a).length > 0 ? await studentAudioWindow(a) : null;
+  // 이 학생 번호에 연결된 구글·카카오 로그인
+  const links = a.account_id ? await listLoginLinks([a.account_id]) : [];
   // 같은 이름의 다른 달 신청 (수강 이력) — 최신 달이 위
   const history = apps.filter((x) => x.name === a.name).sort((x, y) => y.cohort.localeCompare(x.cohort) || y.created_at.localeCompare(x.created_at));
   const phone = a.phone?.replace(/(\d{3})(\d{3,4})(\d{4})/, "$1-$2-$3");
@@ -116,6 +120,23 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
             </form>
           </div>
         )}
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-slate-50 p-3 text-sm">
+          <span className="font-bold text-slate-600">🔗 로그인 연결</span>
+          {links.length === 0 ? (
+            <span className="text-slate-500">없음 (이름 + 비밀번호로만 들어와요)</span>
+          ) : links.map((l) => (
+            <form key={`${l.provider}:${l.subject}`} action={unlinkLogin} className="flex items-center gap-2 rounded-full bg-white px-3 py-1">
+              <input type="hidden" name="provider" value={l.provider} />
+              <input type="hidden" name="subject" value={l.subject} />
+              <input type="hidden" name="id" value={a.id} />
+              <span>
+                {PROVIDER_LABEL[l.provider]}{l.email || l.nickname ? ` · ${l.email ?? l.nickname}` : ""}
+                {l.last_login_at && <span className="text-slate-400"> · 마지막 {new Date(l.last_login_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" })}</span>}
+              </span>
+              <button className="text-xs font-bold text-red-600 underline">연결 끊기</button>
+            </form>
+          ))}
+        </div>
         {mission?.intro_at && (
           <p className="rounded-2xl bg-sky-soft p-3 text-sm text-slate-600">
             📝 {mission.prev_score} → 목표 {mission.target_score} · 시험 {mission.exam_month}

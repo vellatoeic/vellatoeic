@@ -9,6 +9,7 @@ import {
 } from "@/lib/config";
 import {
   createApplication, listApplications, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, setHomeworkStar, drawGift, getGiftDraw, saveGiftItem, deleteGiftItem, setGiftSent, type GiftDraw, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
+  appsByAccount, getLoginLink, saveLoginLink, linkAccount, deleteLoginLink, type Application,
   saveMission, type Mission, createYbmOrder, listYbmOrders, updateYbmOrders, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, setTestDouble, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudioLink, setAudioOrder, deleteAudios, createSpecialMaterialLink, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, listDepositEvents, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture, cleanupOrphanSpecialFiles,
 } from "@/lib/db";
 import { canWatch, isActive, loginApps } from "@/lib/access";
@@ -37,7 +38,12 @@ import { adjustedBooks } from "@/lib/manualLink";
 import { safe } from "@/lib/safe";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
+  setAccount, getAccountId, getPendingLink, clearPendingLink,
 } from "@/lib/auth";
+import { isProvider, isSignupNext, loginModeOf, planLink, safeNext } from "@/lib/socialLogin";
+import { loginSetup } from "@/lib/socialServer";
+import { allow } from "@/lib/rateLimit";
+import { randomUUID } from "crypto";
 
 export type FormState = { error?: string; ok?: string };
 
@@ -84,6 +90,10 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   const pickupTime = clean(fd.get("pickup_time"));
   const pin = clean(fd.get("pin"));
   const slot = clean(fd.get("slot"));
+  // 구글·카카오만 방식: 비밀번호 칸이 없고, 로그인한 학생 번호(account_id)로 신청이 묶여요
+  const social = (await loginSetup()).mode === "social";
+  const accountId = social ? await getAccountId() : null;
+  if (social && !accountId) return { error: "먼저 구글 또는 카카오로 로그인해 주세요." };
 
   if (!["onsite", "online"].includes(kind)) return { error: "수강 형태를 선택해 주세요." };
   if (!Object.hasOwn(COURSES, course)) return { error: "수강 신청한 반을 선택해 주세요." };
@@ -95,20 +105,24 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   if (deskPickup && (!/^\d{4}-\d{2}-\d{2}$/.test(pickupDate) || pickupDate < todayKST())) return { error: "교재 받을 날짜를 오늘 이후로 골라 주세요." };
   if (deskPickup && !/^([01]\d|2[0-3]):[0-5]\d$/.test(pickupTime)) return { error: "교재 받을 시간을 골라 주세요." };
   if (pickup === "delivery" && address.length < 10) return { error: "택배 받을 주소를 입력해 주세요." };
-  if (!/^\d{4}$/.test(pin)) return { error: "강의실 비밀번호를 숫자 4자리로 정해 주세요." };
-  if (pin !== clean(fd.get("pin2"))) return { error: "비밀번호 확인이 맞지 않아요. 같은 숫자 4자리를 두 번 입력해 주세요." };
+  if (!social && !/^\d{4}$/.test(pin)) return { error: "강의실 비밀번호를 숫자 4자리로 정해 주세요." };
+  if (!social && pin !== clean(fd.get("pin2"))) return { error: "비밀번호 확인이 맞지 않아요. 같은 숫자 4자리를 두 번 입력해 주세요." };
   if (!fd.get("ybm_registered")) return { error: "YBM 학원 수강 등록을 먼저 마쳐 주세요. (등록했다면 체크)" };
   if (!fd.get("agree")) return { error: "필독 사항 확인에 체크해 주세요." };
 
   // 격일반 두 달째·이어듣기는 서버가 지난달 기록(같은 이름·비밀번호·반·격일반·납부 완료)으로 판단해요
-  const plan = await applicationPlan({ cohort, course, track, pickup, name, pin, wantContinuing: !!fd.get("continuing") });
+  const plan = await applicationPlan({ cohort, course, track, pickup, name, pin, wantContinuing: !!fd.get("continuing"), accountId });
   if (plan.error) return { error: plan.error };
   const { continuing, books } = plan;
 
   await safe("expireUnpaid", () => expireUnpaid(Date.now()), null); // 30분 지난 입금 대기는 취소돼서 아래 중복 검사에서 빠져요 (다시 신청 가능)
-  // 같은 달에 같은 이름 + 같은 비밀번호로 이미 낸 신청이 있으면 새로 만들지 않고 그 신청 화면으로 보내요.
+  // 같은 달에 같은 이름 + 같은 비밀번호(구글·카카오만 방식은 같은 학생 번호)로 이미 낸 신청이 있으면 새로 만들지 않고 그 신청 화면으로 보내요.
   // 이름이 같아도 비밀번호가 다르면 동명이인으로 보고 새로 받아요.
-  const mine = (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash) && isActive(a));
+  const mine = accountId
+    ? (await appsByAccount(accountId)).filter(isActive)
+    : (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash) && isActive(a));
+  // 이미 구글·카카오로 연결한 학생이 이름+비밀번호로 새 달을 신청하면 같은 학생 번호를 이어 붙여요
+  const account = accountId ?? mine.find((a) => a.account_id)?.account_id ?? null;
   const existing = mine.find((a) => a.cohort === cohort);
   if (existing) {
     await setStudent(mine.map((a) => a.id));
@@ -131,20 +145,22 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
     pickup_date: deskPickup ? pickupDate : null,
     pickup_time: deskPickup ? pickupTime : null,
     amount: calcAmount(books, pickup),
-    pin_hash: hashPin(pin),
+    pin_hash: social ? null : hashPin(pin),
+    ...(account ? { account_id: account } : {}),
   });
   // 신청서보다 먼저 온 입금이 있으면 바로 연결해서 납부 확인해요
   await linkWaitingDeposit({ kind: "app", id, depositor, amount: calcAmount(books, pickup) });
-  await setStudent([id]); // 신청하면 바로 강의실 로그인 상태
+  await setStudent(social ? [...mine.map((a) => a.id), id] : [id]); // 신청하면 바로 강의실 로그인 상태
   redirect(`/my/${id}`);
 }
 
 // 신청 전에 서버 판단으로 교재·금액·안내를 미리 계산해요 (확인 창에서 보여줘요)
-async function applicationPlan(p: { cohort: string; course: CourseId; track: Track; pickup: Pickup; name: string; pin: string; wantContinuing: boolean }) {
-  const found = isAlt(p.track) && /^\d{4}$/.test(p.pin) ? await findByName(p.name) : [];
-  const prev = isAlt(p.track) ? findPrevAlt(found, (a) => checkPin(p.pin, a.pin_hash), p.cohort, p.course) : null;
+// accountId가 있으면(구글·카카오만 방식) 같은 학생 번호의 지난달 신청으로, 없으면 이름 + 비밀번호로 찾아요
+async function applicationPlan(p: { cohort: string; course: CourseId; track: Track; pickup: Pickup; name: string; pin: string; wantContinuing: boolean; accountId: string | null }) {
+  const found = !isAlt(p.track) ? [] : p.accountId ? await appsByAccount(p.accountId) : /^\d{4}$/.test(p.pin) ? await findByName(p.name) : [];
+  const prev = isAlt(p.track) ? findPrevAlt(found, (a) => !!p.accountId || checkPin(p.pin, a.pin_hash), p.cohort, p.course) : null;
   const error = altTrackError(prev, p.track);
-  const books = planBooks({ course: p.course, track: p.track, pickup: p.pickup, round: await roundFor(p.cohort), prev, wantContinuing: p.wantContinuing });
+  const books = planBooks({ course: p.course, track: p.track, pickup: p.pickup, round: await roundFor(p.cohort), prev, wantContinuing: p.wantContinuing, social: !!p.accountId });
   return { ...books, error, secondMonth: !!prev };
 }
 
@@ -155,7 +171,8 @@ export async function previewApplication(fd: FormData): Promise<{ error?: string
   const pickup = (kind === "onsite" ? "classroom" : clean(fd.get("pickup"))) as Pickup;
   const cohort = clean(fd.get("cohort"));
   if (!Object.hasOwn(COURSES, course) || !COURSES[course].tracks.includes(track) || !/^\d{4}-\d{2}$/.test(cohort)) return { error: "반·과정·수강 월을 다시 골라 주세요." };
-  const plan = await applicationPlan({ cohort, course, track, pickup, name: normName(clean(fd.get("name"))), pin: clean(fd.get("pin")), wantContinuing: !!fd.get("continuing") });
+  const accountId = (await loginSetup()).mode === "social" ? await getAccountId() : null;
+  const plan = await applicationPlan({ cohort, course, track, pickup, name: normName(clean(fd.get("name"))), pin: clean(fd.get("pin")), wantContinuing: !!fd.get("continuing"), accountId });
   if (plan.error) return { error: plan.error };
   return { books: plan.books.map((b) => BOOKS[b]), amount: plan.amount, continuing: plan.continuing, notice: plan.notice, secondMonth: plan.secondMonth };
 }
@@ -176,6 +193,49 @@ export async function studentLogin(_: FormState, fd: FormData): Promise<FormStat
   await setStudent(result.apps.map((a) => a.id));
   const next = clean(fd.get("next"));
   redirect(next === "/check" || next.startsWith("/check?") || next === "/class" || next === "/mission" || next === "/faq" ? next : "/class");
+}
+
+// ── 구글·카카오 로그인: 처음 한 번 '내 신청 찾기' ─────────────
+// 이름 + 비밀번호가 맞는 신청(환불·취소 포함 기록 전부)을 이 구글·카카오 계정의 학생 번호로 묶어요.
+export async function linkWithPin(_: FormState, fd: FormData): Promise<FormState> {
+  const pending = await getPendingLink();
+  if (!pending) return { error: "시간이 지났어요. 구글·카카오 로그인 버튼을 다시 눌러 주세요." };
+  const name = clean(fd.get("name"));
+  const pin = clean(fd.get("pin"));
+  if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 비밀번호 4자리를 입력해 주세요." };
+  if (!allow(`link:${pending.p}:${pending.sub}`, 10, 10 * 60 * 1000)) return { error: "여러 번 틀렸어요. 10분 뒤에 다시 해 주세요." };
+  const found = await findByName(name);
+  const result = loginApps(found, (a) => checkPin(pin, a.pin_hash));
+  if (!result.apps) {
+    await sleep(800);
+    return { error: result.error };
+  }
+  const link = await getLoginLink(pending.p, pending.sub);
+  const plan = planLink(found.filter((a) => checkPin(pin, a.pin_hash)), link?.account_id ?? null, randomUUID);
+  await linkAccount(plan.accountId, plan.attach, plan.merge);
+  await saveLoginLink({ provider: pending.p, subject: pending.sub, account_id: plan.accountId, email: pending.email, nickname: pending.nick });
+  await clearPendingLink();
+  await setAccount(plan.accountId);
+  await setStudent((await appsByAccount(plan.accountId)).filter(isActive).map((a) => a.id));
+  redirect(safeNext(clean(fd.get("next"))));
+}
+
+// 아직 신청한 적이 없는 학생: 새 학생 번호를 만들고 신청서로 보내요
+export async function startFresh(fd: FormData) {
+  const pending = await getPendingLink();
+  const next = safeNext(clean(fd.get("next")));
+  if (!pending) redirect("/guide");
+  const link = await getLoginLink(pending.p, pending.sub);
+  const accountId = link?.account_id ?? randomUUID();
+  await saveLoginLink({ provider: pending.p, subject: pending.sub, account_id: accountId, email: pending.email, nickname: pending.nick });
+  await clearPendingLink();
+  await setAccount(accountId);
+  redirect(isSignupNext(next) ? next : "/guide");
+}
+
+export async function cancelLink() {
+  await clearPendingLink();
+  redirect("/class");
 }
 
 export async function studentLogout() {
@@ -276,6 +336,22 @@ export async function markChatKicked() {
   const ids = (await listApplications()).filter((a) => a.cohort === running && a.status === "refunded").map((a) => a.id);
   await setSetting(`chat_kicked:${running}`, ids.join(","));
   revalidatePath("/admin");
+}
+
+// 학생 로그인 방식 (이름+비밀번호만 / 둘 다 / 구글·카카오만)
+export async function saveLoginMode(fd: FormData) {
+  if (!(await isAdmin())) return;
+  await setSetting("login_mode", loginModeOf(clean(fd.get("login_mode"))));
+  revalidatePath("/", "layout");
+}
+
+// 학생 통합 화면: 구글·카카오 연결 끊기 (폰을 바꿨거나 다른 사람 계정으로 잘못 연결했을 때)
+export async function unlinkLogin(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const provider = clean(fd.get("provider"));
+  const subject = clean(fd.get("subject"));
+  if (isProvider(provider) && subject) await deleteLoginLink(provider, subject);
+  revalidatePath(`/admin/students/${clean(fd.get("id"))}`);
 }
 
 export async function saveSettings(fd: FormData) {
@@ -787,13 +863,18 @@ export async function registerSpecialLecture(_: FormState, fd: FormData): Promis
   if (!event || event.published === false) return { error: "신청할 특강을 선택해 주세요." };
   if (!specialRegistrationOpen(event)) return { error: "신청이 마감됐어요." };
   if (mode !== "onsite" && mode !== "online") return { error: "현장 또는 불라방을 선택해 주세요." };
-  if (!name || !/^\d{4}$/.test(pin)) return { error: "이름과 강의실 비밀번호 4자리를 입력해 주세요." };
+  // 구글·카카오만 방식: 이름·비밀번호 칸 없이 로그인한 학생의 신청으로 확인해요
+  const social = (await loginSetup()).mode === "social";
+  if (!social && (!name || !/^\d{4}$/.test(pin))) return { error: "이름과 강의실 비밀번호 4자리를 입력해 주세요." };
 
-  const mine = (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash) && isActive(a));
+  const mine: Application[] = social
+    ? (await activeStudentApps()).apps
+    : (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash) && isActive(a));
+  if (social && mine.length === 0) return { error: "먼저 구글 또는 카카오로 로그인해 주세요." };
   const month = mine.filter((a) => a.cohort === event.event_date.slice(0, 7));
   if (month.length === 0) {
     await sleep(800);
-    return { error: "이름 또는 강의실 비밀번호가 맞지 않아요. 이번 달 수강 신청 내역을 확인해 주세요." };
+    return { error: social ? "이번 달 수강 신청 내역이 없어요. 수강 신청을 먼저 해 주세요." : "이름 또는 강의실 비밀번호가 맞지 않아요. 이번 달 수강 신청 내역을 확인해 주세요." };
   }
   const paid = month.filter(canWatch);
   if (paid.length === 0) return { error: "수강 신청 후에 특강을 신청할 수 있어요." };

@@ -30,7 +30,7 @@ export default async function MissionPage() {
     if ((await activeStudentApps()).loggedIn) {
       return <div className="pt-12"><div className="card mx-auto max-w-sm text-center"><p className="font-jua text-2xl text-sky-ink">수강 정보가 없어요</p><p className="mt-2 text-slate-600">Vella쌤에게 문의해 주세요.</p></div></div>;
     }
-    return <StudentLogin next="/mission" note="강의실과 같은 이름·비밀번호로 들어와요." />;
+    return <StudentLogin next="/mission" note="강의실과 같은 이름·비밀번호로 들어와요." socialNote="강의실과 같은 구글·카카오 계정으로 들어와요." />;
   }
   const { app, mission } = current;
   const [cafeUrl, cafeHomeworkUrl, blogUrl] = await Promise.all([getSetting("cafe_url"), getSetting("cafe_homework_url"), getSetting("blog_url")]);
