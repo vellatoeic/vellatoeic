@@ -2,6 +2,9 @@
 
 import { startTransition, useActionState, useRef, useState, type FormEvent } from "react";
 import { previewApplication, submitApplication, type FormState } from "@/app/actions";
+import type { ReceiptResult } from "@/app/receiptActions";
+import type { ReceiptClass } from "@/lib/receipt/classes";
+import ReceiptStep from "./ReceiptStep";
 import { BRING_BOOKS_TEXT, lateDeliveryWarning, LATE_DELIVERY_TEXT } from "@/lib/altContinue";
 import { scheduleClassFor } from "@/lib/schedule";
 import {
@@ -58,13 +61,41 @@ export default function ApplyForm({ kind, months, today }: { kind: Kind; months:
   const [plan, setPlan] = useState<Awaited<ReturnType<typeof previewApplication>> | null>(null);
   const [checking, setChecking] = useState(false);
   const detailRef = useRef<HTMLInputElement>(null);
+  // YBM 수강증: 서버가 읽은 반으로 칸을 채워요. '바로 확인'이면 잠그고, '직접 고르기'(override)를 누르면 풀려요(선생님 확인).
+  const [receipt, setReceipt] = useState<ReceiptResult | null>(null);
+  const [override, setOverride] = useState(false);
+  const receiptClasses = (receipt?.classes ?? []).filter((c) => months.some((m) => m.cohort === c.cohort));
+  const locked = receipt?.status === "match" && !override && receiptClasses.length > 0;
+  const wrongPage = receipt?.status === "match" && receipt.kind === "online" && kind === "onsite" && !override;
+  const needOverride = receipt?.status === "reject" && !override;
+
+  const applyClass = (c: ReceiptClass) => {
+    setMonth(c.cohort);
+    setCourse(c.course);
+    setTrack(c.track);
+    setSlot(c.slot);
+    setContinuing(null);
+  };
+  function onReceipt(r: ReceiptResult | null) {
+    setReceipt(r);
+    setOverride(false);
+    const usable = (r?.classes ?? []).filter((c) => months.some((m) => m.cohort === c.cohort));
+    // 격일반 2개월 과정처럼 두 달이 다 열려 있으면 학생이 달을 고를 때 그 달 반으로 채워요
+    const one = usable.find((c) => c.cohort === month) ?? (usable.length === 1 ? usable[0] : null);
+    if (one) applyClass(one);
+  }
+  function chooseMonth(cohort: string) {
+    setMonth(cohort);
+    const c = !override ? receiptClasses.find((x) => x.cohort === cohort) : null;
+    if (c) applyClass(c);
+  }
 
   // 시작반 격일반만 지난달 이어듣기 여부를 확인해요
   const askContinuing = course === "start" && isAlt(track);
   const books = course ? booksFor(course, track, round, askContinuing && continuing === true) : [];
   const amount = calcAmount(books, pickup);
   const online = kind === "online";
-  const blocked = !month || !course || !slot || (askContinuing && continuing === null);
+  const blocked = !receipt?.id || wrongPage || needOverride || !month || !course || !slot || (askContinuing && continuing === null);
 
   // 카카오 우편번호 검색 (불러오지 못하면 직접 입력으로 바꿔요)
   function searchAddress() {
@@ -137,6 +168,16 @@ export default function ApplyForm({ kind, months, today }: { kind: Kind; months:
       {askContinuing && continuing === true && <input type="hidden" name="continuing" value="1" />}
       {slot && <input type="hidden" name="slot" value={slot} />}
       {month && <input type="hidden" name="cohort" value={month} />}
+      {receipt?.id && <input type="hidden" name="receipt_id" value={receipt.id} />}
+      {override && <input type="hidden" name="receipt_override" value="1" />}
+
+      <ReceiptStep kind={kind} result={receipt} onResult={onReceipt} />
+      {(locked || wrongPage || needOverride) && (
+        <button type="button" onClick={() => setOverride(true)} className="-mt-3 block text-left text-xs text-slate-500 underline underline-offset-2">
+          {needOverride ? "수강증이 맞는데 계속 안 되나요? 반을 직접 고를게요" : "수강증과 다른 반이 나왔나요? 반을 직접 고를게요"}
+        </button>
+      )}
+      {override && <p className="-mt-3 rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800">직접 고른 반은 선생님이 수강증과 비교해서 확인해요. 학원에 등록한 반과 같은지 꼭 확인해 주세요.</p>}
 
       <div>
         <p className="label">수강 월</p>
@@ -145,7 +186,7 @@ export default function ApplyForm({ kind, months, today }: { kind: Kind; months:
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {months.map((m) => (
-              <button type="button" key={m.cohort} onClick={() => setMonth(m.cohort)} aria-pressed={month === m.cohort} className={`${choice(month === m.cohort)} text-center`}>
+              <button type="button" key={m.cohort} onClick={() => chooseMonth(m.cohort)} disabled={locked && !receiptClasses.some((c) => c.cohort === m.cohort)} aria-pressed={month === m.cohort} className={`${choice(month === m.cohort)} text-center disabled:opacity-40`}>
                 <span className="block font-jua text-xl text-sky-ink">{m.label}</span>
                 <span className="text-xs text-slate-500">{m.range}</span>
               </button>
@@ -156,10 +197,10 @@ export default function ApplyForm({ kind, months, today }: { kind: Kind; months:
       </div>
 
       <div>
-        <p className="label">1. 수강 신청한 반</p>
+        <p className="label">1. 수강 신청한 반 {locked && <span className="font-normal text-emerald-700">(수강증대로 정해졌어요)</span>}</p>
         <div className="grid grid-cols-3 gap-3">
           {(Object.keys(COURSES) as CourseId[]).map((c) => (
-            <button type="button" key={c} onClick={() => pickCourse(c)} className={`${choice(course === c)} text-center`}>
+            <button type="button" key={c} onClick={() => pickCourse(c)} disabled={locked && course !== c} className={`${choice(course === c)} text-center disabled:opacity-40`}>
               <p className="font-jua text-xl text-sky-ink">{COURSES[c].label}</p>
               <p className="mt-1 text-xs text-slate-500">{COURSE_DESC[c]}</p>
             </button>
@@ -179,7 +220,8 @@ export default function ApplyForm({ kind, months, today }: { kind: Kind; months:
                   setTrack(t);
                   setContinuing(null);
                 }}
-                className={`${choice(track === t)} block w-full`}
+                disabled={locked && track !== t}
+                className={`${choice(track === t)} block w-full disabled:opacity-40`}
               >
                 <span className="font-jua text-lg text-sky-ink">
                   {COURSES[course].label} {TRACKS[t]}
@@ -217,7 +259,7 @@ export default function ApplyForm({ kind, months, today }: { kind: Kind; months:
             {(Object.keys(TIME_SLOTS) as TimeSlot[]).map((s) => {
               const [name, time] = slotLabel({ course, track }, s).split(" ");
               return (
-                <button type="button" key={s} onClick={() => setSlot(s)} className={`${choice(slot === s)} text-center`}>
+                <button type="button" key={s} onClick={() => setSlot(s)} disabled={locked && slot !== s} className={`${choice(slot === s)} text-center disabled:opacity-40`}>
                   <span className="font-jua block text-lg text-sky-ink">{name}</span>
                   <span className="mt-1 block text-sm text-slate-600">{time}</span>
                 </button>
@@ -332,6 +374,7 @@ export default function ApplyForm({ kind, months, today }: { kind: Kind; months:
         )}
       </div>
 
+      {!receipt?.id && <p className="text-center text-sm font-bold text-amber-700">맨 위에서 YBM 수강증을 먼저 올려 주세요.</p>}
       {(checkError || state.error) && <p className="rounded-xl bg-red-50 p-3 text-center font-bold text-red-600">{checkError || state.error}</p>}
 
       <button className="btn w-full" disabled={pending || blocked || checking}>
@@ -350,6 +393,9 @@ export default function ApplyForm({ kind, months, today }: { kind: Kind; months:
               <p className="font-jua text-xl text-sky-deep">{slotLabel({ course, track }, slot)}</p>
               {plan?.continuing && <p className="text-sm text-slate-600">이어듣기 (지난달 기록 확인 · LC 교재만)</p>}
             </div>
+            <p className={`rounded-xl p-3 text-center text-sm font-bold ${locked ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
+              {locked ? "YBM 수강증과 같은 반이에요" : "선생님이 수강증을 보고 반을 확인해요"}
+            </p>
             {plan?.notice && <p className="rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-800">{plan.notice}</p>}
             <dl className="grid grid-cols-[5.5rem_1fr] gap-y-2 text-[15px]">
               <dt className="text-slate-500">이름</dt><dd className="font-bold">{String(confirm.get("name")).trim()}</dd>

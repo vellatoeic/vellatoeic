@@ -1,0 +1,27 @@
+{
+  "_설명": "12월 반 목록 예시 — YBM 서면 강좌 페이지의 벨라토익 12월 강좌(2026-11 확인) 그대로. 시험 도구(try)가 반 대조에 쓴다. 다음 달은 term · startsOn · endsOn 만 바꿔 복사한다. 개강일은 운영 사이트 값(12월 수업 2026-12-07 ~ 2026-12-31)",
+  "sections": [
+    { "id": "12-premier-am", "term": "2026-12", "kind": "full", "level": 750, "program": "premier", "track": "w4", "timeBlock": "10:00~13:20" },
+    { "id": "12-premier-pm", "term": "2026-12", "kind": "full", "level": 750, "program": "premier", "track": "w4", "timeBlock": "18:00~21:20" },
+    { "id": "12-solve-am", "term": "2026-12", "kind": "full", "level": 750, "program": "score", "track": "w4", "timeBlock": "11:10~13:20" },
+    { "id": "12-solve-pm", "term": "2026-12", "kind": "full", "level": 750, "program": "score", "track": "w4", "timeBlock": "18:00~20:10" },
+    { "id": "12-start-am", "term": "2026-12", "kind": "full", "level": 650, "program": "score", "track": "w4", "timeBlock": "10:00~12:10" },
+    { "id": "12-start-pm", "term": "2026-12", "kind": "full", "level": 650, "program": "score", "track": "w4", "timeBlock": "19:10~21:20" },
+    { "id": "12-lc750-am", "term": "2026-12", "kind": "lc", "level": 750, "program": "score", "track": "w4", "timeBlock": "11:10~12:10" },
+    { "id": "12-lc750-pm", "term": "2026-12", "kind": "lc", "level": 750, "program": "score", "track": "w4", "timeBlock": "19:10~20:10" },
+    { "id": "12-lc650-am", "term": "2026-12", "kind": "lc", "level": 650, "program": "score", "track": "w4", "timeBlock": "11:10~12:10" },
+    { "id": "12-lc650-pm", "term": "2026-12", "kind": "lc", "level": 650, "program": "score", "track": "w4", "timeBlock": "19:10~20:10" },
+    { "id": "12-rc750-am", "term": "2026-12", "kind": "rc", "level": 750, "program": "score", "track": "w4", "timeBlock": "12:20~13:20" },
+    { "id": "12-rc750-pm", "term": "2026-12", "kind": "rc", "level": 750, "program": "score", "track": "w4", "timeBlock": "18:00~19:00" },
+    { "id": "12-rc650-am", "term": "2026-12", "kind": "rc", "level": 650, "program": "score", "track": "w4", "timeBlock": "10:00~11:00" },
+    { "id": "12-rc650-pm", "term": "2026-12", "kind": "rc", "level": 650, "program": "score", "track": "w4", "timeBlock": "20:20~21:20" },
+    { "id": "12-solve-mw-am", "term": "2026-12", "kind": "full", "level": 750, "program": "score", "track": "mw", "timeBlock": "11:10~13:20" },
+    { "id": "12-solve-mw-pm", "term": "2026-12", "kind": "full", "level": 750, "program": "score", "track": "mw", "timeBlock": "18:00~20:10" },
+    { "id": "12-solve-tt-am", "term": "2026-12", "kind": "full", "level": 750, "program": "score", "track": "tt", "timeBlock": "11:10~13:20" },
+    { "id": "12-solve-tt-pm", "term": "2026-12", "kind": "full", "level": 750, "program": "score", "track": "tt", "timeBlock": "18:00~20:10" },
+    { "id": "12-start-mw-am", "term": "2026-12", "kind": "full", "level": 650, "program": "score", "track": "mw", "timeBlock": "10:00~12:10" },
+    { "id": "12-start-mw-pm", "term": "2026-12", "kind": "full", "level": 650, "program": "score", "track": "mw", "timeBlock": "19:10~21:20" },
+    { "id": "12-start-tt-am", "term": "2026-12", "kind": "full", "level": 650, "program": "score", "track": "tt", "timeBlock": "10:00~12:10" },
+    { "id": "12-start-tt-pm", "term": "2026-12", "kind": "full", "level": 650, "program": "score", "track": "tt", "timeBlock": "19:10~21:20" }
+  ]
+}

@@ -31,12 +31,38 @@ export type Application = {
   pending_from?: string | null; // 30분 입금 타이머 시작 (비어 있으면 신청 시각, 관리자가 되살리면 그 시각)
   books_adjusted?: boolean; // 관리자가 교재를 직접 고른 신청 (회차 재계산·반 변경에서 교재를 자동으로 바꾸지 않아요)
   audio_extended_until?: string | null; // 관리자가 음원 기간을 다시 열어준 마지막 날
+  receipt_status?: ReceiptStatus | null; // 수강증 확인 (비어 있음 = 수강증 없이 받은 예전 신청)
 };
 
 export type NewApplication = Omit<Application, "id" | "status" | "created_at">;
 
 // 신청 조회에 쓰는 칸 (비밀번호 해시 pin_hash는 로그인 확인 때만 읽어요)
-const APP_COLS = "id,cohort,kind,course,track,continuing,slot,pickup_date,pickup_time,books,pickup,name,phone,depositor,address,amount,status,created_at,paid_at,cancelled_at,cancel_reason,pending_from,books_adjusted,audio_extended_until";
+const APP_COLS = "id,cohort,kind,course,track,continuing,slot,pickup_date,pickup_time,books,pickup,name,phone,depositor,address,amount,status,created_at,paid_at,cancelled_at,cancel_reason,pending_from,books_adjusted,audio_extended_until,receipt_status";
+
+// ── 수강증 자동 확인 (SQL 40) ──
+// auto = 수강증대로 자동 확인 · review = 선생님 확인 필요 · approved = 선생님이 확인함
+export type ReceiptStatus = "auto" | "review" | "approved";
+export type ReceiptCheck = {
+  id: string;
+  created_at: string;
+  application_id: string | null;
+  status: "read" | ReceiptStatus; // read = 읽기만 함(제출 전)
+  outcome: "match" | "review" | "reject" | "skipped";
+  cohorts: string[];
+  classes: { cohort: string; course: CourseId; track: Track; slot: TimeSlot }[];
+  kind: Kind | null;
+  receipt_name: string | null;
+  captured_at: string | null;
+  image_hash: string | null;
+  reading: Record<string, unknown>;
+  reasons: string[];
+  ocr_text: string | null;
+  ocr_ms: number | null;
+  image_path: string | null;
+  image_bytes: number | null;
+  image_deleted_at: string | null;
+  decided_at: string | null;
+};
 
 export type Lecture = {
   id: string;
@@ -194,9 +220,10 @@ type Mem = {
   notices: Notice[];
   noticeReads: NoticeRead[];
   ybmOrders: YbmOrder[];
+  receiptChecks: ReceiptCheck[];
 };
 const g = globalThis as unknown as { __vellaMem?: Mem };
-const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [], testResults: [], testOverrides: [], testDoubles: [], notices: [], noticeReads: [], ybmOrders: [] });
+const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [], testResults: [], testOverrides: [], testDoubles: [], notices: [], noticeReads: [], ybmOrders: [], receiptChecks: [] });
 mem.specialLectures ??= [];
 mem.specialRegistrations ??= [];
 mem.specialMaterials ??= [];
@@ -214,6 +241,7 @@ mem.testOverrides ??= [];
 mem.notices ??= [];
 mem.noticeReads ??= [];
 mem.ybmOrders ??= [];
+mem.receiptChecks ??= [];
 
 // 그 달 날짜 범위: 1일 이상 ~ 다음 달 1일 미만 (11월처럼 30일까지인 달에 '-31'을 만들면 DB 오류가 나요)
 export function monthRange(cohort: string) {
@@ -313,7 +341,7 @@ async function listCohortApplicationsRaw(cohort: string): Promise<Application[]>
   return mem.apps.filter((a) => a.cohort === cohort);
 }
 
-type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "continuing" | "slot" | "books" | "amount" | "cohort" | "audio_extended_until" | "cancelled_at" | "cancel_reason" | "pending_from" | "books_adjusted">>;
+type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "continuing" | "slot" | "books" | "amount" | "cohort" | "audio_extended_until" | "cancelled_at" | "cancel_reason" | "pending_from" | "books_adjusted" | "receipt_status">>;
 
 export async function updateApplication(id: string, patch: ApplicationPatch) {
   await updateApplications([id], patch);
@@ -521,8 +549,159 @@ export async function cleanupYbmOrders(days = 90) {
   mem.ybmOrders = mem.ybmOrders.filter((o) => !old.some((x) => x.id === o.id));
 }
 
+// ── 수강증 자동 확인 (SQL 40) ───────────────────
+// 사진은 선생님 확인이 필요할 때만 줄여서 저장해요(receipts 비공개 보관함). 자동 확인된 수강증은 사진을 남기지 않아요.
+const RECEIPT_BUCKET = "receipts";
+type NewReceiptCheck = Pick<ReceiptCheck, "outcome" | "cohorts" | "classes" | "kind" | "receipt_name" | "captured_at" | "image_hash" | "reading" | "reasons" | "ocr_text" | "ocr_ms">;
+
+export async function createReceiptCheck(c: NewReceiptCheck, image?: Buffer): Promise<string> {
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const path = image ? `${now.slice(0, 7)}/${id}.jpg` : null;
+  const row = { ...c, id, image_path: path, image_bytes: image ? image.length : null };
+  if (sb) {
+    if (image && path) {
+      const up = await sb.storage.from(RECEIPT_BUCKET).upload(path, image, { contentType: "image/jpeg", upsert: false });
+      if (up.error) throw up.error;
+    }
+    const { error } = await sb.from("receipt_checks").insert(row);
+    if (error) {
+      if (path) await sb.storage.from(RECEIPT_BUCKET).remove([path]);
+      throw error;
+    }
+    return id;
+  }
+  if (image && path) mem.photos[path] = `data:image/jpeg;base64,${image.toString("base64")}`;
+  mem.receiptChecks.push({ ...row, created_at: now, application_id: null, status: "read", image_deleted_at: null, decided_at: null });
+  return id;
+}
+
+export async function getReceiptCheck(id: string): Promise<ReceiptCheck | null> {
+  if (!isUuid(id)) return null;
+  if (sb) {
+    const { data, error } = await sb.from("receipt_checks").select("*").eq("id", id).maybeSingle();
+    if (error) throw error;
+    return (data as ReceiptCheck) ?? null;
+  }
+  return mem.receiptChecks.find((c) => c.id === id) ?? null;
+}
+
+type ReceiptPatch = Partial<Pick<ReceiptCheck, "application_id" | "status" | "reasons" | "ocr_text" | "image_path" | "image_deleted_at" | "decided_at">>;
+export async function updateReceiptChecks(ids: string[], patch: ReceiptPatch) {
+  const ok = ids.filter(isUuid);
+  if (ok.length === 0) return;
+  if (sb) {
+    const db = sb;
+    await inChunks(ok, async (chunk) => {
+      const { error } = await db.from("receipt_checks").update(patch).in("id", chunk);
+      if (error) throw error;
+      return [];
+    });
+    return;
+  }
+  for (const c of mem.receiptChecks) if (ok.includes(c.id)) Object.assign(c, patch);
+}
+
+// 수강증 사진만 바로 지워요 (자동 확인된 수강증 · 기록과 읽은 값은 남아요)
+export async function dropReceiptImage(id: string, path: string | null) {
+  if (!path) return;
+  if (sb) await sb.storage.from(RECEIPT_BUCKET).remove([path]);
+  else delete mem.photos[path];
+  await updateReceiptChecks([id], { image_path: null, image_deleted_at: new Date().toISOString() });
+}
+
+// 신청서에 연결된 수강증 기록 (관리 화면)
+export async function receiptChecksFor(appIds: string[]): Promise<ReceiptCheck[]> {
+  const ok = appIds.filter(isUuid);
+  if (ok.length === 0) return [];
+  if (sb) {
+    const db = sb;
+    return inChunks(ok, async (chunk) => {
+      const { data, error } = await db.from("receipt_checks").select("*").in("application_id", chunk);
+      if (error) throw error;
+      return (data ?? []) as ReceiptCheck[];
+    });
+  }
+  return mem.receiptChecks.filter((c) => c.application_id && ok.includes(c.application_id));
+}
+
+// 확인이 필요한 수강증 (최신순)
+export async function listReceiptChecks(status: ReceiptCheck["status"]): Promise<ReceiptCheck[]> {
+  if (sb) {
+    const db = sb;
+    return allRows<ReceiptCheck>((from, to) => db.from("receipt_checks").select("*").eq("status", status).order("created_at", { ascending: false }).order("id").range(from, to));
+  }
+  return mem.receiptChecks.filter((c) => c.status === status).sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+// 같은 사진(지문)이나 같은 초에 캡처한 수강증으로 낸 다른 신청 찾기
+export async function findReceiptTwins(hash: string | null, capturedAt: string | null): Promise<ReceiptCheck[]> {
+  const out: ReceiptCheck[] = [];
+  for (const [col, value] of [["image_hash", hash], ["captured_at", capturedAt]] as const) {
+    if (!value) continue;
+    if (sb) {
+      const { data, error } = await sb.from("receipt_checks").select("*").eq(col, value).not("application_id", "is", null).limit(20);
+      if (error) throw error;
+      out.push(...((data ?? []) as ReceiptCheck[]));
+    } else out.push(...mem.receiptChecks.filter((c) => c[col] === value && c.application_id));
+  }
+  return [...new Map(out.map((c) => [c.id, c])).values()];
+}
+
+export async function receiptImageUrl(path: string): Promise<string | null> {
+  if (sb) {
+    const { data, error } = await sb.storage.from(RECEIPT_BUCKET).createSignedUrl(path, 60 * 10);
+    if (error) throw error;
+    return data?.signedUrl ?? null;
+  }
+  return mem.photos[path] ?? null;
+}
+
+// 지금 보관 중인 수강증 사진 수·용량 (관리 화면 용량 표시)
+export async function receiptImageUsage(): Promise<{ images: number; bytes: number }> {
+  if (sb) {
+    const db = sb;
+    const rows = await allRows<{ image_bytes: number | null }>((from, to) => db.from("receipt_checks").select("image_bytes").not("image_path", "is", null).order("id").range(from, to));
+    return { images: rows.length, bytes: rows.reduce((s, r) => s + (r.image_bytes ?? 0), 0) };
+  }
+  const rows = mem.receiptChecks.filter((c) => c.image_path);
+  return { images: rows.length, bytes: rows.reduce((s, r) => s + (r.image_bytes ?? 0), 0) };
+}
+
+// 자동 정리 (관리 화면을 열 때): ① 제출하지 않은 기록은 하루 뒤 기록째 삭제 ② 확인이 끝난 수강증은 7일 뒤 사진·원문만 삭제
+// ③ 신청이 지워져 연결이 풀린 기록은 7일 뒤 삭제. 읽은 값·까닭은 남겨요(같은 수강증 다시 쓰기 확인용).
+export async function purgeReceipts(nowMs = Date.now(), keepDays = 7) {
+  const day = 24 * 3600 * 1000;
+  const unsentBefore = new Date(nowMs - day).toISOString();
+  const decidedBefore = new Date(nowMs - keepDays * day).toISOString();
+  let rows: ReceiptCheck[];
+  if (sb) {
+    const db = sb;
+    rows = await allRows<ReceiptCheck>((from, to) => db.from("receipt_checks").select("id,status,application_id,created_at,decided_at,image_path,ocr_text").or("image_path.not.is.null,ocr_text.not.is.null,application_id.is.null").order("id").range(from, to));
+  } else rows = [...mem.receiptChecks];
+  const drop = rows.filter((c) => (c.status === "read" && c.created_at < unsentBefore) || (c.status !== "read" && !c.application_id && c.created_at < decidedBefore));
+  const strip = rows.filter((c) => !drop.includes(c) && (c.status === "approved" || c.status === "auto") && (c.image_path || c.ocr_text) && (c.decided_at ?? c.created_at) < decidedBefore);
+  const paths = [...drop, ...strip].flatMap((c) => (c.image_path ? [c.image_path] : []));
+  if (paths.length) {
+    if (sb) await sb.storage.from(RECEIPT_BUCKET).remove(paths);
+    else for (const p of paths) delete mem.photos[p];
+  }
+  if (drop.length) {
+    if (sb) {
+      const db = sb;
+      await inChunks(drop.map((c) => c.id), async (chunk) => {
+        const { error } = await db.from("receipt_checks").delete().in("id", chunk);
+        if (error) throw error;
+        return [];
+      });
+    } else mem.receiptChecks = mem.receiptChecks.filter((c) => !drop.includes(c));
+  }
+  if (strip.length) await updateReceiptChecks(strip.map((c) => c.id), { image_path: null, ocr_text: null, image_deleted_at: new Date(nowMs).toISOString() });
+  return { dropped: drop.length, stripped: strip.length };
+}
+
 // ── 공지 ───────────────────────────────────────
-export type NoticeRead = { notice_id: string; app_id: string; read_at?: string; cohort?: string | null };
+export type NoticeRead ={ notice_id: string; app_id: string; read_at?: string; cohort?: string | null };
 export type NoticeFields = Omit<Notice, "id" | "created_at">;
 
 export const listNotices = () => memo("notices", listNoticesRaw);

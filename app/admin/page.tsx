@@ -20,6 +20,7 @@ import { currentAltIssues } from "@/lib/altIssuesServer";
 import { altFixResult } from "@/lib/altContinue";
 import { classBookOptions } from "@/lib/manualLink";
 import { fixRoundsOnce } from "@/lib/roundFixServer";
+import ReceiptReviewBox from "./ReceiptReviewBox";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
@@ -59,6 +60,7 @@ function Row({ a, group, mission, fresh, sum, back, bookOptions }: { a: Applicat
             {a.kind === "online" && <Badge tone={a.status === "shipped" ? "green" : a.status === "paid" ? "amber" : "slate"}>교재 {book}</Badge>}
             {a.continuing && <Badge tone="slate">이어듣기</Badge>}
             {a.books_adjusted && <Badge tone="amber">⚠️ 교재 조정</Badge>}
+            {a.receipt_status === "review" ? <Badge tone="amber">수강증 확인 필요</Badge> : a.receipt_status ? <Badge tone="green">수강증 {a.receipt_status === "auto" ? "자동 확인" : "확인"}</Badge> : null}
             <Badge tone={missionCount(mission) === 4 ? "green" : "slate"}>미션 {missionCount(mission)}/4</Badge>
           </div>
           {sum && sum.past > 0 && (
@@ -368,6 +370,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
           </ul>
         </section>
       )}
+
+      <ReceiptReviewBox apps={everything} />
 
       {waitingDeposits.length > 0 && (
         <section className="rounded-3xl border-2 border-amber-200 bg-amber-50 p-5">

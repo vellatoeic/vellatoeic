@@ -217,6 +217,12 @@ const INTENSIVE_TIME: Slot[] = [
   { label: "저녁반", from: "18:00", to: "21:20", detail: "문풀 RC 18:00 · LC 19:10 · 시작 RC 20:20" },
 ];
 
+// 단과(RC만·LC만) 수업 시간 [오전, 저녁] — YBM 강좌 표기와 같아요. 수강증 자동 확인(lib/receipt)이 이 시간으로 반을 찾아요.
+export const SINGLE_TIME: Record<"start" | "solve", Record<"rc" | "lc", [string, string]>> = {
+  start: { rc: ["10:00~11:00", "20:20~21:20"], lc: ["11:10~12:10", "19:10~20:10"] },
+  solve: { rc: ["12:20~13:20", "18:00~19:00"], lc: ["11:10~12:10", "19:10~20:10"] },
+};
+
 // 격일반은 같은 시간에 수업하고 수업 일수만 달라요
 export const KLASS_TIME: Record<Klass, Slot[]> = {
   "start-daily": START_TIME,
