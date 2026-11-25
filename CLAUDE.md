@@ -126,12 +126,12 @@
 - 개강 직전 택배 안내: 고른 수강 월의 학생 반 첫 수업일 3일 전 ~ 마지막 수업일에 불라방이 택배를 고르면 '📦 지금 신청하면 첫 수업 전에 교재가 도착하기 어려워요 (평일 2~3일). 1층 데스크 수령을 추천해요.'(막지 않음), 같은 조건(신청일 기준)이면 /my 택배 안내에도. 테스트 tests/alt-continue.test.ts.
 
 ## 구글·카카오 로그인 (SQL 39)
-- 학생 로그인 방식(관리 첫 화면 '🔐 학생 로그인 방식', settings.login_mode): pin = 이름 + 비밀번호만(기본, 지금과 같음) / both = 카카오·구글 버튼 + 이름·비밀번호(옮겨 가는 기간) / social = 카카오·구글만. 버튼은 Vercel 환경변수 키가 있는 것만 켜져요(구글 GOOGLE_CLIENT_ID·GOOGLE_CLIENT_SECRET, 카카오 KAKAO_REST_API_KEY·(선택) KAKAO_CLIENT_SECRET). 켜진 로그인이 하나도 없으면 social이어도 이름+비밀번호로 동작(lib/socialLogin.ts effectiveMode). 카드에 이번 달·다음 달 신청 중 연결한 학생 수.
+- 학생 로그인 방식(관리 첫 화면 '학생 로그인 방식', settings.login_mode): pin = 이름 + 비밀번호만(기본, 지금과 같음) / both = 카카오·구글 버튼 + 이름·비밀번호(옮겨 가는 기간) / social = 카카오·구글만. 버튼은 Vercel 환경변수 키가 있는 것만 켜져요(구글 GOOGLE_CLIENT_ID·GOOGLE_CLIENT_SECRET, 카카오 KAKAO_REST_API_KEY·(선택) KAKAO_CLIENT_SECRET). 켜진 로그인이 하나도 없으면 social이어도 이름+비밀번호로 동작(lib/socialLogin.ts effectiveMode). 카드에 이번 달·다음 달 신청 중 연결한 학생 수.
 - 구조: 학생 번호 applications.account_id + 표 login_links(provider·subject → account_id, 이메일·별명·마지막 로그인). 버튼 → /api/auth/{google|kakao}?next=(확인값·PKCE 쿠키 vella_oauth 10분, /api/auth 경로에만) → 돌아오는 주소 /api/auth/{provider}/callback(각 개발자 사이트에 등록: https://vellatoeic.vercel.app/…, 미리보기 https://vellatoeic-git-google-login-vella-toeic.vercel.app/…, http://localhost:3000/…). next는 사이트 안 정해진 화면만(safeNext). 연결된 계정이면 그 번호의 신청으로 로그인(환불·취소 제외, loginApps 같은 규칙), 처음이면 /login(vella_link 쿠키 20분): '교재비 신청을 한 적이 있어요' = 이름+비밀번호 한 번 → 맞는 신청 전부(환불·취소 기록 포함) 그 번호로, 번호가 섞이면 가장 먼저 신청한 쪽으로 합쳐요(planLink) / '벨라토익 수업이 처음이에요' = 새 번호 → 신청서. 기기에는 vella_account(학생 번호)도 저장, 로그아웃하면 같이 지워요. 코드 lib/socialLogin.ts(규칙)·lib/socialAuth.ts(구글·카카오와 주고받기)·lib/socialServer.ts·app/login·components/SocialButtons.tsx.
-- 강의실 '🔗 카카오·구글 계정 연결하기'(both·social, 로그인한 신청에 번호가 없을 때): 지금 로그인한 신청을 그 계정에 바로 연결(비밀번호 다시 안 물음).
+- 강의실 '카카오·구글 계정 연결하기'(both·social, 로그인한 신청에 번호가 없을 때): 지금 로그인한 신청을 그 계정에 바로 연결(비밀번호 다시 안 물음).
 - social 방식: 강의실·QR 출석·미션·밀린 테스트·특강·신청서 모두 카카오·구글 버튼만. 신청서는 로그인 먼저(로그인 전엔 신청서 대신 버튼), 비밀번호 칸 없음(pin_hash 비움, account_id로 저장, 같은 번호·같은 달 신청이 있으면 그 신청으로). 특강 신청은 로그인한 학생 신청으로 확인(이름·비밀번호 3번 칸 없음). 격일반 두 달째는 같은 번호의 지난달 신청(못 찾으면 '먼저 연결' 안내). '수업 듣는 방법' ② 문구도 방식에 맞춰 바뀌어요. both 방식에서 이름+비밀번호로 낸 새 신청은 같은 이름·비밀번호 신청에 번호가 있으면 그 번호를 이어 붙여요.
 - 카톡·인스타·네이버 앱 안 브라우저는 구글이 로그인을 막아요(SocialButtons): 카톡은 kakaotalk://web/openExternal로 밖 브라우저, 안드로이드 다른 앱은 크롬(intent), 아이폰 다른 앱은 'Safari로 열기' 안내 + 주소 복사. 카카오 버튼은 어디서나 돼요.
-- 관리: 학생 통합 화면 '🔗 로그인 연결'(카카오·구글·이메일·마지막 로그인, [연결 끊기]). 비밀번호를 잊은 학생은 신청 관리에서 비밀번호를 새로 정해 알려 주고, 그 비밀번호로 한 번 연결해요. 테스트 tests/social-login.test.ts.
+- 관리: 학생 통합 화면 '로그인 연결'(카카오·구글·이메일·마지막 로그인, [연결 끊기]). 비밀번호를 잊은 학생은 신청 관리에서 비밀번호를 새로 정해 알려 주고, 그 비밀번호로 한 번 연결해요. 테스트 tests/social-login.test.ts.
 
 ## 디자인
 - 대표색 연하늘(app/globals.css 색상 토큰). 글꼴은 제목·굵은 글씨 Jua, 본문 고운돋움. 둥근 카드, 구름 모양. 학원 느낌이 아닌 차분하고 친근한 분위기.

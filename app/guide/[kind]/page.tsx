@@ -94,7 +94,7 @@ export default async function KindGuide({ params }: { params: Promise<{ kind: st
 
       {login.mode === "social" && !accountId ? (
         <section className="card space-y-3 text-center">
-          <p className="font-jua text-2xl text-sky-ink">✍️ 신청서 쓰기 전에 로그인해 주세요</p>
+          <p className="font-jua text-2xl text-sky-ink">신청서 쓰기 전에 로그인해 주세요</p>
           <p className="text-sm text-slate-600">카카오 또는 구글 계정으로 신청하면, 강의실·특강도 같은 버튼으로 들어와요.</p>
           <SocialButtons providers={login.providers} next={`/guide/${kind}`} />
         </section>

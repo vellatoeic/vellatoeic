@@ -37,7 +37,7 @@ export default async function LoginLinkPage({ searchParams }: { searchParams: Pr
   return (
     <div className="mx-auto max-w-md space-y-5 pt-8">
       <div className="text-center">
-        <h1 className="font-jua text-3xl text-sky-ink">🔗 처음 한 번만 연결해요</h1>
+        <h1 className="font-jua text-3xl text-sky-ink">처음 한 번만 연결해요</h1>
         <p className="mt-2 text-slate-600">
           {label} 계정{who ? ` (${who})` : ""}으로 {pending.none ? "들어왔는데, 연결된 수강 신청이 없어요." : "처음 들어왔어요."}
         </p>

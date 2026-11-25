@@ -266,7 +266,7 @@ export default function ApplyForm({ kind, months, today, account = null }: { kin
         </label>
         {account && (
           <p className="rounded-2xl bg-sky-soft px-4 py-3 text-sm text-sky-ink sm:col-span-2">
-            🔗 <b>{account}</b> 계정으로 신청해요. 강의실·특강도 이 계정으로 들어와요.
+            <b>{account}</b> 계정으로 신청해요. 강의실·특강도 이 계정으로 들어와요.
           </p>
         )}
         {pinFields && <label className="sm:col-span-2">

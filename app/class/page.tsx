@@ -323,7 +323,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
       {/* 카카오·구글 연결 안내: 로그인 방식이 '둘 다'·'구글·카카오만'이고 아직 연결 안 한 학생에게만 */}
       {loginInfo.providers.length > 0 && !apps.some((a) => a.account_id) && (
         <section className="card space-y-3">
-          <p className="font-jua text-xl text-sky-ink">🔗 카카오·구글 계정 연결하기</p>
+          <p className="font-jua text-xl text-sky-ink">카카오·구글 계정 연결하기</p>
           <p className="text-sm text-slate-600">한 번 연결하면 다음부터 이름·비밀번호 없이 버튼 하나로 들어와요.</p>
           <SocialButtons providers={loginInfo.providers} next="/class" link />
         </section>

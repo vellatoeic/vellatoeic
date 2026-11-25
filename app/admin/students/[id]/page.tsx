@@ -121,7 +121,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
           </div>
         )}
         <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-slate-50 p-3 text-sm">
-          <span className="font-bold text-slate-600">🔗 로그인 연결</span>
+          <span className="font-bold text-slate-600">로그인 연결</span>
           {links.length === 0 ? (
             <span className="text-slate-500">없음 (이름 + 비밀번호로만 들어와요)</span>
           ) : links.map((l) => (
