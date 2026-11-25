@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import QRCode from "qrcode";
 import { headers } from "next/headers";
 import { SITE_URL } from "@/lib/config";
@@ -36,7 +37,7 @@ export default async function QrPage() {
       </div>
 
       <section className="card text-center">
-        <p className="font-jua text-3xl text-sky-ink">출석 체크 ☁️</p>
+        <p className="flex items-center justify-center gap-2 font-jua text-3xl text-sky-ink">출석 체크 <Icon name="cloud" size={34} /></p>
         <p className="mt-1 text-slate-600">휴대폰 카메라로 QR을 찍으면 출석 스티커가 붙어요</p>
         <div className="mx-auto mt-4 aspect-square w-full max-w-sm" dangerouslySetInnerHTML={{ __html: svg }} />
         <p className="mt-2 text-[11px] text-slate-400">{url}</p>

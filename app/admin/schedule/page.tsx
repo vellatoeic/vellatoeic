@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import { isAdmin } from "@/lib/auth";
 import { currentCohort, getSetting, isPreview } from "@/lib/db";
 import { defaultHolidays, holidayKey, parseHolidays, scheduleKey, schoolDaysFor, SCHEDULE_CLASSES, type ScheduleClass } from "@/lib/schedule";
@@ -33,14 +34,14 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
         <input type="hidden" name="cohort" value={cohort} />
         {confirmed && <input type="hidden" name="undo" value="1" />}
         <div className="text-sm">
-          <p className="font-jua text-lg text-sky-ink">{confirmed ? "✅" : "⚠️"} {Number(cohort.slice(5, 7))}월 수업일 확인</p>
+          <p className="flex items-center gap-1.5 font-jua text-lg text-sky-ink"><Icon name={confirmed ? "check" : "alert"} size={22} />{Number(cohort.slice(5, 7))}월 수업일 확인</p>
           {Object.keys(initialHolidays).length > 0 && <p className="font-bold text-red-600">공휴일이 있는 달이에요: {Object.entries(initialHolidays).map(([d, n]) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))} ${n}`).join(", ")}</p>}
           <p className="text-slate-500">반별 수업일을 모두 본 뒤 [확인]을 누르면 &apos;이번 달 할 일&apos;에서 체크돼요.</p>
         </div>
         <button className={confirmed ? "btn-ghost !py-2 text-sm" : "btn !py-2 !text-sm"}>{confirmed ? "확인 취소" : "확인했어요"}</button>
       </form>
       <section className="card space-y-2 text-sm">
-        <p className="font-jua text-lg text-sky-ink">🎤 {Number(cohort.slice(5, 7))}월 특강 요일</p>
+        <p className="flex items-center gap-1.5 font-jua text-lg text-sky-ink"><Icon name="mic" size={22} />{Number(cohort.slice(5, 7))}월 특강 요일</p>
         <div className="flex flex-wrap items-center gap-2">
           {(["5", "6"] as const).map((w) => (
             <form key={w} action={setSpecialWeekday}>

@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import { isAdmin } from "@/lib/auth";
 import { currentCohort, isPreview, listAudios, roundFor } from "@/lib/db";
 import { BOOKS, cohortLabel, todayKST } from "@/lib/config";
@@ -52,7 +53,7 @@ export default async function AudioAdmin({ searchParams }: { searchParams: Promi
 
       <section className="card space-y-4">
         <h2 className="font-jua text-2xl text-sky-ink">{cohortLabel(cohort)} {BOOKS[book]} 음원 <span className="text-base text-slate-400">· {list.length}개</span></h2>
-        <p className="rounded-2xl bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-800">📌 음원은 구글 드라이브 링크로만 등록 (공유: 링크가 있는 모든 사용자)</p>
+        <p className="rounded-2xl bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-800"><Icon name="pin" size={18} className="mr-1" />음원은 구글 드라이브 링크로만 등록 (공유: 링크가 있는 모든 사용자)</p>
         <LinkForm action={addAudioLink} hidden={{ cohort, book }} titlePlaceholder="제목 (예: PART 1)" />
         {list.length === 0 ? <p className="text-sm text-slate-500">아직 등록한 음원이 없어요.</p> : (
           <ol className="divide-y divide-sky-soft">
@@ -61,7 +62,7 @@ export default async function AudioAdmin({ searchParams }: { searchParams: Promi
                 <span className="font-jua w-7 shrink-0 text-center text-sky-deep">{i + 1}</span>
                 <span className="min-w-0 flex-1 truncate">
                   {a.link_url
-                    ? <a href={a.link_url} target="_blank" rel="noreferrer" className="underline decoration-sky-main underline-offset-2">🔗 {a.title}</a>
+                    ? <a href={a.link_url} target="_blank" rel="noreferrer" className="underline decoration-sky-main underline-offset-2"><Icon name="link" size={16} className="mr-1" />{a.title}</a>
                     : <>{a.title} <span className="text-xs font-bold text-amber-600">예전 파일 (이사 후 없음 → 링크로 다시 등록하고 삭제해 주세요)</span></>}
                   {a.link_url && !isDriveLink(a.link_url) && <span className="ml-1 text-xs text-amber-600">구글 드라이브 링크가 아니에요</span>}
                 </span>

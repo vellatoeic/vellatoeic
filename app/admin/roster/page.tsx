@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import { BOOKS, CLASSROOM, COURSES, TRACKS, TRACK_ORDER, cohortLabel, slotTag, type BookId, type CourseId, type TimeSlot } from "@/lib/config";
 import { listCohortApplications, currentCohort, isPreview, type Application } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
@@ -69,8 +70,8 @@ export default async function Roster() {
           <h2 className="font-jua text-3xl text-sky-ink">첫날 {CLASSROOM} 교재 지급 명단</h2>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
-          <PrintButton slot="am" label="☀️ 오전반만 인쇄" />
-          <PrintButton slot="pm" label="🌙 저녁반만 인쇄" />
+          <PrintButton slot="am" label="오전반만 인쇄" />
+          <PrintButton slot="pm" label="저녁반만 인쇄" />
           <PrintButton label="전체 인쇄" />
         </div>
       </div>
@@ -91,8 +92,8 @@ export default async function Roster() {
         return (
           <div key={slot ?? "none"} data-slot-part={slot ?? "none"} className="space-y-4">
             <div className={`rounded-3xl p-5 break-inside-avoid ${slot ? "bg-sky-soft" : "bg-amber-50"}`}>
-              <h2 className={`font-jua text-3xl ${slot ? "text-sky-ink" : "text-amber-700"}`}>{slotTag(slot)} <span className="text-xl">({inSlot.length}명)</span></h2>
-              <p className="mt-1 font-bold text-slate-700">📚 {bookCount(paid).join(" · ") || "납부 완료 학생이 아직 없어요"}</p>
+              <h2 className={`flex items-center gap-2 font-jua text-3xl ${slot ? "text-sky-ink" : "text-amber-700"}`}><Icon name={slot === "am" ? "sun" : slot === "pm" ? "moon" : "clock"} size={32} />{slotTag(slot)} <span className="text-xl">({inSlot.length}명)</span></h2>
+              <p className="mt-1 font-bold text-slate-700"><Icon name="book" size={18} className="mr-1" />{bookCount(paid).join(" · ") || "납부 완료 학생이 아직 없어요"}</p>
               <p className="text-xs text-slate-500">납부 완료 {paid.length}명 기준{inSlot.length > paid.length ? ` · 미납 ${inSlot.length - paid.length}명은 빼고 셌어요` : ""}</p>
             </div>
             {(Object.keys(COURSES) as CourseId[]).flatMap((co) =>

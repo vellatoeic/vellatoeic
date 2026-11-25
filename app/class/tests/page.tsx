@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import Link from "next/link";
 import { todayKST, cohortLabel } from "@/lib/config";
 import { activeStudentApps } from "@/lib/student";
@@ -6,7 +7,7 @@ import { listTestResults } from "@/lib/db";
 import { TEST_LABEL, type TestKind } from "@/lib/tests";
 import TestForm from "@/components/tests/TestForm";
 import LineChart from "@/components/tests/LineChart";
-import StudentLogin from "../StudentLogin";
+import LoginCard from "../LoginCard";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "테스트 기록 · vella_toeic", robots: { index: false } };
@@ -15,7 +16,7 @@ const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`;
 
 export default async function TestsPage() {
   const { loggedIn, apps } = await activeStudentApps();
-  if (!loggedIn) return <StudentLogin next="/class" />;
+  if (!loggedIn) return <LoginCard next="/class" />;
   const today = todayKST();
   const testApps = apps.filter(takesTests).sort((a, b) => b.cohort.localeCompare(a.cohort));
   if (testApps.length === 0) {
@@ -31,13 +32,13 @@ export default async function TestsPage() {
     .map((r) => ({ label: String(r.test_no), pct: Math.round((r.score / r.questions) * 100), r }));
 
   return (
-    <div className="space-y-5 pt-8">
+    <div className="stagger space-y-5 pt-8">
       <Link href="/class" className="text-sm text-sky-deep underline">← 강의실로</Link>
       <h1 className="font-jua text-3xl text-sky-ink">데일리 테스트</h1>
 
       <section className="space-y-2">
-        <h2 className="font-jua text-xl text-sky-ink">⏰ 밀린 테스트 <span className="text-sm text-slate-500">({cohortLabel(current.cohort)} · 지난 수업 테스트도 낼 수 있어요)</span></h2>
-        {missed.length === 0 ? <p className="rounded-2xl bg-white p-4 text-sm text-slate-500">밀린 테스트가 없어요 👍</p> : missed.map((t) => (
+        <h2 className="flex flex-wrap items-center gap-1.5 font-jua text-xl text-sky-ink"><Icon name="clock" size={26} />밀린 테스트 <span className="text-sm text-slate-500">({cohortLabel(current.cohort)} · 지난 수업 테스트도 낼 수 있어요)</span></h2>
+        {missed.length === 0 ? <p className="rounded-2xl bg-white p-4 text-sm text-slate-500">밀린 테스트가 없어요 <Icon name="check" size={18} /></p> : missed.map((t) => (
           <div key={`${t.day}-${t.spec.kind}${t.spec.no}`}>
             <p className="mb-1 px-1 text-xs text-slate-500">{md(t.day)} 수업</p>
             <TestForm appId={current.id} day={t.day} kind={t.spec.kind} no={t.spec.no} label={`${TEST_LABEL[t.spec.kind]} ${t.spec.no}`} questions={t.spec.questions} late />
@@ -46,7 +47,7 @@ export default async function TestsPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-jua text-xl text-sky-ink">📈 내 점수 기록</h2>
+        <h2 className="flex items-center gap-1.5 font-jua text-xl text-sky-ink"><Icon name="chart" size={26} />내 점수 기록</h2>
         {(["word", "rc"] as const).map((kind) => {
           const s = series(kind);
           return (

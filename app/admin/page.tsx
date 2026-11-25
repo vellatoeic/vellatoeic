@@ -1,4 +1,5 @@
 import LoginModeCard from "./LoginModeCard";
+import Icon from "@/components/Icon";
 import { adminAlerts } from "@/lib/adminAlerts";
 import { BOOKS, COURSES, KINDS, TRACKS, TRACK_ORDER, slotTag, bookStatusLabel, cohortLabel, roundOf, thisMonthKST, won, type BookId, type CourseId, type TimeSlot } from "@/lib/config";
 import { listApplications, listDepositEvents, listWaitingDepositEvents, listYbmOrders, listMissions, getSetting, currentCohort, roundFor, isPreview, type Application, type Mission } from "@/lib/db";
@@ -59,7 +60,7 @@ function Row({ a, group, mission, fresh, sum, back, bookOptions }: { a: Applicat
             <Badge tone={a.status === "pending" ? "amber" : a.status === "refunded" || a.status === "cancelled" ? "slate" : "green"}>{a.status === "pending" ? "미납" : a.status === "refunded" ? "환불" : a.status === "cancelled" ? "취소" : "납부 완료"}</Badge>
             {a.kind === "online" && <Badge tone={a.status === "shipped" ? "green" : a.status === "paid" ? "amber" : "slate"}>교재 {book}</Badge>}
             {a.continuing && <Badge tone="slate">이어듣기</Badge>}
-            {a.books_adjusted && <Badge tone="amber">⚠️ 교재 조정</Badge>}
+            {a.books_adjusted && <Badge tone="amber">교재 조정</Badge>}
             <Badge tone={missionCount(mission) === 4 ? "green" : "slate"}>미션 {missionCount(mission)}/4</Badge>
           </div>
           {sum && sum.past > 0 && (
@@ -78,7 +79,7 @@ function Row({ a, group, mission, fresh, sum, back, bookOptions }: { a: Applicat
           </p>
           {mission?.intro_at && (
             <p className="mt-1 rounded-xl bg-sky-soft px-2.5 py-1.5 text-xs text-slate-600">
-              📝 {mission.prev_score} → 목표 {mission.target_score} · 시험 {mission.exam_month}
+              <Icon name="clipboard" size={16} className="mr-1" />{mission.prev_score} → 목표 {mission.target_score} · 시험 {mission.exam_month}
               {mission.affiliation && ` · ${mission.affiliation}`}
               {mission.instagram && ` · ${mission.instagram}`}
               {mission.message && <span className="block text-sky-ink">“{mission.message}”</span>}
@@ -284,11 +285,11 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
     <div className="space-y-5 pt-8">
       <AdminTabs active="apps" />
       <section className="card space-y-2 !p-4">
-        <p className="font-jua text-xl text-sky-ink">📅 이번 달 할 일 <span className="text-sm text-slate-500">· {cohortLabel(checklist.cohort)} 개강 {md(checklist.first)} 준비</span></p>
+        <p className="flex flex-wrap items-center gap-1 font-jua text-xl text-sky-ink"><Icon name="calendar" size={26} />이번 달 할 일 <span className="text-sm text-slate-500">· {cohortLabel(checklist.cohort)} 개강 {md(checklist.first)} 준비</span></p>
         <ul className="grid gap-1.5 sm:grid-cols-2">
           {checklist.items.map((it) => (
             <li key={it.key} className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-xl px-3 py-2 text-sm ${it.state === "todo" ? "bg-amber-50" : it.state === "done" ? "bg-emerald-50/60" : "bg-slate-50 text-slate-400"}`}>
-              <span>{it.state === "done" ? "✅" : it.state === "todo" ? "⚠️" : "○"}</span>
+              {it.state === "later" ? <span>○</span> : <Icon name={it.state === "done" ? "check" : "alert"} size={18} />}
               <b className={it.state === "later" ? "font-normal" : "text-sky-ink"}>{it.title}</b>
               {it.state === "later" && it.from && <span className="text-xs">{md(it.from)}부터</span>}
               {it.state !== "later" && it.detail && <span className="text-xs text-slate-500">{it.detail}</span>}
@@ -303,27 +304,27 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
           ))}
         </ul>
       </section>
-      {linked && <p className="card !bg-emerald-50 text-center font-bold text-emerald-700">💳 입금을 학생 신청에 연결하고 납부 확인했어요</p>}
+      {linked && <p className="card !bg-emerald-50 text-center font-bold text-emerald-700"><Icon name="card" size={20} className="mr-1" />입금을 학생 신청에 연결하고 납부 확인했어요</p>}
       {roundFix && (
         <div className="space-y-1 rounded-3xl border-2 border-sky-main bg-white p-4 text-sm">
-          <p className="font-jua text-lg text-sky-ink">📚 교재 회차 바로잡음 {roundFix.count}건 (홀수달 1회차·짝수달 2회차로 자동)</p>
-          {roundFix.diffs && <p className="font-bold text-amber-700">💰 납부 완료라 금액은 그대로, 차이: {roundFix.diffs}</p>}
+          <p className="font-jua text-lg text-sky-ink"><Icon name="book" size={22} className="mr-1" />교재 회차 바로잡음 {roundFix.count}건 (홀수달 1회차·짝수달 2회차로 자동)</p>
+          {roundFix.diffs && <p className="font-bold text-amber-700"><Icon name="coins" size={20} className="mr-1" />납부 완료라 금액은 그대로, 차이: {roundFix.diffs}</p>}
         </div>
       )}
       {mv && (() => {
         const [target, n, changed, errors] = mv.split("|");
         return (
           <div className="space-y-1 rounded-3xl border-2 border-sky-main bg-white p-4 text-sm">
-            {Number(n) > 0 && <p className="font-jua text-lg text-sky-ink">🔁 {cohortLabel(target)}(으)로 {n}명 옮겼어요 · 교재를 새 기수 회차로 다시 계산했어요</p>}
-            {changed && <p className="font-bold text-amber-700">💰 금액 변경됨: {changed}</p>}
-            {errors && <p className="font-bold text-red-600">⚠️ 옮기지 못함: {errors}</p>}
+            {Number(n) > 0 && <p className="font-jua text-lg text-sky-ink"><Icon name="repeat" size={22} className="mr-1" />{cohortLabel(target)}(으)로 {n}명 옮겼어요 · 교재를 새 기수 회차로 다시 계산했어요</p>}
+            {changed && <p className="font-bold text-amber-700"><Icon name="coins" size={20} className="mr-1" />금액 변경됨: {changed}</p>}
+            {errors && <p className="font-bold text-red-600"><Icon name="alert" size={20} className="mr-1" />옮기지 못함: {errors}</p>}
           </div>
         );
       })()}
 
       {waiting.length > 0 && (
         <CloseOnSubmitForm action={bulkConfirmPayment} className="block rounded-3xl border-2 border-amber-300 bg-amber-50 p-5">
-          <p className="font-jua text-2xl text-amber-700">⚠️ 수업 전 입금 대기 {waiting.length}명</p>
+          <p className="flex items-center gap-1.5 font-jua text-2xl text-amber-700"><Icon name="alert" size={30} />수업 전 입금 대기 {waiting.length}명</p>
           <p className="mt-1 text-sm text-slate-600">입금 문자 자동 확인이 켜져 있으면 입금자명·금액이 맞는 학생은 자동으로 납부 확인돼요. 남은 학생은 통장과 맞춰 보고 체크한 뒤 [납부 확인]을 눌러 주세요.</p>
           <label className="mt-3 flex items-center gap-2 text-sm font-bold text-sky-ink"><SelectAll group="pending-alert" /> {waiting.length}명 전체 선택</label>
           <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
@@ -347,7 +348,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
 
       {altList.length > 0 && (
         <section id="alt" className="rounded-3xl border-2 border-amber-300 bg-amber-50 p-5">
-          <p className="font-jua text-xl text-amber-700">⚠️ 격일반 확인 필요 {altList.length}건</p>
+          <p className="flex items-center gap-1.5 font-jua text-xl text-amber-700"><Icon name="alert" size={26} />격일반 확인 필요 {altList.length}건</p>
           <p className="mt-1 text-sm text-slate-600">이번 달·다음 달 격일반 신청을 지난달 기록(같은 이름·반·격일반·납부 완료)과 비교했어요. 관리 화면에서는 비밀번호를 비교할 수 없어 같은 이름으로 찾아요 — 동명이인이면 [무시]를 눌러 주세요.</p>
           <ul className="mt-3 space-y-2">
             {altList.map(({ issue, fix }) => (
@@ -372,7 +373,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
 
       {waitingDeposits.length > 0 && (
         <section className="rounded-3xl border-2 border-amber-200 bg-amber-50 p-5">
-          <p className="font-jua text-xl text-amber-700">📥 신청서 없는 입금 {waitingDeposits.length}건</p>
+          <p className="flex items-center gap-1.5 font-jua text-xl text-amber-700"><Icon name="mail" size={26} />신청서 없는 입금 {waitingDeposits.length}건</p>
           <p className="mt-1 text-sm text-slate-600">교재비로 보이는 입금이 먼저 왔어요. 14일 안에 입금자명·금액이 같은 신청서(또는 인강 주문)가 들어오면 자동으로 납부 확인되고 여기서 빠져요.</p>
           <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
             {waitingDeposits.map((e) => (
@@ -393,7 +394,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
 
       {bookChecks.length > 0 && (
         <section className="rounded-3xl border-2 border-red-200 bg-red-50 p-5">
-          <p className="font-jua text-xl text-red-600">⚠️ 교재비 입금 문자 확인 필요 {bookChecks.length}건</p>
+          <p className="flex items-center gap-1.5 font-jua text-xl text-red-600"><Icon name="siren" size={26} />교재비 입금 문자 확인 필요 {bookChecks.length}건</p>
           <p className="mt-1 text-sm text-slate-600">입금자명이 같은 학생이 여러 명이거나 금액이 달라서 자동으로 확정하지 못했어요. 맞는 학생을 골라 [처리]하거나, 관계없으면 무시해 주세요.</p>
           <ul className="mt-3 space-y-2">
             {bookChecks.map((e) => (
@@ -434,7 +435,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
 
       {unslotted.length > 0 && (
         <CloseOnSubmitForm action={bulkChangeSlot} className="block rounded-3xl border-2 border-sky-main bg-white p-5">
-          <p className="font-jua text-xl text-sky-ink">🕒 수강 시간을 정해야 하는 학생 {unslotted.length}명</p>
+          <p className="flex items-center gap-1.5 font-jua text-xl text-sky-ink"><Icon name="clock" size={26} />수강 시간을 정해야 하는 학생 {unslotted.length}명</p>
           <p className="mt-1 text-sm text-slate-600">예전에 신청해서 오전/저녁이 비어 있어요. 체크한 뒤 오전반 또는 저녁반을 눌러 주세요.</p>
           <label className="mt-3 flex items-center gap-2 text-sm font-bold text-sky-ink"><SelectAll group="unslotted" /> {unslotted.length}명 전체 선택</label>
           <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
@@ -449,8 +450,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
             ))}
           </ul>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <button name="slot" value="am" className="btn !py-2.5 !text-base">☀️ 오전반으로</button>
-            <button name="slot" value="pm" className="btn !py-2.5 !text-base">🌙 저녁반으로</button>
+            <button name="slot" value="am" className="btn gap-1 !py-2.5 !text-base"><Icon name="sun" size={20} />오전반으로</button>
+            <button name="slot" value="pm" className="btn gap-1 !py-2.5 !text-base"><Icon name="moon" size={20} />저녁반으로</button>
           </div>
         </CloseOnSubmitForm>
       )}
@@ -458,7 +459,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
       {/* ── 최근 신청: 수강·YBM 인강 주문을 한 목록에 최신순으로 (특강은 [특강 관리]에서) ── */}
       <details id="recent" className="card !p-4" open={alerts.fresh.length > 0}>
         <summary className="font-jua cursor-pointer text-lg text-sky-ink">
-          🆕 최근 신청 <span className="text-sm text-slate-500">· 수강·인강 주문 최신순 (특강은 [특강 관리]에서)</span>
+          <Icon name="new" size={22} className="mr-1" />최근 신청 <span className="text-sm text-slate-500">· 수강·인강 주문 최신순 (특강은 [특강 관리]에서)</span>
           {alerts.fresh.length > 0 && <span className="ml-2 rounded-full bg-red-500 px-2 py-0.5 text-sm text-white">{alerts.fresh.length}</span>}
         </summary>
         <ul className="mt-2 divide-y divide-sky-soft text-sm">
@@ -478,7 +479,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
       <LoginModeCard />
 
       <details id="settings" className="card !p-4">
-        <summary className="font-jua cursor-pointer text-lg text-sky-ink">⚙️ 기본 설정 (모집 기수 · 계좌 · 카페·블로그 주소)</summary>
+        <summary className="font-jua cursor-pointer text-lg text-sky-ink"><Icon name="settings" size={24} className="mr-1" />기본 설정 (모집 기수 · 계좌 · 카페·블로그 주소)</summary>
         <div className="mt-4">
           <CloseOnSubmitForm action={saveSettings} className="card grid gap-4 sm:grid-cols-[10rem_7rem_1fr_auto] sm:items-end">
           <label>
@@ -506,7 +507,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
             <input type="url" name="cafe_homework_url" defaultValue={cafeHomeworkUrl} className="input" placeholder="https://cafe.naver.com/..." />
           </label>
           <label className="sm:col-span-3">
-            <span className="label">💬 단톡방 오픈채팅 링크 <span className="font-normal text-slate-400">(비우면 강의실에서 숨겨요)</span></span>
+            <span className="label"><Icon name="chat" size={20} className="mr-1" />단톡방 오픈채팅 링크 <span className="font-normal text-slate-400">(비우면 강의실에서 숨겨요)</span></span>
             <input type="url" name="chat_url" defaultValue={chatUrl} className="input" placeholder="https://open.kakao.com/..." />
           </label>
           <label>
@@ -514,7 +515,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
             <input name="chat_code" defaultValue={chatCode} className="input" placeholder="예: 1234" />
           </label>
           <label className="sm:col-span-4">
-            <span className="label">🎁 벨라토익 카톡 채널 주소 <span className="font-normal text-slate-400">(선물 결과 카드의 [카톡 채널 열기] 버튼, 비우면 버튼 숨김)</span></span>
+            <span className="label"><Icon name="gift" size={20} className="mr-1" />벨라토익 카톡 채널 주소 <span className="font-normal text-slate-400">(선물 결과 카드의 [카톡 채널 열기] 버튼, 비우면 버튼 숨김)</span></span>
             <input type="url" name="kakao_channel_url" defaultValue={kakaoChannel} className="input" placeholder="https://pf.kakao.com/..." />
           </label>
           <button className="btn !py-3">저장</button>
@@ -522,7 +523,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
             새 신청만 이 기수로 저장돼요.<br />바꿔도 지금 수업 중인 반에는 영향이 없어요.
           </p>
         </CloseOnSubmitForm>
-          <p className="mt-3 rounded-2xl bg-sky-soft p-3 text-sm text-sky-ink">📚 교재 회차는 자동이에요 · 이번 달 {roundOf(thisMonth)}회차 / 다음 달 {roundOf(movableCohorts(thisMonth)[1])}회차 <span className="text-slate-500">(홀수달 1회차, 짝수달 2회차)</span></p>
+          <p className="mt-3 rounded-2xl bg-sky-soft p-3 text-sm text-sky-ink"><Icon name="book" size={18} className="mr-1" />교재 회차는 자동이에요 · 이번 달 {roundOf(thisMonth)}회차 / 다음 달 {roundOf(movableCohorts(thisMonth)[1])}회차 <span className="text-slate-500">(홀수달 1회차, 짝수달 2회차)</span></p>
         </div>
       </details>
 
@@ -575,9 +576,9 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
 
       {/* 수강 시간 탭: 수강 형태·납부 필터와 같이 써요 (예: 현장 + 오전반) */}
       <div className="grid grid-cols-3 gap-2">
-        {([["am", "☀️ 오전반"], ["pm", "🌙 저녁반"], ["all", "전체"]] as const).map(([v, label]) => (
+        {([["am", "오전반"], ["pm", "저녁반"], ["all", "전체"]] as const).map(([v, label]) => (
           <a key={v} href={link({ t: v })} className={`rounded-2xl px-3 py-3 text-center font-jua text-lg ${t === v ? "bg-sky-deep text-white shadow" : "bg-white text-sky-ink ring-1 ring-sky-main"}`}>
-            {label} <span className="text-base">{v === "all" ? beforeSlot.length : beforeSlot.filter((a) => a.slot === v).length}명</span>
+            {v !== "all" && <Icon name={v === "am" ? "sun" : "moon"} size={20} className="mr-1" />}{label} <span className="text-base">{v === "all" ? beforeSlot.length : beforeSlot.filter((a) => a.slot === v).length}명</span>
           </a>
         ))}
       </div>
@@ -651,7 +652,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
         <div key={sec.sk} className="space-y-3">
           <label className={`flex items-center gap-3 rounded-2xl px-4 py-3 ${sec.slot ? "bg-sky-soft" : "bg-amber-50"}`}>
             <SelectAll group={`${sec.sk}-`} prefix />
-            <h2 className={`font-jua text-2xl ${sec.slot ? "text-sky-ink" : "text-amber-700"}`}>{slotTag(sec.slot)} <span className="text-lg">({sec.total}명)</span></h2>
+            <h2 className={`flex items-center gap-1.5 font-jua text-2xl ${sec.slot ? "text-sky-ink" : "text-amber-700"}`}><Icon name={sec.slot === "am" ? "sun" : sec.slot === "pm" ? "moon" : "clock"} size={28} />{slotTag(sec.slot)} <span className="text-lg">({sec.total}명)</span></h2>
           </label>
           {sec.groups.map((g) => {
             const pending = g.items.filter((a) => a.status === "pending").length;

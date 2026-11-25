@@ -34,10 +34,11 @@ test("키가 들어 있는 로그인만 켜져요 (카카오는 REST API 키만 
 test("로그인 뒤 돌아갈 주소: 사이트 안의 정해진 화면만, 나머지는 강의실", () => {
   assert.equal(safeNext("/check?d=1"), "/check?d=1");
   assert.equal(safeNext("/guide/online"), "/guide/online");
-  assert.equal(safeNext("https://evil.example"), "/class");
-  assert.equal(safeNext("//evil.example"), "/class");
-  assert.equal(safeNext("/admin"), "/class");
-  assert.equal(safeNext(null), "/class");
+  assert.equal(safeNext("https://evil.example"), "/go");
+  assert.equal(safeNext("//evil.example"), "/go");
+  assert.equal(safeNext("/admin"), "/go");
+  assert.equal(safeNext("/go"), "/go");
+  assert.equal(safeNext(null), "/go");
   assert.equal(isSignupNext("/guide/onsite"), true);
   assert.equal(isSignupNext("/class"), false);
 });

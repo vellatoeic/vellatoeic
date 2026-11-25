@@ -61,7 +61,7 @@ export default async function KindGuide({ params }: { params: Promise<{ kind: st
   const accountLabel = accountId ? (link ? `${PROVIDER_LABEL[link.provider]}${link.email || link.nickname ? ` (${link.email ?? link.nickname})` : ""}` : "로그인한") : null;
 
   return (
-    <div className="space-y-6 pt-8">
+    <div className="stagger space-y-6 pt-8">
       <div className="text-center">
         <span className="rounded-full bg-sky-main px-4 py-1.5 text-sm font-bold text-sky-ink">
           {KINDS[kind].label}

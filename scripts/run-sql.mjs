@@ -8,10 +8,12 @@
 //   npm run sql -- --check                         접속만 확인(읽기 전용: applications 행 수)
 //
 // 연결 주소는 .env.local의 SUPABASE_DB_URL(Session pooler URI)에서 읽어요. 주소·비밀번호는 어떤 출력에도 찍지 않아요.
+// 작업 폴더(git worktree)에서 실행하면 원래 폴더의 .env.local을 찾아 써요. SQL 파일·APPLIED.md 기록은 실행한 폴더 것을 써요.
 // 파일 안의 begin; / commit; 은 빼고, 파일 전체를 이 스크립트의 트랜잭션 하나로 묶어요.
 
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, relative, resolve, sep } from "node:path";
+import { basename, dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 
@@ -107,13 +109,35 @@ const lineAt = (text, at) => text.slice(0, at).split("\n").length;
 const cut = (s, n = 60) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
 // ── 연결 ──
-function readDbUrl() {
-  const file = resolve(ROOT, ".env.local");
+function dbUrlIn(file) {
   let url = "";
   if (existsSync(file)) {
     for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
       const m = line.match(/^\s*(?:export\s+)?SUPABASE_DB_URL\s*=\s*(.*?)\s*$/);
       if (m) url = m[1].replace(/^(["'])(.*)\1$/, "$2").trim();
+    }
+  }
+  return url;
+}
+
+// 작업 폴더(git worktree, 예: .claude/worktrees/…)에는 .env.local이 없어요.
+// git이 알려주는 원래 폴더(메인 checkout = 공통 .git 폴더의 위)를 찾아 그 .env.local을 써요. 주소를 복사해 두지 않아요.
+function mainCheckoutRoot() {
+  try {
+    const common = execFileSync("git", ["rev-parse", "--git-common-dir"], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return common ? dirname(resolve(ROOT, common)) : null;
+  } catch {
+    return null;
+  }
+}
+
+function readDbUrl() {
+  let url = dbUrlIn(resolve(ROOT, ".env.local"));
+  if (!url) {
+    const main = mainCheckoutRoot();
+    if (main && main !== resolve(ROOT)) {
+      url = dbUrlIn(resolve(main, ".env.local"));
+      if (url) log(`ℹ️ 작업 폴더라서 원래 폴더(${main})의 .env.local로 접속해요.`);
     }
   }
   if (!url) stop(`❌ .env.local의 SUPABASE_DB_URL이 비어 있어요. 이렇게 넣어 주세요:

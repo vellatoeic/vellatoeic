@@ -1,5 +1,7 @@
 "use client";
 
+import Icon from "@/components/Icon";
+import IconText from "@/components/IconText";
 import { keep } from "@/lib/keep";
 import { CLASSROOM } from "@/lib/config";
 import { useActionState, useState } from "react";
@@ -15,7 +17,7 @@ export default function SpecialForm({ events, needPin = true }: { events: Option
   if (state.ok) {
     return (
       <div className="card space-y-3 text-center">
-        <p className={`font-jua text-2xl ${mode === "online" ? "text-emerald-600" : "text-amber-600"}`}>{mode === "online" ? "✅ 신청이 확정됐어요" : "⏳ 보증금 입금 후 확정돼요"}</p>
+        <p className={`font-jua text-2xl ${mode === "online" ? "text-emerald-600" : "text-amber-600"}`}><span className="inline-flex items-center gap-2"><Icon name={mode === "online" ? "check" : "hourglass"} size={30} />{mode === "online" ? "신청이 확정됐어요" : "보증금 입금 후 확정돼요"}</span></p>
         <p className="text-slate-700">{state.ok.split(". ").map((line, i, all) => <span key={i} className="block">{line}{i < all.length - 1 ? "." : ""}</span>)}</p>
         <button type="button" onClick={() => window.location.reload()} className="btn-ghost !py-2 text-sm">다른 특강도 신청하기</button>
       </div>
@@ -31,7 +33,7 @@ export default function SpecialForm({ events, needPin = true }: { events: Option
             <label key={event.id} className={`flex items-start gap-3 rounded-xl p-3 ${event.closed ? "bg-slate-100 opacity-70" : "bg-sky-soft"}`}>
               <input type="radio" name="event_id" value={event.id} required disabled={event.closed} className="mt-1 accent-sky-deep" />
               <span>
-                <b className="block text-sky-ink">{event.title}</b>
+                <b className="block text-sky-ink"><IconText text={event.title} /></b>
                 <span className="text-sm text-slate-600">{event.when}</span>
                 {event.closed
                   ? <span className="mt-1 block text-sm font-bold text-slate-500">신청이 마감됐어요</span>

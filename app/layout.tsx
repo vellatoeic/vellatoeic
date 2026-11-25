@@ -1,10 +1,19 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
-import Cloud from "@/components/Cloud";
-import "@fontsource/jua";
-import "@fontsource/gowun-dodum";
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+import "@fontsource/playfair-display/latin-600.css";
+import "@fontsource/playfair-display/latin-700-italic.css";
+import "@fontsource/great-vibes/latin-400.css";
 import "./globals.css";
+import SiteMenu from "@/components/SiteMenu";
+import IconDefs from "@/components/IconDefs";
+import ModeSwitch from "@/components/ModeSwitch";
+import { getAccountId, getStudentIds, getViewing, isAdmin } from "@/lib/auth";
+import { stopViewing } from "@/app/actions";
+import { safe } from "@/lib/safe";
+import { ensureDemo } from "@/lib/demoSeed";
 import { INSTAGRAM_URL, SITE_URL } from "@/lib/config";
+import { BRAND } from "@/lib/homeContent";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/seo";
 import Bell from "@/components/notices/Bell";
 import { safeNoticeSummary } from "@/lib/noticeView";
@@ -31,33 +40,53 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#9fd8f5" };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  await safe("demo", () => ensureDemo(), undefined); // DB 없는 미리보기 + VELLA_DEMO=1 일 때만 예시 학생 (운영 DB에서는 아무것도 안 해요)
   const notice = await safeNoticeSummary(); // 공지 계산이 실패해도 페이지는 떠요
+  // 강사로 로그인했으면 [학생 | 강사] 전환 버튼, 학생 화면 미리보기 중이면 위에 띠
+  const [admin, viewing, loggedIn] = await Promise.all([
+    safe("layout.isAdmin", () => isAdmin(), false),
+    safe("layout.viewing", () => getViewing(), null),
+    safe("layout.loggedIn", async () => (await getStudentIds()).length > 0 || !!(await getAccountId()), false),
+  ]);
   return (
     <html lang="ko">
       <body className="min-h-dvh">
-        <header className="print:hidden sticky top-0 z-10 border-b border-sky-main/40 bg-sky-soft/90 backdrop-blur">
-          <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 lg:px-8">
-            <Link href="/" className="font-jua leading-tight text-sky-ink">
-              <span className="block text-xs text-sky-ink/60">토익의 시작</span>
-              <span className="flex items-center gap-1.5 text-2xl">
-                vella_toeic
-                <Cloud className="cloud-a h-6 w-auto fill-sky-main drop-shadow-[0_1px_0_rgba(43,143,199,0.25)]" />
-              </span>
-            </Link>
-            <div className="flex items-center gap-2">
+        <IconDefs />
+        <header className="site-hdr print:hidden">
+          <nav className="site-hdr-in">
+            <Link href="/" className="wordmark" aria-label="벨라토익 첫 화면">VELLA <i>TOEIC</i></Link>
+            <div className="site-hdr-nav" aria-label="첫 화면 바로가기">
+              <Link href="/#teacher">벨라쌤 소개</Link>
+              <Link href="/#project">최단 프로젝트</Link>
+              <Link href="/#finder">반 찾기</Link>
+              <Link href="/#proof">성적 인증</Link>
+              <Link href="/#courses">강좌</Link>
+              <Link href="/faq">FAQ</Link>
+            </div>
+            <div className="ml-auto flex items-center gap-1.5">
               <Bell count={notice.unread} visitorKeys={notice.visitorKeys} />
-              <Link href="/class" className="rounded-full bg-sky-main px-3 py-2 text-sm font-bold text-sky-ink">
-                강의실
-              </Link>
+              {admin ? <ModeSwitch /> : loggedIn ? <Link href="/class" className="hdr-class">강의실</Link> : <Link href="/login" className="hdr-login">로그인</Link>}
+              <SiteMenu loggedIn={loggedIn} />
             </div>
           </nav>
+          {viewing && (
+            <form action={stopViewing} className="view-strip">
+              <input type="hidden" name="app_id" value={viewing.appId} />
+              <span><b>{viewing.name}</b> 학생 화면 미리보기 중 · 보기만 돼요</span>
+              <button type="submit">끝내기</button>
+            </form>
+          )}
         </header>
         <main className="mx-auto max-w-3xl px-4 pb-16">{children}</main>
-        <footer className="print:hidden mx-auto max-w-3xl px-4 pb-10 text-center text-sm text-sky-ink/60">
-          <a href={INSTAGRAM_URL} target="_blank" rel="noreferrer" className="underline">
-            @vella_toeic
-          </a>
-          <span className="mx-2">·</span>부산 서면
+        <footer className="site-foot print:hidden">
+          <p className="wordmark">VELLA <i>TOEIC</i></p>
+          <p>{BRAND.center} · 벨라토익 · 문의 {BRAND.phone}</p>
+          <p>
+            <a href={INSTAGRAM_URL} target="_blank" rel="noreferrer" className="underline">@vella_toeic</a>
+            <span className="mx-2">·</span>
+            <a href={BRAND.youtubeUrl} target="_blank" rel="noreferrer" className="underline">유튜브 벨라토익</a>
+            <span className="mx-2">·</span>부산 서면
+          </p>
         </footer>
       </body>
     </html>

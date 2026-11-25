@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import Link from "next/link";
 import { todayKST } from "@/lib/config";
 import { addAttendance, listAttendance } from "@/lib/db";
@@ -6,16 +7,17 @@ import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
 import { isClassDay, nextClassDay } from "@/lib/attendanceDays";
 import { specialDay } from "@/lib/special";
 import { canWatch } from "@/lib/access";
-import StudentLogin from "../class/StudentLogin";
+import LoginCard from "../class/LoginCard";
 import { classAppsFor } from "@/lib/classCohort";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "출석 체크 · vella_toeic", robots: { index: false } };
 
-function Box({ title, children }: { title: string; children: React.ReactNode }) {
+function Box({ title, children, icon = "cloud" }: { title: string; children: React.ReactNode; icon?: string }) {
   return (
     <div className="pt-12">
       <div className="card mx-auto max-w-sm space-y-3 text-center">
+        <Icon name={icon} size={64} className="mx-auto block" />
         <p className="font-jua text-3xl text-sky-ink">{title}</p>
         {children}
         <Link href="/class" className="btn-ghost mt-2">강의실로 가기</Link>
@@ -32,7 +34,7 @@ export default async function Check() {
     return <Box title="수강 정보가 없어요"><p className="text-slate-600">Vella쌤에게 문의해 주세요.</p></Box>;
   }
   if (apps.length === 0) {
-    return <StudentLogin next="/check" note="출석하려면 먼저 로그인해 주세요. (처음 한 번만)" />;
+    return <LoginCard next="/check" note="출석하려면 먼저 로그인해 주세요. (처음 한 번만)" />;
   }
 
   // 수업 기수(날짜 기준)의 신청으로 출석해요. 모집 기수와 상관없어요.
@@ -55,7 +57,7 @@ export default async function Check() {
   if (classToday.length === 0) {
     const next = calendars.map((c) => nextClassDay(c.days, c.holidays, today)).filter((d): d is string => !!d).sort()[0];
     return (
-      <Box title="오늘은 수업이 없는 날이에요 ☁️">
+      <Box title="오늘은 수업이 없는 날이에요">
         <p className="text-slate-600">{next ? <>다음 수업: <b>{specialDay(next)}</b></> : "이번 달 수업이 모두 끝났어요."}</p>
       </Box>
     );
@@ -83,7 +85,7 @@ export default async function Check() {
   }
 
   return (
-    <Box title={already ? "오늘은 이미 출석했어요 ☁️" : "출석 완료! ☁️"}>
+    <Box title={already ? "오늘은 이미 출석했어요" : "출석 완료!"} icon={already ? "cloud" : "check"}>
       <p className="text-slate-600">{already ? "출석은 하루에 한 번만 찍으면 돼요." : `${mine[0].name}님, 오늘도 왔네요 :)`}</p>
       <p className="font-jua text-5xl text-sky-deep">{days.size}</p>
       <p className="text-sm text-slate-500">이번 달 모은 출석 스티커</p>

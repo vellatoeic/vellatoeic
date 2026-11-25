@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import { COURSES, PARTS, LECTURE_COURSES, TIME_SLOTS, cohortLabel, type Part } from "@/lib/config";
 import { listLectures, currentCohort, isPreview } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
@@ -41,7 +42,7 @@ export default async function Lectures({ searchParams }: { searchParams: Promise
 
       {pastSet.size > 0 && (
         <p className="flex flex-wrap items-center gap-2 rounded-2xl bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
-          📦 열람 기간이 끝난 지난 기수 {pastSet.size}개 (강의 {pastCount}개) {old ? "도 함께 보고 있어요" : "는 숨겨 뒀어요"}
+          <Icon name="parcel" size={16} className="mr-1" />열람 기간이 끝난 지난 기수 {pastSet.size}개 (강의 {pastCount}개) {old ? "도 함께 보고 있어요" : "는 숨겨 뒀어요"}
           <a href={old ? "/admin/lectures" : "/admin/lectures?old=1"} className="ml-auto font-bold text-sky-deep underline">{old ? "지난 기수 숨기기" : "지난 기수 보기"}</a>
         </p>
       )}

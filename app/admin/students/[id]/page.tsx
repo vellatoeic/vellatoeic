@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BOOKS, COURSES, KINDS, TRACKS, classSlotLabel, bookStatusLabel, cohortLabel, todayKST, won } from "@/lib/config";
@@ -9,7 +10,7 @@ import { specialDay } from "@/lib/special";
 import { TEST_LABEL } from "@/lib/tests";
 import { missionCount } from "@/lib/mission";
 import { watchSummary } from "@/lib/watchlist";
-import { changeCohort, cycleAttendance, cycleHomework, extendAudio, unlinkLogin } from "@/app/actions";
+import { changeCohort, cycleAttendance, cycleHomework, extendAudio, unlinkLogin, viewAsStudent } from "@/app/actions";
 import { listLoginLinks } from "@/lib/db";
 import { PROVIDER_LABEL } from "@/lib/socialLogin";
 import { movableCohorts } from "@/lib/cohortMove";
@@ -70,9 +71,9 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
         const [target, n, changed, errors] = mv.split("|");
         return (
           <div className="space-y-1 rounded-3xl border-2 border-sky-main bg-white p-4 text-sm">
-            {Number(n) > 0 && <p className="font-jua text-lg text-sky-ink">🔁 {cohortLabel(target)}(으)로 옮겼어요 · 교재를 새 기수 회차로 다시 계산했어요</p>}
-            {changed && <p className="font-bold text-amber-700">💰 금액 변경됨: {changed}</p>}
-            {errors && <p className="font-bold text-red-600">⚠️ 옮기지 못함: {errors}</p>}
+            {Number(n) > 0 && <p className="font-jua text-lg text-sky-ink"><Icon name="repeat" size={22} className="mr-1" />{cohortLabel(target)}(으)로 옮겼어요 · 교재를 새 기수 회차로 다시 계산했어요</p>}
+            {changed && <p className="font-bold text-amber-700"><Icon name="coins" size={20} className="mr-1" />금액 변경됨: {changed}</p>}
+            {errors && <p className="font-bold text-red-600"><Icon name="alert" size={20} className="mr-1" />옮기지 못함: {errors}</p>}
           </div>
         );
       })()}
@@ -84,6 +85,11 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
             <h2 className="font-jua text-3xl text-sky-ink">{a.name}</h2>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {/* 이 학생이 보는 화면(대시보드·강의실)을 보기 전용으로 열어요 */}
+            <form action={viewAsStudent}>
+              <input type="hidden" name="app_id" value={a.id} />
+              <button className="btn !py-2 !text-sm">이 학생 화면으로 보기</button>
+            </form>
             <Link href={`/admin?c=${a.cohort}&q=${encodeURIComponent(a.name)}`} className="btn-ghost !py-2 text-sm">신청 관리에서 바꾸기 (납부·반·시간·환불)</Link>
             <details className="relative text-sm">
               <summary className="btn-ghost cursor-pointer list-none !py-2">기수 변경</summary>
@@ -113,7 +119,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
         </dl>
         {audioWin && (
           <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-sky-soft p-3 text-sm">
-            <span>🎧 LC 음원 기간 <b className="text-sky-ink">{specialDay(audioWin.start)} ~ {specialDay(audioWin.end)}</b>{audioWin.end < today ? " (지남)" : ""}{a.audio_extended_until ? " · 다시 열어 줌" : ""}</span>
+            <span><Icon name="headphones" size={18} className="mr-1" />LC 음원 기간 <b className="text-sky-ink">{specialDay(audioWin.start)} ~ {specialDay(audioWin.end)}</b>{audioWin.end < today ? " (지남)" : ""}{a.audio_extended_until ? " · 다시 열어 줌" : ""}</span>
             <form action={extendAudio} className="ml-auto">
               <input type="hidden" name="id" value={a.id} />
               <button className="btn-ghost !py-1.5 text-sm">음원 7일 다시 열기</button>
@@ -139,7 +145,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
         </div>
         {mission?.intro_at && (
           <p className="rounded-2xl bg-sky-soft p-3 text-sm text-slate-600">
-            📝 {mission.prev_score} → 목표 {mission.target_score} · 시험 {mission.exam_month}
+            <Icon name="clipboard" size={16} className="mr-1" />{mission.prev_score} → 목표 {mission.target_score} · 시험 {mission.exam_month}
             {mission.affiliation && ` · ${mission.affiliation}`}{mission.instagram && ` · ${mission.instagram}`}
             {mission.message && <span className="block text-sky-ink">“{mission.message}”</span>}
           </p>
@@ -151,7 +157,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
           {[
             { label: "출석", value: `${s.attended}/${s.past}`, sub: s.late ? `지각 ${s.late}` : "지난 수업 기준" },
             { label: "결석", value: `${s.absent}회`, sub: s.streak ? `최근 ${s.streak}회 연속` : "연속 결석 없음", warn: s.absent >= 3 || s.streak >= 2 },
-            { label: "숙제", value: `${s.hwDue - s.hwMissing}/${s.hwDue}`, sub: `⭐ 별 ${homework.filter((h) => isHomeworkStickerEligible(h.day, h.created_at)).length}개`, warn: s.hwMissing >= 3 },
+            { label: "숙제", value: `${s.hwDue - s.hwMissing}/${s.hwDue}`, sub: `별 ${homework.filter((h) => isHomeworkStickerEligible(h.day, h.created_at)).length}개`, warn: s.hwMissing >= 3 },
             { label: "테스트 평균", value: tests.length ? `${pct("rc") ?? "-"}%` : "-", sub: tests.length ? `RC · 단어 ${pct("word") ?? "-"}% · ${tests.length}회 제출` : "제출 기록 없음" },
           ].map((x) => (
             <div key={x.label} className="rounded-2xl bg-sky-soft p-2.5">
@@ -161,14 +167,14 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
             </div>
           ))}
         </div>
-        {s.reasons.length > 0 && <p className="flex flex-wrap gap-1">{s.reasons.map((r) => <span key={r} className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-600">🚨 {r}</span>)}</p>}
+        {s.reasons.length > 0 && <p className="flex flex-wrap gap-1">{s.reasons.map((r) => <span key={r} className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-600"><Icon name="siren" size={14} className="mr-1" />{r}</span>)}</p>}
       </section>
 
       {(regs.length > 0 || history.length > 1) && (
         <div className="grid gap-4 lg:grid-cols-2">
           {regs.length > 0 && (
             <section className="card text-sm">
-              <p className="font-jua text-lg text-sky-ink">🎤 특강 신청</p>
+              <p className="flex items-center gap-1 font-jua text-lg text-sky-ink"><Icon name="mic" size={24} />특강 신청</p>
               <ul className="mt-2 divide-y divide-sky-soft">
                 {[...regs].sort((x, y) => y.created_at.localeCompare(x.created_at)).map((r) => {
                   const e = eventById.get(r.special_lecture_id);
@@ -176,7 +182,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
                     <li key={r.id} className="flex flex-wrap items-center gap-2 py-2">
                       <b className="text-sky-ink">{e ? `${specialDay(e.event_date)} ${e.title}` : "특강"}</b>
                       <span className="text-slate-500">{r.mode === "onsite" ? `현장 · ${DEPOSIT[r.deposit ?? "pending"]}` : "불라방"}</span>
-                      {r.deposit_refunded_at && <span className={`${chip} bg-emerald-100 text-emerald-700`}>💸 보증금 환불 완료</span>}
+                      {r.deposit_refunded_at && <span className={`${chip} bg-emerald-100 text-emerald-700`}>보증금 환불 완료</span>}
                     </li>
                   );
                 })}
@@ -185,11 +191,11 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
           )}
           {history.length > 1 && (
             <section className="card text-sm">
-              <p className="font-jua text-lg text-sky-ink">📚 수강 이력 <span className="text-sm text-slate-400">(같은 이름)</span></p>
+              <p className="flex items-center gap-1 font-jua text-lg text-sky-ink"><Icon name="book" size={24} />수강 이력 <span className="text-sm text-slate-400">(같은 이름)</span></p>
               <ul className="mt-2 divide-y divide-sky-soft">
                 {history.map((h) => (
                   <li key={h.id} className="py-2">
-                    {h.id === a.id ? <b className="text-sky-ink">▶ {cohortLabel(h.cohort)} {classSlotLabel(h)} · {KINDS[h.kind].short} (지금 보는 신청)</b> : (
+                    {h.id === a.id ? <b className="text-sky-ink"><Icon name="play" size={16} className="mr-1" />{cohortLabel(h.cohort)} {classSlotLabel(h)} · {KINDS[h.kind].short} (지금 보는 신청)</b> : (
                       <Link href={`/admin/students/${h.id}`} className="text-sky-deep underline">{cohortLabel(h.cohort)} {classSlotLabel(h)} · {KINDS[h.kind].short}</Link>
                     )}
                     <span className="ml-2 text-xs text-slate-400">{STATUS[h.status]}</span>
@@ -209,7 +215,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
           cohort={a.cohort}
           className={`${COURSES[a.course].label} ${TRACKS[a.track]}`}
           klass={klass}
-          scheduleDays={studentDays(schoolDaysFor(rawDays, a.cohort, klass), a.created_at)}
+          scheduleDays={studentDays(schoolDaysFor(rawDays, a.cohort, klass).filter((d) => !(rawHolidays ? parseHolidays(rawHolidays, a.cohort) : defaultHolidays(a.cohort))[d]), a.created_at)}
           holidays={rawHolidays ? parseHolidays(rawHolidays, a.cohort) : defaultHolidays(a.cohort)}
           attendance={attendance}
           homework={homework.map(({ day, created_at }) => ({ day, created_at }))}
@@ -220,7 +226,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
         />
       </div>
       <section className="card !p-4">
-        <p className="font-jua px-1 text-lg text-sky-ink">📅 날짜별 출석·숙제·테스트 (고치기)</p>
+        <p className="flex items-center gap-1 font-jua px-1 text-lg text-sky-ink"><Icon name="calendar" size={24} />날짜별 출석·숙제·테스트 (고치기)</p>
         <p className="px-1 text-xs text-slate-500">출석 칸을 누르면 출석 → 지각 → 결석 순서로 바뀌어요. 숙제를 누르면 기록을 취소해요.</p>
         <ul className="mt-2 divide-y divide-sky-soft">
           {all.map((d) => {
@@ -245,13 +251,13 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
                   <form action={cycleHomework}>
                     <input type="hidden" name="id" value={a.id} />
                     <input type="hidden" name="day" value={d} />
-                    <button className={`rounded-full px-3 py-1 ${star ? "bg-amber-100 font-bold text-amber-700" : hw ? "bg-amber-50 text-amber-700" : "bg-slate-50 text-slate-400"}`} title="누르면 없음 → ⭐ 숙제 → 없음 순서로 바뀌어요">
-                      {star ? "⭐ 숙제" : hw ? "✓ 숙제(늦음) → 눌러서 ⭐" : "· 숙제 없음"}
+                    <button className={`rounded-full px-3 py-1 ${star ? "bg-amber-100 font-bold text-amber-700" : hw ? "bg-amber-50 text-amber-700" : "bg-slate-50 text-slate-400"}`} title="누르면 없음 → 별 숙제 → 없음 순서로 바뀌어요">
+                      {star ? <><Icon name="star" size={16} className="mr-0.5" />숙제</> : hw ? "✓ 숙제(늦음) → 눌러서 별" : "· 숙제 없음"}
                     </button>
                   </form>
                 )}
                 {testsOf(d).map((t) => (
-                  <span key={t.id} className="rounded-full bg-white px-3 py-1 ring-1 ring-sky-main">📝 {TEST_LABEL[t.kind]} {t.test_no} · <b className="text-sky-ink">{t.score}/{t.questions}</b></span>
+                  <span key={t.id} className="rounded-full bg-white px-3 py-1 ring-1 ring-sky-main"><Icon name="stopwatch" size={16} className="mr-1" />{TEST_LABEL[t.kind]} {t.test_no} · <b className="text-sky-ink">{t.score}/{t.questions}</b></span>
                 ))}
               </li>
             );

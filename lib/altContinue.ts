@@ -45,7 +45,7 @@ export function lateDeliveryWarning(today: string, first: string | null, last: s
   const from = new Date(Date.parse(`${first}T00:00:00Z`) - 3 * 86400000).toISOString().slice(0, 10);
   return today >= from && today <= last;
 }
-export const LATE_DELIVERY_TEXT = "📦 지금 신청하면 첫 수업 전에 교재가 도착하기 어려워요 (평일 2~3일). 1층 데스크 수령을 추천해요.";
+export const LATE_DELIVERY_TEXT = "지금 신청하면 첫 수업 전에 교재가 도착하기 어려워요 (평일 2~3일). 1층 데스크 수령을 추천해요.";
 
 // ── 이미 들어온 신청 점검 (관리자 '⚠️ 격일반 확인 필요') ──
 // 관리자 쪽에서는 비밀번호를 비교할 수 없어서(학생마다 따로 암호화) '같은 이름'으로 지난달 기록을 찾아요.
@@ -83,4 +83,4 @@ export function altFixResult(a: Application, issue: AltIssue, round: 1 | 2) {
 }
 
 // 시작반 격일반 이어듣기 학생 교재 지참 안내
-export const BRING_BOOKS_TEXT = "📚 이번 달은 LC 교재만 새로 받아요. 지난달 개념집과 시작반 RC 교재를 꼭 가져와 주세요!";
+export const BRING_BOOKS_TEXT = "이번 달은 LC 교재만 새로 받아요. 지난달 개념집과 시작반 RC 교재를 꼭 가져와 주세요!";

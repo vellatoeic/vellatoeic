@@ -3,6 +3,9 @@ import { after } from "next/server";
 import { BOOKS, COURSES, PARTS, TIME_SLOTS, TRACKS, TRACK_PARTS, cohortLabel, todayKST, won } from "@/lib/config";
 import { liveState } from "@/lib/live";
 import AddToHome from "@/components/AddToHome";
+import Icon from "@/components/Icon";
+import IconText from "@/components/IconText";
+import StudentTabBar from "@/components/StudentTabBar";
 import NoticePopupHost from "@/components/notices/NoticePopupHost";
 import BookReceived from "@/components/BookReceived";
 import TestForm from "@/components/tests/TestForm";
@@ -19,7 +22,7 @@ import { studentLogout } from "@/app/actions";
 import AudioBanner from "@/components/audio/AudioBanner";
 import AudioList from "@/components/audio/AudioList";
 import AudioPopup from "@/components/audio/AudioPopup";
-import StudentLogin from "./StudentLogin";
+import LoginCard from "./LoginCard";
 import StickerBoard from "./StickerBoard";
 import SocialButtons from "@/components/SocialButtons";
 import { loginSetup } from "@/lib/socialServer";
@@ -50,7 +53,7 @@ export const metadata = { title: "강의실 · vella_toeic", robots: { index: fa
 export default async function ClassRoom({ searchParams }: { searchParams: Promise<{ t?: string; expired?: string }> }) {
   after(() => safe("expireUnpaid", () => expireUnpaid(), null)); // 30분 지난 입금 대기 자동 취소는 화면을 보낸 뒤에 (1분에 한 번, 실패해도 강의실은 열려요)
   const { loggedIn, apps } = await activeStudentApps();
-  if (!loggedIn) return <StudentLogin />;
+  if (!loggedIn) return <LoginCard />;
   // 환불·삭제된 수강생은 아무것도 볼 수 없어요. 취소된 신청만 있으면 취소 안내를 보여줘요.
   if (apps.length === 0) {
     const cancelled = (await safe("cancelledApps", async () => getApplications(await getStudentIds()), [])).filter((a) => a.status === "cancelled").sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
@@ -106,9 +109,11 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
       getSetting(scheduleKey(appCohort, klass)),
       getSetting(holidayKey(appCohort)),
     ]);
+    const holidays = rawHolidays ? parseHolidays(rawHolidays, appCohort) : defaultHolidays(appCohort);
+    // 수업일은 공휴일 제외 (라이브 '다음 수업'·스티커판이 공휴일을 수업일로 보지 않게, lib/classCalendar와 같은 규칙)
     return [`${appCohort}:${klass}`, {
-      days: schoolDaysFor(rawDays, appCohort, klass),
-      holidays: rawHolidays ? parseHolidays(rawHolidays, appCohort) : defaultHolidays(appCohort),
+      days: schoolDaysFor(rawDays, appCohort, klass).filter((d) => !holidays[d]),
+      holidays,
     }] as const;
   })));
 
@@ -163,28 +168,34 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
     const state = liveState({ ...liveApp, slot: tab }, schedule?.days ?? []);
     if (!state.open) {
       return (
-        <div className="rounded-3xl bg-slate-200 px-5 py-4 text-center text-slate-500">
-          <p className="font-jua text-2xl">🔴 라이브 입장</p>
-          <p className="mt-1 text-sm">{state.next ? `다음 라이브: ${state.next}` : "이번 달 라이브가 모두 끝났어요"}</p>
+        <div className="flex items-center gap-3 rounded-[22px] border border-sky-deep/10 bg-white px-5 py-4 text-slate-500 shadow-[0_6px_22px_rgba(18,64,92,0.07)]">
+          <Icon name="live" size={36} />
+          <div className="flex-1">
+          <p className="font-jua text-xl text-sky-ink">라이브 입장</p>
+          <p className="text-sm">{state.next ? `다음 라이브: ${state.next}` : "이번 달 라이브가 모두 끝났어요"}</p>
+          </div>
         </div>
       );
     }
     const link = liveLinkFor(liveApp, lectures, state.slot);
     return link ? (
-      <a href={`https://youtu.be/${link.youtube_id}`} target="_blank" rel="noreferrer" className="block rounded-3xl bg-red-500 px-5 py-4 text-center text-white shadow-[0_5px_0_#b91c1c] active:translate-y-1 active:shadow-none">
-        <p className="font-jua text-2xl">🔴 라이브 입장</p>
-        <p className="mt-1 text-sm opacity-90">{state.label} · 눌러서 입장해요</p>
+      <a href={`https://youtu.be/${link.youtube_id}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-[22px] bg-gradient-to-br from-[#ff7a7f] to-[#e5484d] px-5 py-4 text-white shadow-[0_6px_0_#b8383c,0_12px_30px_rgba(229,72,77,0.3)] active:translate-y-1 active:shadow-[0_3px_0_#b8383c]">
+        <Icon name="livedot" size={34} className="vt-pulse" />
+        <div className="flex-1">
+        <p className="font-jua text-2xl">라이브 입장</p>
+        <p className="text-sm opacity-90">{state.label} · 눌러서 입장해요</p>
+        </div>
       </a>
     ) : (
-      <div className="rounded-3xl bg-red-100 px-5 py-4 text-center text-red-600">
-        <p className="font-jua text-2xl">🔴 라이브 곧 시작</p>
+      <div className="rounded-[22px] border border-red-200 bg-[#fff1f1] px-5 py-4 text-center text-red-600">
+        <p className="flex items-center justify-center gap-2 font-jua text-2xl"><Icon name="livedot" size={28} className="vt-pulse" />라이브 곧 시작</p>
         <p className="mt-1 text-sm">{state.label} · 라이브 링크가 올라오면 여기서 바로 입장해요. 잠시 후 새로고침해 주세요.</p>
       </div>
     );
   })();
 
   return (
-    <div className="space-y-6 pt-8">
+    <div className="stagger space-y-6 pt-8">
       <div className="flex items-end justify-between">
         <div>
           <p className="text-slate-500">{name}님의</p>
@@ -197,18 +208,18 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
 
 
-      {expired && <p className="card !bg-slate-100 text-center font-bold text-slate-600">📚 열람 기간이 끝났어요</p>}
+      {expired && <p className="card !bg-slate-100 flex items-center justify-center gap-2 font-bold text-slate-600"><Icon name="book" size={24} />열람 기간이 끝났어요</p>}
 
       {bringBooks && (
         <div className="rounded-3xl border-2 border-yellow-300 bg-yellow-100 p-5 text-center">
-          <p className="font-jua text-xl text-yellow-900">📚 {bringBooks} 수업에 지난달 개념집 + 시작반 RC 교재를 챙겨 오세요</p>
+          <p className="font-jua text-xl text-yellow-900"><Icon name="book" size={24} className="mr-1" />{bringBooks} 수업에 지난달 개념집 + 시작반 RC 교재를 챙겨 오세요</p>
           <p className="mt-1 text-sm text-yellow-800">이번 달은 LC 교재만 새로 받아요 (격일반 이어듣기)</p>
         </div>
       )}
 
       {allClosed && lastClosed && (
         <div className="rounded-3xl border-2 border-sky-main bg-white p-5 text-center">
-          <p className="font-jua text-xl text-sky-ink">📚 {Number(lastClosed.cohort.slice(5, 7))}월 강의 열람 기간이 끝났어요.</p>
+          <p className="font-jua text-xl text-sky-ink"><Icon name="book" size={24} className="mr-1" />{Number(lastClosed.cohort.slice(5, 7))}월 강의 열람 기간이 끝났어요.</p>
           {signupMonth && (
             <>
               <p className="mt-1 text-sm text-slate-600">{signupMonth.label}은 수강 신청 후 들을 수 있어요.</p>
@@ -220,7 +231,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
       {pending.map((a) => (
         <div key={a.id} className="rounded-3xl border-2 border-amber-300 bg-amber-50 p-5 text-center">
-          <p className="font-jua text-2xl text-amber-700">⏳ 입금 확인 중이에요</p>
+          <p className="flex items-center justify-center gap-2 font-jua text-2xl text-amber-700"><Icon name="hourglass" size={30} />입금 확인 중이에요</p>
           <p className="mt-1 text-slate-700">확인되면 라이브 입장 버튼이 열려요.</p>
           <p className="font-jua mt-3 text-3xl text-sky-ink">{won(a.amount)}</p>
           <p className="mt-2 rounded-2xl bg-white p-3 font-bold text-sky-ink">{account || "계좌 안내 준비 중이에요"}</p>
@@ -233,7 +244,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
           <div className="grid grid-cols-2 gap-1 rounded-2xl bg-white p-1 shadow-[0_2px_0_#d5ecf9]">
             {(["am", "pm"] as const).map((s) => (
               <Link key={s} href={`/class?t=${s}`} scroll={false} className={`rounded-xl py-2.5 text-center font-jua text-lg ${tab === s ? "bg-sky-deep text-white" : "text-sky-ink"}`}>
-                {s === "am" ? "☀️ 오전반" : "🌙 저녁반"}
+                <span className="inline-flex items-center gap-1.5"><Icon name={s === "am" ? "sun" : "moon"} size={20} />{s === "am" ? "오전반" : "저녁반"}</span>
               </Link>
             ))}
           </div>
@@ -254,7 +265,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
         const ok = r.mode === "online" || r.deposit === "paid";
         return (
           <Link key={r.id} href="/special" className={`flex items-center justify-between gap-2 rounded-2xl border-2 px-4 py-3 text-sm ${ok ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
-            <span className="font-bold text-slate-700">🎤 {specialDay(e.event_date)} 특강 · <span className={ok ? "text-emerald-700" : "text-amber-700"}>{ok ? "✅ 신청 확정" : "⏳ 보증금 입금 대기"}</span></span>
+            <span className="inline-flex flex-wrap items-center gap-1 font-bold text-slate-700"><Icon name="mic" size={20} />{specialDay(e.event_date)} 특강 · <span className={`inline-flex items-center gap-1 ${ok ? "text-emerald-700" : "text-amber-700"}`}><Icon name={ok ? "check" : "hourglass"} size={18} />{ok ? "신청 확정" : "보증금 입금 대기"}</span></span>
             <span className="shrink-0 text-sky-deep">특강 페이지로 →</span>
           </Link>
         );
@@ -266,7 +277,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
             // 눌러서 접고 펼 수 있어요. 아직 안 낸 테스트가 있으면 펼친 채로 시작해요.
             <details open={myTests.today.some((t) => !t.result)} className="group">
               <summary className="flex cursor-pointer list-none items-center justify-between font-jua text-xl text-sky-ink">
-                <span>📝 오늘의 테스트 <span className="text-sm text-slate-500">· 제출 {myTests.today.filter((t) => t.result).length}/{myTests.today.length}</span></span>
+                <span className="inline-flex items-center gap-1.5"><Icon name="stopwatch" size={26} />오늘의 테스트 <span className="text-sm text-slate-500">· 제출 {myTests.today.filter((t) => t.result).length}/{myTests.today.length}</span></span>
                 <span className="text-sm text-slate-400 group-open:hidden">펼치기 ▾</span>
                 <span className="hidden text-sm text-slate-400 group-open:inline">접기 ▴</span>
               </summary>
@@ -283,7 +294,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
             // 다음 수업일 테스트 미리 내기 (접어 두고 필요할 때 펼쳐요)
             <details className="group rounded-2xl bg-white/60 px-3 py-2">
               <summary className="flex cursor-pointer list-none items-center justify-between font-jua text-lg text-sky-ink">
-                <span>⏩ 다음 수업 테스트 미리 내기 <span className="text-sm text-slate-500">· {specialDay(myTests.next[0].day)} · 제출 {myTests.next.filter((t) => t.result).length}/{myTests.next.length}</span></span>
+                <span className="inline-flex flex-wrap items-center gap-1.5"><Icon name="arrowRight" size={20} />다음 수업 테스트 미리 내기 <span className="text-sm text-slate-500">· {specialDay(myTests.next[0].day)} · 제출 {myTests.next.filter((t) => t.result).length}/{myTests.next.length}</span></span>
                 <span className="text-sm text-slate-400 group-open:hidden">펼치기 ▾</span>
                 <span className="hidden text-sm text-slate-400 group-open:inline">접기 ▴</span>
               </summary>
@@ -297,7 +308,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
             </details>
           )}
           <Link href="/class/tests" className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm font-bold text-sky-ink">
-            <span>{myTests.missed.length > 0 ? `⏰ 밀린 테스트 ${myTests.missed.length}개 · ` : ""}📈 내 점수 기록</span>
+            <span className="inline-flex items-center gap-1.5">{myTests.missed.length > 0 && <><Icon name="clock" size={18} />밀린 테스트 {myTests.missed.length}개 · </>}<Icon name="chart" size={18} />내 점수 기록</span>
             <span className="text-sky-main">›</span>
           </Link>
         </section>
@@ -309,7 +320,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
       {latestMission < 4 && (
         <Link href="/mission" className="flex items-center gap-3 rounded-[20px] border-2 border-[#ffd23f] bg-white p-4 shadow-[0_3px_0_#cfe6f5]">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#e8f8ef] text-2xl">✅</span>
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#e8f8ef]"><Icon name="clipboard" size={32} /></span>
           <span className="flex-1">
             <b className="block text-lg text-sky-ink">첫 수업 미션 {latestMission} / 4</b>
             <span className="text-sm text-slate-500">다 하면 스티커판에 웰컴 배지가 붙어요</span>
@@ -335,7 +346,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
       {chatUrl && paid.some((a) => a.cohort === today.slice(0, 7) || a.cohort === nextMonthOf(today)) && (
         <a href={chatUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-2xl border-2 border-[#ffe58a] bg-[#fff9e0] px-4 py-3">
           <span>
-            <span className="block font-jua text-lg text-[#7d6728]">💬 벨라토익 단톡방</span>
+            <span className="flex items-center gap-1.5 font-jua text-lg text-[#7d6728]"><Icon name="chat" size={24} />벨라토익 단톡방</span>
             {chatCode && <span className="text-sm text-[#a7741a]">참여코드 <b className="font-jua text-lg tracking-widest">{chatCode}</b></span>}
           </span>
           <span className="shrink-0 text-sm font-bold text-[#a7741a]">들어가기 ↗</span>
@@ -363,12 +374,12 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
               const left = dayDiff(today, box.period.end);
               if (today < box.period.start) {
                 const [, sm, sd] = box.period.start.split("-").map(Number);
-                return <p className="mt-4 rounded-2xl bg-sky-soft p-4 text-sm text-slate-600">🎧 LC 음원은 {sm}/{sd}부터 종강일({m}/{d})까지 받을 수 있어요.</p>;
+                return <p className="mt-4 rounded-2xl bg-sky-soft p-4 text-sm text-slate-600"><Icon name="headphones" size={20} className="mr-1" />LC 음원은 {sm}/{sd}부터 종강일({m}/{d})까지 받을 수 있어요.</p>;
               }
               return (
                 // 다운로드 기간에는 항상 펼쳐 둬요. 누른 파일은 '받음 ✓' (이 기기에 기록)
                 <div id="lc-audio" className="mt-4 scroll-mt-4 rounded-2xl bg-sky-soft p-4">
-                  <p className="font-jua text-lg text-sky-ink">🎧 LC 음원 <span className="text-sm text-slate-500">({audioBooksFor(a).map((b) => BOOKS[b]).join(", ")} 교재 · {box.list.length}개)</span></p>
+                  <p className="flex flex-wrap items-center gap-1.5 font-jua text-lg text-sky-ink"><Icon name="headphones" size={26} />LC 음원 <span className="text-sm text-slate-500">({audioBooksFor(a).map((b) => BOOKS[b]).join(", ")} 교재 · {box.list.length}개)</span></p>
                   <p className={`text-sm font-bold ${left <= 3 ? "text-red-500" : "text-sky-deep"}`}>{m}/{d}까지 다운로드 가능 ({left === 0 ? "D-DAY" : `D-${left}`}) · 종강일이 지나면 다시 받을 수 없어요</p>
                   {box.list.length === 0 ? <p className="mt-2 text-sm text-slate-500">음원이 올라오면 여기에 보여요.</p> : (
                     <AudioList cohort={a.cohort} items={box.list.map((x) => ({ id: x.id, title: x.title }))} />
@@ -377,6 +388,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
                 </div>
               );
             })()}
+            <div id="sticker" className="scroll-mt-20" />
             {(() => {
               const klass = scheduleClassFor(a.course, a.track);
               const schedule = schedulesByClass.get(`${a.cohort}:${klass}`)!;
@@ -397,11 +409,11 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
             })()}
             {phase === "extended" && w && (
               <div className="mt-6 rounded-2xl bg-emerald-50 p-3 text-center text-sm">
-                <p className="font-bold text-emerald-700">📚 {Number(a.cohort.slice(5, 7))}월 강의는 {dayLabelKo(w.until)}까지 볼 수 있어요{!hasNextOf(a) && ` · ${Number(shiftMonth(a.cohort, 1).slice(5, 7))}월 수업도 함께해요!`}</p>
+                <p className="font-bold text-emerald-700"><Icon name="book" size={20} className="mr-1" />{Number(a.cohort.slice(5, 7))}월 강의는 {dayLabelKo(w.until)}까지 볼 수 있어요{!hasNextOf(a) && ` · ${Number(shiftMonth(a.cohort, 1).slice(5, 7))}월 수업도 함께해요!`}</p>
                 {!hasNextOf(a) && <a href={`/guide/${a.kind}`} className="btn mt-2 inline-block !py-2 !text-sm">{Number(shiftMonth(a.cohort, 1).slice(5, 7))}월 수강 신청하기</a>}
               </div>
             )}
-            {mine.length > 0 && <h3 className="font-jua mt-6 border-t border-sky-main/50 pt-5 text-2xl text-sky-ink">📚 지난 강의</h3>}
+            {mine.length > 0 && <h3 className="font-jua mt-6 border-t border-sky-main/50 pt-5 flex items-center gap-2 text-2xl text-sky-ink"><Icon name="replay" size={30} />지난 강의</h3>}
             {TRACK_PARTS[a.track].map((part) => {
               const list = mine.filter((l) => l.part === part);
               if (list.length === 0) return null;
@@ -418,8 +430,8 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
                           <span className="font-jua flex h-8 min-w-8 shrink-0 items-center justify-center rounded-full bg-white px-2 text-sm text-sky-deep">
                             {l.slot ? TIME_SLOTS[l.slot] : i + 1}
                           </span>
-                          <span className="flex-1 text-slate-800">{l.title}</span>
-                          <span className="text-sky-deep">▶</span>
+                          <span className="flex-1 text-slate-800"><IconText text={l.title} /></span>
+                          <Icon name="play" size={26} />
                         </Link>
                       </li>
                     ))}
@@ -433,6 +445,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
       <AddToHome />
       <NoticePopupHost />
+      <StudentTabBar tests={!!testApp} />
     </div>
   );
 }

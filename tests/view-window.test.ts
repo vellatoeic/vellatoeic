@@ -56,7 +56,7 @@ test("종강일 팝업: 종강일 당일 ~ 마감일, 격일반 종강일 기준
 test("종강일 팝업 문구: 다음 달 신청이 없으면 신청 버튼, 있으면 없음", () => {
   const base = { cohort: "2026-10", end: "2026-10-29", until: "2026-11-01", kind: "online" as const };
   const [no] = courseEndNotices([{ ...base, hasNext: false }], "2026-10-30");
-  assert.equal(no.title, "🎁 종강 기념! 10월 강의를 11/1(일)까지 열어 둘게요");
+  assert.equal(no.title, "종강 기념! 10월 강의를 11/1(일)까지 열어 둘게요");
   assert.equal(no.link_label, "11월 수강 신청하기");
   assert.equal(no.link_url, "/guide/online");
   const [yes] = courseEndNotices([{ ...base, hasNext: true }], "2026-10-30");

@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import Link from "next/link";
 import { BLOG_URL, CLASSROOM, INSTAGRAM_URL } from "@/lib/config";
 import { getSetting } from "@/lib/db";
@@ -14,18 +15,18 @@ export const metadata = pageMeta(
 const YBM_SIGNUP_URL = "https://www.ybmedu.com/seomyon/vellatoeic";
 
 const CLASSES = [
-  { icon: "🌱", name: "시작반", goal: "토익 650 목표", body: "토익을 처음 시작하거나 다시 기초부터 잡고 싶은 분을 위한 개념반이에요. 개념집과 RC·LC 교재로 문법·어휘·듣기의 뼈대를 차근차근 쌓아요." },
-  { icon: "🔥", name: "문풀반", goal: "토익 750 목표", body: "개념을 아는 분을 위한 실전반이에요. 점수가 오르는 풀이 감각을 집중해서 끌어올려요." },
-  { icon: "⚡", name: "속성반", goal: "한 달 집중", body: "한 달 동안 시작반과 문풀반을 함께 듣는 주 4일 집중 과정이에요. 짧은 기간에 개념과 실전을 한 번에 끝내고 싶은 분께 맞아요." },
-  { icon: "🗓️", name: "격일반", goal: "2달 완성", body: "월·수 또는 화·목, 주 2일씩 두 달 이어 들으면 한 과정이 완성돼요. 일정이 바쁜 직장인·대학생에게 좋아요." },
-  { icon: "🎯", name: "단과", goal: "RC 또는 LC만", body: "RC만, 혹은 LC만 집중해서 듣고 싶을 때 골라요. LC는 시작반·문풀반 공통 수업이에요." },
+  { icon: "reading", name: "시작반", goal: "토익 650 목표", body: "토익을 처음 시작하거나 다시 기초부터 잡고 싶은 분을 위한 개념반이에요. 개념집과 RC·LC 교재로 문법·어휘·듣기의 뼈대를 차근차근 쌓아요." },
+  { icon: "target", name: "문풀반", goal: "토익 750 목표", body: "개념을 아는 분을 위한 실전반이에요. 점수가 오르는 풀이 감각을 집중해서 끌어올려요." },
+  { icon: "stopwatch", name: "속성반", goal: "한 달 집중", body: "한 달 동안 시작반과 문풀반을 함께 듣는 주 4일 집중 과정이에요. 짧은 기간에 개념과 실전을 한 번에 끝내고 싶은 분께 맞아요." },
+  { icon: "calendar", name: "격일반", goal: "2달 완성", body: "월·수 또는 화·목, 주 2일씩 두 달 이어 들으면 한 과정이 완성돼요. 일정이 바쁜 직장인·대학생에게 좋아요." },
+  { icon: "headphones", name: "단과", goal: "RC 또는 LC만", body: "RC만, 혹은 LC만 집중해서 듣고 싶을 때 골라요. LC는 시작반·문풀반 공통 수업이에요." },
 ];
 
 const CARE = [
-  { icon: "📝", title: "데일리 테스트", body: "매 수업 짧은 테스트로 실력이 쌓이는 걸 직접 확인해요." },
-  { icon: "⭐", title: "출석·숙제 스티커판", body: "QR로 출석하고 숙제를 내면 스티커판에 별이 쌓여요. 한 달 스티커판을 다 채우면 작은 선물도 준비돼 있어요." },
-  { icon: "🎤", title: "특강", body: "매달 두 번, 수강생만을 위한 특강이 열려요. 현장 또는 라이브로 참여할 수 있어요." },
-  { icon: "📺", title: "강의 다시 보기", body: "놓친 수업은 강의실에서 종강일까지 다시 볼 수 있어요." },
+  { icon: "stopwatch", title: "데일리 테스트", body: "매 수업 짧은 테스트로 실력이 쌓이는 걸 직접 확인해요." },
+  { icon: "star", title: "출석·숙제 스티커판", body: "QR로 출석하고 숙제를 내면 스티커판에 별이 쌓여요. 한 달 스티커판을 다 채우면 작은 선물도 준비돼 있어요." },
+  { icon: "mic", title: "특강", body: "매달 두 번, 수강생만을 위한 특강이 열려요. 현장 또는 라이브로 참여할 수 있어요." },
+  { icon: "replay", title: "강의 다시 보기", body: "놓친 수업은 강의실에서 종강일까지 다시 볼 수 있어요." },
 ];
 
 export default async function AboutPage() {
@@ -40,7 +41,7 @@ export default async function AboutPage() {
   ];
 
   return (
-    <article className="space-y-6 pt-8">
+    <article className="stagger space-y-6 pt-8">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml() }} />
 
       <header className="text-center">
@@ -54,24 +55,24 @@ export default async function AboutPage() {
       </header>
 
       <section className="card space-y-4">
-        <h2 className="font-jua text-2xl text-sky-ink">📚 반 구성</h2>
+        <h2 className="flex items-center gap-2 font-jua text-2xl text-sky-ink"><Icon name="book" size={32} />반 구성</h2>
         <p className="text-[15px] text-slate-600">모든 과정은 <b>4주 16회</b>(주 4회, 월~목)이고 매달 첫째 주에 개강해요. 반마다 오전반·저녁반이 있어요.</p>
         <ul className="grid gap-3 sm:grid-cols-2">
           {CLASSES.map((c) => (
             <li key={c.name} className="rounded-2xl bg-sky-soft p-4">
-              <h3 className="font-jua text-xl text-sky-ink">{c.icon} {c.name} <span className="text-base text-sky-deep">· {c.goal}</span></h3>
+              <h3 className="flex flex-wrap items-center gap-1.5 font-jua text-xl text-sky-ink"><Icon name={c.icon} size={30} />{c.name} <span className="text-base text-sky-deep">· {c.goal}</span></h3>
               <p className="mt-1 text-[15px] leading-relaxed text-slate-700">{c.body}</p>
             </li>
           ))}
         </ul>
-        <a href={YBM_SIGNUP_URL} target="_blank" rel="noreferrer" className="btn w-full">✍️ 수강 신청하러 가기 ↗</a>
+        <a href={YBM_SIGNUP_URL} target="_blank" rel="noreferrer" className="btn w-full gap-2"><Icon name="edit" size={24} />수강 신청하러 가기 ↗</a>
         <p className="text-center text-sm text-slate-500">YBM 서면에서 수강 등록 후, 이 홈페이지에서 교재비를 신청해요.</p>
       </section>
 
       <Timetable />
 
       <section className="card space-y-4">
-        <h2 className="font-jua text-2xl text-sky-ink">🏫 현장 수업 · 💻 라이브 수업</h2>
+        <h2 className="flex flex-wrap items-center gap-2 font-jua text-2xl text-sky-ink"><Icon name="school" size={32} />현장 수업 · <Icon name="laptop" size={32} />라이브 수업</h2>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl bg-sky-soft p-4">
             <h3 className="font-jua text-xl text-sky-ink">현장 수업 ({CLASSROOM})</h3>
@@ -86,11 +87,11 @@ export default async function AboutPage() {
       </section>
 
       <section className="card space-y-4">
-        <h2 className="font-jua text-2xl text-sky-ink">☁️ 끝까지 함께하는 수업 관리</h2>
+        <h2 className="flex items-center gap-2 font-jua text-2xl text-sky-ink"><Icon name="cloud" size={32} />끝까지 함께하는 수업 관리</h2>
         <ul className="grid gap-3 sm:grid-cols-2">
           {CARE.map((c) => (
             <li key={c.title} className="rounded-2xl bg-sky-soft p-4">
-              <h3 className="font-jua text-lg text-sky-ink">{c.icon} {c.title}</h3>
+              <h3 className="flex items-center gap-1.5 font-jua text-lg text-sky-ink"><Icon name={c.icon} size={28} />{c.title}</h3>
               <p className="mt-1 text-[15px] leading-relaxed text-slate-700">{c.body}</p>
             </li>
           ))}
@@ -98,7 +99,7 @@ export default async function AboutPage() {
       </section>
 
       <section className="card space-y-4">
-        <h2 className="font-jua text-2xl text-sky-ink">👥 함께하는 스터디</h2>
+        <h2 className="flex items-center gap-2 font-jua text-2xl text-sky-ink"><Icon name="people" size={32} />함께하는 스터디</h2>
         <div className="space-y-1 rounded-2xl bg-sky-soft p-4 text-[15px] leading-relaxed text-slate-700">
           <p className="font-jua text-lg text-sky-ink">혼자 하면 무너지는 토익, 스터디로 끝까지 함께 가요.</p>
           <p>현장 수강생은 수업 전에 함께, 불라방 수강생은 셀프 스터디로 참여해요.</p>
@@ -107,7 +108,7 @@ export default async function AboutPage() {
       </section>
 
       <section className="card space-y-4">
-        <h2 className="font-jua text-2xl text-sky-ink">✍️ 수강 신청 방법</h2>
+        <h2 className="flex items-center gap-2 font-jua text-2xl text-sky-ink"><Icon name="edit" size={30} />수강 신청 방법</h2>
         <ol className="space-y-3">
           {[
             <>YBM 서면 학원에서 벨라토익 수업 <b>수강 등록</b>을 해요. <a href={YBM_SIGNUP_URL} target="_blank" rel="noreferrer" className="text-sky-deep underline">YBM 서면 수강 등록 ↗</a></>,
@@ -122,13 +123,13 @@ export default async function AboutPage() {
           ))}
         </ol>
         <div className="grid grid-cols-2 gap-2">
-          <Link href="/guide/onsite" className="btn !px-3 !text-base">🏫 현장 교재비 신청</Link>
-          <Link href="/guide/online" className="btn !px-3 !text-base">💻 불라방 교재비 신청</Link>
+          <Link href="/guide/onsite" className="btn gap-1.5 !px-3 !text-base"><Icon name="school" size={24} />현장 교재비 신청</Link>
+          <Link href="/guide/online" className="btn gap-1.5 !px-3 !text-base"><Icon name="laptop" size={24} />불라방 교재비 신청</Link>
         </div>
       </section>
 
       <section className="card space-y-3">
-        <h2 className="font-jua text-2xl text-sky-ink">🔗 벨라토익 채널</h2>
+        <h2 className="flex items-center gap-2 font-jua text-2xl text-sky-ink"><Icon name="link" size={30} />벨라토익 채널</h2>
         <ul className="grid gap-2 sm:grid-cols-3">
           {links.map((l) => (
             <li key={l.label}>

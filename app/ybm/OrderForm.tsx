@@ -1,5 +1,6 @@
 "use client";
 
+import Icon from "@/components/Icon";
 import { startTransition, useActionState, useRef, useState, type FormEvent } from "react";
 import { createYbmOrderAction, type FormState } from "@/app/actions";
 
@@ -83,11 +84,11 @@ export default function OrderForm({ amountLabel }: { amountLabel: string }) {
       <section className="card space-y-3">
         <p className="flex items-center gap-2 font-jua text-lg text-sky-ink"><span className="grid h-7 w-7 place-items-center rounded-full bg-sky-deep text-sm text-white">1</span>신청 교재</p>
         <div className="rounded-2xl bg-sky-soft p-3 text-[15px]">
-          <p className="flex justify-between py-1"><span>📘 벨라토익 &apos;개념 zip&apos;</span><span>10,000원</span></p>
-          <p className="flex justify-between py-1"><span>🚚 택배비</span><span>4,000원</span></p>
+          <p className="flex justify-between py-1"><span className="inline-flex items-center gap-1.5"><Icon name="book" size={20} />벨라토익 &apos;개념 zip&apos;</span><span>10,000원</span></p>
+          <p className="flex justify-between py-1"><span className="inline-flex items-center gap-1.5"><Icon name="parcel" size={20} />택배비</span><span>4,000원</span></p>
           <p className="mt-1.5 flex justify-between border-t-2 border-dashed border-sky-main pt-2 font-jua text-xl text-sky-ink"><span>총 금액</span><span>{amountLabel}</span></p>
         </div>
-        <p className="text-sm text-slate-500">📦 인강 수강생은 <b>택배로만</b> 받아요. 입금 확인 후 순서대로 보내 드려요.</p>
+        <p className="text-sm text-slate-500"><Icon name="parcel" size={18} className="mr-1" />인강 수강생은 <b>택배로만</b> 받아요. 입금 확인 후 순서대로 보내 드려요.</p>
       </section>
 
       <section className="card space-y-4">
@@ -111,7 +112,7 @@ export default function OrderForm({ amountLabel }: { amountLabel: string }) {
         <div className="space-y-2">
           <span className="label">YBM 인강 수강증 캡처</span>
           <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-sky-main bg-sky-soft p-4 text-sm font-bold text-sky-ink">
-            📷 {proof ? "다른 사진으로 바꾸기" : "사진 올리기"}
+            <Icon name="camera" size={22} className="mr-1" />{proof ? "다른 사진으로 바꾸기" : "사진 올리기"}
             <input type="file" accept="image/*" hidden onChange={(e) => pickProof(e.target.files?.[0])} />
           </label>
           {preview && <img src={preview} alt="수강증 미리보기" className="max-h-56 rounded-xl border border-sky-main" />}
@@ -136,7 +137,7 @@ export default function OrderForm({ amountLabel }: { amountLabel: string }) {
               <dt className="text-slate-500">입금자명</dt><dd>{String(confirm.get("depositor") ?? "").trim() || String(confirm.get("name"))}</dd>
               <dt className="text-slate-500">금액</dt><dd className="font-jua text-xl text-sky-ink">{amountLabel}</dd>
             </dl>
-            <p className="rounded-xl bg-red-50 p-3 text-center text-sm font-bold text-red-600">⏰ 제출 후 30분 안에 입금해 주세요</p>
+            <p className="rounded-xl bg-red-50 p-3 text-center text-sm font-bold text-red-600"><Icon name="clock" size={18} className="mr-1" />제출 후 30분 안에 입금해 주세요</p>
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => setConfirm(null)} className="btn-ghost">수정하기</button>
               <button type="button" onClick={() => { const fd = confirm; setConfirm(null); startTransition(() => action(fd)); }} className="btn">맞아요, 신청</button>

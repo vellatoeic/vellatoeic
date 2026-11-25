@@ -1,9 +1,9 @@
 import "server-only";
 import { todayKST } from "./config";
 import { getSetting, listApplications, listAudios, listLectures, listSpecialLectures } from "./db";
-import { holidaysOf } from "./classCalendar";
+import { holidaysOf, scheduleDays } from "./classCalendar";
 import { classCohortNow } from "./classCohort";
-import { SCHEDULE_CLASSES, scheduleKey, schoolDaysFor, type ScheduleClass } from "./schedule";
+import { SCHEDULE_CLASSES, type ScheduleClass } from "./schedule";
 import { shiftMonth } from "./signupMonths";
 import { currentAltIssues } from "./altIssuesServer";
 
@@ -17,7 +17,7 @@ export const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 1
 // 그 기수 모든 반 중 가장 이른 첫 수업일
 async function firstClassDay(cohort: string) {
   const days = (await Promise.all((Object.keys(SCHEDULE_CLASSES) as ScheduleClass[]).map(async (k) =>
-    schoolDaysFor(await getSetting(scheduleKey(cohort, k)), cohort, k)))).flat().sort();
+    scheduleDays(cohort, k)))).flat().sort(); // 공휴일 제외
   return days[0] ?? `${cohort}-01`;
 }
 
@@ -62,7 +62,7 @@ export async function monthlyChecklist(today = todayKST()): Promise<{ cohort: st
   });
   // 4. 개강일 라이브 링크 (개강 전날부터, 오전·저녁 각각)
   const has = (slot: "am" | "pm") => lectures.some((l) => l.cohort === cohort && l.slot === slot);
-  items.push(gate(addDays(first, -1), has("am") && has("pm"), { key: "live", title: `개강일(${md(first)}) 라이브 링크 등록`, detail: `오전 ${has("am") ? "✅" : "⚠️"} · 저녁 ${has("pm") ? "✅" : "⚠️"}`, href: "/admin/lectures" }));
+  items.push(gate(addDays(first, -1), has("am") && has("pm"), { key: "live", title: `개강일(${md(first)}) 라이브 링크 등록`, detail: `오전 ${has("am") ? "등록됨" : "필요"} · 저녁 ${has("pm") ? "등록됨" : "필요"}`, href: "/admin/lectures" }));
   // 5·6. 개강 3일 전부터: 입금 대기 · 불라방 택배 미발송
   const mine = apps.filter((a) => a.cohort === cohort);
   const pending = mine.filter((a) => a.status === "pending").length;

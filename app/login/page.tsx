@@ -1,34 +1,26 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getPendingLink } from "@/lib/auth";
 import { getSetting } from "@/lib/db";
 import { PROVIDER_LABEL, safeNext } from "@/lib/socialLogin";
-import { loginSetup } from "@/lib/socialServer";
+import { myZone } from "@/lib/zones";
 import { cancelLink, startFresh } from "@/app/actions";
-import SocialButtons from "@/components/SocialButtons";
+import StudentLogin from "@/app/class/StudentLogin";
 import LinkForm from "./LinkForm";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "로그인 연결 · vella_toeic", robots: { index: false } };
+export const metadata = { title: "로그인 · vella_toeic", robots: { index: false } };
 
-// 구글·카카오로 처음 들어온 학생: 이름+비밀번호로 예전 신청을 한 번만 연결하거나, 처음이면 신청서로
-export default async function LoginLinkPage({ searchParams }: { searchParams: Promise<{ next?: string; e?: string }> }) {
+// 머리의 [로그인] 버튼이 오는 곳 + 구글·카카오로 처음 들어온 학생의 '처음 한 번 연결' 화면
+// - 이미 로그인했으면 알맞은 화면(관리자 / 신청 후 / 신청 전)으로 바로 보내요 (lib/zones.ts)
+// - 구글·카카오로 처음 들어왔으면: 이름+비밀번호로 예전 신청을 한 번만 연결하거나, 처음이면 신청서로
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; e?: string }> }) {
   const { next: rawNext, e } = await searchParams;
   const next = safeNext(rawNext);
   const pending = await getPendingLink();
   if (!pending) {
-    if (e !== "fail") redirect(next);
-    const { providers } = await loginSetup();
-    return (
-      <div className="pt-12">
-        <div className="card mx-auto max-w-sm space-y-4 text-center">
-          <h1 className="font-jua text-2xl text-sky-ink">로그인하지 못했어요</h1>
-          <p className="text-sm text-slate-600">잠시 후 다시 눌러 주세요. 계속 안 되면 다른 방법(카카오·구글)으로 로그인해 보세요.</p>
-          <SocialButtons providers={providers} next={next} />
-          <Link href={next} className="block text-sm text-slate-500 underline">돌아가기</Link>
-        </div>
-      </div>
-    );
+    const { zone } = await myZone();
+    if (zone !== "visitor" && zone !== "linking" && e !== "fail") redirect(next);
+    return <StudentLogin next={rawNext ? next : undefined} error={e} />;
   }
   const label = PROVIDER_LABEL[pending.p];
   const who = pending.email ?? pending.nick;

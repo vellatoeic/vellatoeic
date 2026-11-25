@@ -1,10 +1,14 @@
 "use client";
 
+import Icon from "@/components/Icon";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { cancelMyHomeworkDone, markHomeworkDone } from "@/app/actions";
 import { homeworkAssignmentDays, isHomeworkStickerEligible, weekDaysInMonth, type ScheduleClass } from "@/lib/schedule";
 import Cloud from "@/components/Cloud";
 import { boardStatus } from "@/lib/stickerComplete";
+
+// 스티커판 이미지 저장 글꼴 (사이트 글꼴과 같은 Pretendard, 2026-11 새 디자인)
+const CANVAS_FONT = "'Pretendard Variable', Pretendard, sans-serif";
 
 type StampAttendance = { day: string };
 
@@ -128,6 +132,9 @@ export default function StickerBoard({
 
   const downloadBoard = async () => {
     await document.fonts.ready;
+    // 저장 이미지 글꼴(Pretendard)은 글자 묶음별로 나눠 받아요 → 그릴 글자를 미리 불러와요 (실패해도 기본 글꼴로 저장)
+    const canvasText = [`${firstName}의 ${monthName} 스티커판`, classSummary, displayClass, ...Object.values(holidays), "0123456789 출석 숙제 강의 완주 토익의 시작 @vella_toeic"].join(" ");
+    await Promise.all([document.fonts.load(`800 40px ${CANVAS_FONT}`, canvasText), document.fonts.load(`500 34px ${CANVAS_FONT}`, classSummary)]).catch(() => undefined);
     const canvas = document.createElement("canvas");
     canvas.width = 1080;
     canvas.height = 1920;
@@ -151,10 +158,10 @@ export default function StickerBoard({
     drawStoryCloud(ctx, 800, 1500, 135, "rgba(255,255,255,.7)");
     ctx.textAlign = "center";
     ctx.fillStyle = "#1f5a80";
-    ctx.font = "72px Jua, sans-serif";
+    ctx.font = `800 72px ${CANVAS_FONT}`;
     ctx.fillText(`${firstName}의 ${monthName} 스티커판`, 540, 210);
     ctx.fillStyle = "#5b88a6";
-    ctx.font = "34px 'Gowun Dodum', sans-serif";
+    ctx.font = `500 34px ${CANVAS_FONT}`;
     ctx.fillText(classSummary, 540, 275);
 
     const cols = 5;
@@ -176,7 +183,7 @@ export default function StickerBoard({
       ctx.fillStyle = isLesson ? "#fff" : "#f4fbff";
       roundRect(ctx, x, y, cellWidth, cellHeight, 26, ctx.fillStyle, isLesson ? "#c9e4f5" : "transparent", 2, isLesson ? [10, 8] : []);
       ctx.textAlign = "center";
-      ctx.font = "36px Jua, sans-serif";
+      ctx.font = `800 36px ${CANVAS_FONT}`;
       ctx.fillStyle = isHoliday ? "#e5707e" : isLesson ? "#5b88a6" : "#c6dceb";
       ctx.fillText(String(Number(day.slice(-2))), x + cellWidth / 2, y + 51);
       if (isLesson) {
@@ -187,7 +194,7 @@ export default function StickerBoard({
         if (homeworkDone) drawStoryStar(ctx, x + cellWidth / 2 + 10, y + 78, 48);
         else drawStoryCircle(ctx, x + cellWidth / 2 + 25, y + 104, 13);
       } else if (isHoliday) {
-        ctx.font = "22px Jua, sans-serif";
+        ctx.font = `800 22px ${CANVAS_FONT}`;
         ctx.fillText(holidays[day], x + cellWidth / 2, y + 91);
       }
     }));
@@ -195,21 +202,27 @@ export default function StickerBoard({
     if (complete) {
       ctx.textAlign = "center";
       ctx.fillStyle = "#e0567a";
-      ctx.font = "58px Jua, sans-serif";
-      ctx.fillText(`🌈 ${monthName} 강의 완주! 🌈`, 540, 1395);
+      ctx.font = `800 58px ${CANVAS_FONT}`;
+      ctx.fillText(`${monthName} 강의 완주!`, 540, 1395);
+      drawStoryStar(ctx, 540 - ctx.measureText(`${monthName} 강의 완주!`).width / 2 - 70, 1340, 56);
+      drawStoryStar(ctx, 540 + ctx.measureText(`${monthName} 강의 완주!`).width / 2 + 14, 1340, 56);
     }
     ctx.textAlign = "center";
     ctx.fillStyle = "#1f5a80";
-    ctx.font = "44px Jua, sans-serif";
-    ctx.fillText(`☁️ 출석 ${attendanceCount}     ⭐ 숙제 ${homeworkCount}`, 540, 1515);
-    ctx.font = "42px Jua, sans-serif";
+    ctx.font = `800 44px ${CANVAS_FONT}`;
+    ctx.fillText(`출석 ${attendanceCount}`, 390, 1515);
+    ctx.fillText(`숙제 ${homeworkCount}`, 720, 1515);
+    drawStoryCloud(ctx, 390 - ctx.measureText(`출석 ${attendanceCount}`).width / 2 - 72, 1474, 60, "#79c6ef");
+    drawStoryStar(ctx, 720 - ctx.measureText(`숙제 ${homeworkCount}`).width / 2 - 62, 1474, 50);
+    ctx.font = `800 42px ${CANVAS_FONT}`;
     ctx.fillText(displayClass, 540, 1600);
-    ctx.font = "38px Jua, sans-serif";
+    ctx.font = `800 38px ${CANVAS_FONT}`;
     ctx.fillStyle = "#2b8fc7";
     ctx.fillText("토익의 시작", 540, 1770);
-    ctx.font = "30px Jua, sans-serif";
+    ctx.font = `800 30px ${CANVAS_FONT}`;
     ctx.fillStyle = "#7aa3bd";
-    ctx.fillText("@vella_toeic ☁️", 540, 1815);
+    ctx.fillText("@vella_toeic", 540, 1815);
+    drawStoryCloud(ctx, 540 + ctx.measureText("@vella_toeic").width / 2 + 10, 1790, 40, "#9fd8f5");
 
     const link = document.createElement("a");
     link.download = `${firstName}_${cohort}_sticker-board.png`;
@@ -223,7 +236,7 @@ export default function StickerBoard({
       <header className="relative z-[1] flex items-center justify-between border-b border-[#cfe9f8] bg-[#eef8fe]/95 px-4 py-3">
         <div>
           <small className="block font-jua text-[11px] text-[#7aa3bd]">토익의 시작</small>
-          <strong className="font-jua text-[21px] font-normal text-[#1f5a80]">vella_toeic ☁️</strong>
+          <strong className="inline-flex items-center gap-1 font-jua text-[21px] font-normal text-[#1f5a80]">vella_toeic <Cloud className="h-5 w-auto fill-sky-main" /></strong>
         </div>
         <span className="rounded-full bg-[#9fd8f5] px-3 py-2 text-[13px] font-bold text-[#1f5a80]">강의실</span>
       </header>
@@ -234,23 +247,23 @@ export default function StickerBoard({
 
         {complete ? (
           <div className="sticker-complete mt-[14px] rounded-[22px] px-4 py-4 text-center">
-            <b className="block font-jua text-2xl font-normal">🎉 {monthName} 스티커판 완성!</b>
-            <span className="mt-1 block text-[13.5px]">{total}회 강의 + 숙제 {homeworkTotal}개 완주<br />{firstName}님 정말 대단해요 🌈</span>
+            <b className="flex items-center justify-center gap-1.5 font-jua text-2xl font-normal"><Icon name="sparkle" size={28} />{monthName} 스티커판 완성!</b>
+            <span className="mt-1 block text-[13.5px]">{total}회 강의 + 숙제 {homeworkTotal}개 완주<br />{firstName}님 정말 대단해요 <Icon name="sparkle" size={18} /></span>
           </div>
         ) : (
           <div className="mt-[14px] rounded-[22px] bg-white p-4 shadow-[0_2px_0_#d5ecf9]">
             <div className="mb-1.5 flex items-baseline justify-between text-sm">
-              <span>☁️ 출석</span>
+              <span className="inline-flex items-center gap-1"><Icon name="cloud" size={20} />출석</span>
               <span><b className="font-jua text-lg font-normal">{attendanceCount}</b> / {total}</span>
             </div>
             <Progress value={attendanceCount} total={total} color="#79c6ef" />
             <div className="mb-1.5 mt-3 flex items-baseline justify-between text-sm">
-              <span>⭐ 숙제</span>
+              <span className="inline-flex items-center gap-1"><Icon name="star" size={20} />숙제</span>
               <span><b className="font-jua text-lg font-normal">{homeworkCount}</b> / {homeworkTotal}</span>
             </div>
             <Progress value={homeworkCount} total={homeworkTotal} color="#ffd23f" />
-            {status.lastOnly && <p className="mt-2 text-center font-jua text-[15px] text-[#e5707e]">🎯 마지막 수업 출석만 하면 스티커판 완성!</p>}
-            <p className="mt-3 rounded-[14px] bg-[#fff7d6] px-2 py-[9px] text-center font-jua text-base text-[#a7741a]">강의 완주까지 {Math.max(0, total - attendanceCount)}번 남았어요! 조금만 더 🔥</p>
+            {status.lastOnly && <p className="mt-2 text-center font-jua text-[15px] text-[#e5707e]"><Icon name="target" size={20} className="mr-1" />마지막 수업 출석만 하면 스티커판 완성!</p>}
+            <p className="mt-3 rounded-[14px] bg-[#fff7d6] px-2 py-[9px] text-center font-jua text-base text-[#a7741a]">강의 완주까지 {Math.max(0, total - attendanceCount)}번 남았어요! 조금만 더 <Icon name="target" size={20} /></p>
           </div>
         )}
 
@@ -263,11 +276,11 @@ export default function StickerBoard({
           ) : (
             <p className="mb-3 text-center text-sm text-[#a7741a]">첫 수업 날부터 숙제를 확인할 수 있어요.</p>
           )}
-          <a href={cafeUrl || undefined} target="_blank" rel="noreferrer" aria-disabled={!cafeUrl} onClick={checkFirstHomework} className={`block w-full rounded-2xl bg-[#ffd23f] px-3 py-[13px] text-center font-jua text-lg text-[#5a3b00] shadow-[0_4px_0_#e0b400] ${cafeUrl ? "" : "pointer-events-none opacity-50"}`}>📝 숙제 확인</a>
-          {firstLessonSelected && !selectedHomework && <p className="mt-2 text-center text-xs text-[#a7741a]">첫 수업은 [숙제 확인]만 눌러도 별 스티커를 받아요 ⭐</p>}
+          <a href={cafeUrl || undefined} target="_blank" rel="noreferrer" aria-disabled={!cafeUrl} onClick={checkFirstHomework} className={`block w-full rounded-2xl bg-[#ffd23f] px-3 py-[13px] text-center font-jua text-lg text-[#5a3b00] shadow-[0_4px_0_#e0b400] ${cafeUrl ? "" : "pointer-events-none opacity-50"}`}><Icon name="homework" size={24} className="mr-1" />숙제 확인</a>
+          {firstLessonSelected && !selectedHomework && <p className="mt-2 text-center text-xs text-[#a7741a]">첫 수업은 [숙제 확인]만 눌러도 별 스티커를 받아요 <Icon name="star" size={16} /></p>}
           {selectedHomework && firstLessonSelected ? null : selectedHomework ? (
             <div className="mt-2 rounded-2xl border-2 border-dashed border-[#e0b400] bg-white px-3 py-2.5 text-center text-[#a7741a]">
-              <p className="font-jua text-[15px]">{selectedHomeworkHasSticker ? "숙제 제출 완료! ⭐" : "제출 기록 완료 · 제출일이 수업 다음 날 이후라 스티커는 없어요."}</p>
+              <p className="font-jua text-[15px]">{selectedHomeworkHasSticker ? <>숙제 제출 완료! <Icon name="star" size={18} /></> : "제출 기록 완료 · 제출일이 수업 다음 날 이후라 스티커는 없어요."}</p>
               <form action={cancelMyHomeworkDone} className="mt-1">
                 <input type="hidden" name="app_id" value={appId} />
                 <input type="hidden" name="day" value={homeworkTargetDay} />
@@ -347,7 +360,7 @@ export default function StickerBoard({
           </div>
         </div>
 
-        <button type="button" onClick={downloadBoard} className="mt-[14px] block w-full rounded-[18px] bg-[#2b8fc7] px-3 py-3.5 font-jua text-lg text-white shadow-[0_4px_0_#1f6f9d]">📸 스티커판 이미지로 저장</button>
+        <button type="button" onClick={downloadBoard} className="mt-[14px] block w-full rounded-[18px] bg-[#2b8fc7] px-3 py-3.5 font-jua text-lg text-white shadow-[0_4px_0_#1f6f9d]"><Icon name="camera" size={24} className="mr-1.5" />스티커판 이미지로 저장</button>
       </main>
     </section>
   );
@@ -358,10 +371,10 @@ function Progress({ value, total, color }: { value: number; total: number; color
 }
 
 function BadgeIcon({ type }: { type: "welcome" | "cloud" | "star" | "medal" | "rainbow" }) {
-  if (type === "welcome") return <span className="text-[24px]">👋</span>;
+  if (type === "welcome") return <Icon name="wave" size={28} />;
   if (type === "cloud") return <CloudSticker fill="#79c6ef" size={34} face={false} />;
   if (type === "star") return <StarSticker size={32} face={false} />;
-  return <span className="text-[24px]">{type === "medal" ? "🏅" : "🌈"}</span>;
+  return <Icon name={type === "medal" ? "trophy" : "sparkle"} size={28} />;
 }
 
 function CloudSticker({ fill, size, face = true }: { fill: string; size: number; face?: boolean }) {

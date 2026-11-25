@@ -1,3 +1,4 @@
+import Icon from "./Icon";
 import Link from "next/link";
 import type { LoginMode } from "@/lib/socialLogin";
 
@@ -7,11 +8,11 @@ export default function HowToWatch({ days, times, beforeApply, login = "pin" }: 
   const steps = [
     "수업 10분 전, 홈페이지 → 강의실",
     login === "social" ? "카카오 또는 구글로 로그인" : login === "both" ? "카카오·구글 또는 이름 + 비밀번호로 로그인" : "이름 + 비밀번호 4자리로 로그인",
-    "맨 위 \"🔴 라이브 입장\" 버튼 누르기",
+    "맨 위 \"라이브 입장\" 버튼 누르기",
   ];
   return (
     <section className="rounded-3xl border-2 border-sky-main bg-white p-6 shadow-[0_4px_24px_rgba(43,143,199,0.12)]">
-      <p className="font-jua text-2xl text-sky-ink">📺 수업 듣는 방법</p>
+      <p className="flex items-center gap-2 font-jua text-2xl text-sky-ink"><Icon name="laptop" size={30} />수업 듣는 방법</p>
       {days && times && times.length > 0 && (
         <div className="mt-3 rounded-2xl bg-sky-soft px-4 py-3">
           <p className="text-sm text-slate-500">내 수업</p>

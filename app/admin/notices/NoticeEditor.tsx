@@ -1,9 +1,19 @@
 "use client";
 
+import Icon from "@/components/Icon";
 import { useState } from "react";
 import { saveNoticeAction } from "@/app/actions";
 import { TRACK_GROUP_LABEL, type Notice, type NoticeSection, type NoticeTarget, type TrackGroup } from "@/lib/notices";
-import { NoticeBody, NoticeHeader } from "@/components/notices/NoticeContent";
+import { NoticeBody, NoticeHeader, sectionIconName } from "@/components/notices/NoticeContent";
+
+// 섹션 아이콘 고르기 (기본 이모티콘 대신 사이트 아이콘)
+const SECTION_ICONS: [string, string][] = [
+  ["pin", "핀"], ["clock", "시계"], ["calendar", "달력"], ["edit", "연필"], ["check", "체크"], ["alert", "주의"], ["help", "물음표"],
+  ["book", "교재"], ["homework", "숙제"], ["stopwatch", "테스트"], ["headphones", "LC 음원"], ["mic", "특강"], ["live", "라이브"],
+  ["replay", "다시 보기"], ["laptop", "불라방"], ["school", "현장"], ["parcel", "택배"], ["coins", "입금"], ["megaphone", "공지"],
+  ["bell", "알림"], ["chat", "단톡방"], ["link", "링크"], ["people", "스터디"], ["target", "목표"], ["trophy", "성적"],
+  ["star", "별"], ["cloud", "구름"], ["gift", "선물"], ["sparkle", "반짝"], ["sun", "오전반"], ["moon", "저녁반"], ["qr", "QR 출석"],
+];
 
 const COURSE_LABEL = { start: "시작반", solve: "문풀반", intensive: "속성반" } as const;
 const KIND_LABEL = { onsite: "현장", online: "불라방" } as const;
@@ -16,7 +26,7 @@ export default function NoticeEditor({ notice, today, monthEnd }: Props) {
   const [title, setTitle] = useState(notice?.title ?? "");
   const [toLabel, setToLabel] = useState(notice?.to_label ?? "");
   const [lead, setLead] = useState(notice?.lead ?? "");
-  const [sections, setSections] = useState<NoticeSection[]>(notice?.sections ?? [{ icon: "📌", title: "", body: "" }]);
+  const [sections, setSections] = useState<NoticeSection[]>((notice?.sections ?? [{ icon: "pin", title: "", body: "" }]).map((x) => ({ ...x, icon: sectionIconName(x.icon) ?? "pin" })));
   const [targets, setTargets] = useState<NoticeTarget[]>(notice?.targets ?? []);
   const [study, setStudy] = useState(notice ? notice.link_url === "@study" : true);
 
@@ -35,7 +45,7 @@ export default function NoticeEditor({ notice, today, monthEnd }: Props) {
         {notice && <input type="hidden" name="id" value={notice.id} />}
         <input type="hidden" name="sections_json" value={JSON.stringify(sections)} />
         <input type="hidden" name="targets_json" value={JSON.stringify(targets)} />
-        <label className="block"><span className="label">제목</span><input name="title" value={title} onChange={(e) => setTitle(e.target.value)} required className="input" placeholder="📚 다음 수업부터 문풀반 스터디 시작!" /></label>
+        <label className="block"><span className="label">제목</span><input name="title" value={title} onChange={(e) => setTitle(e.target.value)} required className="input" placeholder="다음 수업부터 문풀반 스터디 시작!" /></label>
         <label className="block"><span className="label">대상 안내 문구 <span className="font-normal text-slate-400">(제목 아래 작은 글씨)</span></span><input name="to_label" value={toLabel} onChange={(e) => setToLabel(e.target.value)} className="input" placeholder="문풀반 · 현장 수강생 안내" /></label>
         <label className="block"><span className="label">첫 문장 <span className="font-normal text-slate-400">(**이렇게** 감싸면 형광펜 강조)</span></span><textarea name="lead" value={lead} onChange={(e) => setLead(e.target.value)} rows={3} className="input" /></label>
 
@@ -44,7 +54,10 @@ export default function NoticeEditor({ notice, today, monthEnd }: Props) {
           {sections.map((s, i) => (
             <div key={i} className="space-y-2 rounded-2xl bg-sky-soft p-3">
               <div className="flex gap-2">
-                <input value={s.icon} onChange={(e) => setSec(i, { icon: e.target.value })} className="input !w-16 !py-2 text-center" aria-label="아이콘" />
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white"><Icon name={s.icon} size={28} /></span>
+                <select value={s.icon} onChange={(e) => setSec(i, { icon: e.target.value })} className="input !w-36 !py-2" aria-label="아이콘">
+                  {SECTION_ICONS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                </select>
                 <input value={s.title} onChange={(e) => setSec(i, { title: e.target.value })} className="input !py-2" placeholder="소제목" />
               </div>
               <textarea value={s.body} onChange={(e) => setSec(i, { body: e.target.value })} rows={2} className="input !py-2" placeholder="내용" />
@@ -58,12 +71,12 @@ export default function NoticeEditor({ notice, today, monthEnd }: Props) {
               </div>
             </div>
           ))}
-          <button type="button" onClick={() => setSections((l) => [...l, { icon: "📌", title: "", body: "" }])} className="btn-ghost !py-2 text-sm">+ 섹션 추가</button>
+          <button type="button" onClick={() => setSections((l) => [...l, { icon: "pin", title: "", body: "" }])} className="btn-ghost !py-2 text-sm">+ 섹션 추가</button>
         </div>
 
         <div className="space-y-2">
           <p className="label">하단 링크 버튼 <span className="font-normal text-slate-400">(선택)</span></p>
-          <input name="link_label" defaultValue={notice?.link_label ?? "✅ 인증하러 가기"} className="input !py-2" placeholder="버튼 문구" />
+          <input name="link_label" defaultValue={notice?.link_label ?? "인증하러 가기"} className="input !py-2" placeholder="버튼 문구" />
           <label className="flex items-center gap-1.5"><input type="checkbox" name="link_study" checked={study} onChange={(e) => setStudy(e.target.checked)} className="accent-sky-deep" /> 스터디 인증 게시판 링크 쓰기 (신청 관리 기본 설정의 주소)</label>
           {!study && <input name="link_url" defaultValue={notice?.link_url && notice.link_url !== "@study" ? notice.link_url : ""} className="input !py-2" placeholder="https://..." />}
         </div>
@@ -92,14 +105,14 @@ export default function NoticeEditor({ notice, today, monthEnd }: Props) {
         </div>
         <div className="space-y-1.5 rounded-2xl bg-sky-soft p-3 text-sm">
           <label className="flex flex-wrap items-center gap-1.5">
-            <input type="checkbox" name="repeat_monthly" defaultChecked={notice?.repeat_monthly ?? false} className="accent-sky-deep" /> 🔁 매달 반복 · 개강일부터
+            <input type="checkbox" name="repeat_monthly" defaultChecked={notice?.repeat_monthly ?? false} className="accent-sky-deep" /> <Icon name="repeat" size={16} /> 매달 반복 · 개강일부터
             <input type="number" name="repeat_days" min={1} max={31} defaultValue={notice?.repeat_days ?? 7} className="input !w-16 !py-1" />일 동안
           </label>
           <p className="text-xs text-slate-500">반복 공지는 학생 반 개강일(화목반은 화요일, 중간 등록생은 신청 후 첫 수업일)부터 매달 다시 떠요. 게시 종료일은 쓰지 않아요.<br /><b className="text-amber-700">본문에 날짜(예: 10/6)를 직접 쓰지 마세요.</b> &apos;첫 수업&apos;, &apos;다음 수업&apos;처럼 써야 매달 맞는 문장이 돼요.</p>
         </div>
         <div className="flex gap-4">
           <label className="flex items-center gap-1.5"><input type="checkbox" name="popup" defaultChecked={notice?.popup ?? true} className="accent-sky-deep" /> 팝업으로 띄우기</label>
-          <label className="flex items-center gap-1.5"><input type="checkbox" name="pinned" defaultChecked={notice?.pinned ?? false} className="accent-sky-deep" /> 📌 상단 고정</label>
+          <label className="flex items-center gap-1.5"><input type="checkbox" name="pinned" defaultChecked={notice?.pinned ?? false} className="accent-sky-deep" /> <Icon name="pin" size={16} /> 상단 고정</label>
         </div>
         <button className="btn w-full !py-3 !text-base">{notice ? "수정 저장" : "공지 올리기"}</button>
       </div>
@@ -110,7 +123,7 @@ export default function NoticeEditor({ notice, today, monthEnd }: Props) {
           <NoticeHeader notice={{ title: title || "제목", to_label: toLabel }} page="1 / 1" />
           <NoticeBody notice={{ lead, sections }} />
           <div className="flex gap-2 px-[18px] pb-4 pt-2.5">
-            <span className="grid place-items-center rounded-2xl bg-[#e2f7ee] px-3.5 py-3.5 font-jua text-[15px] text-[#2f9e6e]">✅ 링크</span>
+            <span className="grid place-items-center rounded-2xl bg-[#e2f7ee] px-3.5 py-3.5 font-jua text-[15px] text-[#2f9e6e]"><Icon name="check" size={18} className="mr-1" />링크</span>
             <span className="flex-1 rounded-2xl bg-sky-deep py-3.5 text-center font-jua text-lg text-white">확인했어요 ✓</span>
           </div>
         </div>

@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import { BLOG_URL, INSTAGRAM_URL } from "@/lib/config";
 import { getSetting, type Mission } from "@/lib/db";
 import { markMission } from "@/app/actions";
@@ -48,7 +49,7 @@ export default async function MissionPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-2.5 pt-8">
-      <h1 className="text-center font-jua text-[26px] text-sky-ink">첫 수업 미션 ✅</h1>
+      <h1 className="flex items-center justify-center gap-2 font-jua text-[26px] text-sky-ink"><Icon name="clipboard" size={36} />첫 수업 미션</h1>
       <p className="text-center text-sm text-[#6b93ad]">{firstName}님, 4개만 하면 웰컴 배지를 받아요!<br />{start ? `첫 수업(${specialDay(start)}) 시간에 다 같이 해요 :)` : "첫 수업 시간에 다 같이 해요 :)"}</p>
 
       <section className="mt-3 rounded-[20px] bg-white px-4 py-3.5 shadow-[0_2px_0_#d5ecf9]">
@@ -57,7 +58,7 @@ export default async function MissionPage() {
           <i className="block h-full rounded-full bg-gradient-to-r from-[#79c6ef] to-[#b9a7ff]" style={{ width: `${count * 25}%` }} />
         </div>
         <div className="mt-2.5 flex items-center gap-2.5 rounded-xl bg-[#f3efff] px-2.5 py-2 text-[12.5px] text-[#7a6aa8]">
-          <span className={`grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full border-[3px] border-white bg-[#e8f8ef] text-lg shadow-[0_2px_6px_rgba(31,90,128,.2)] ${count === 4 ? "" : "opacity-70 grayscale-[.6]"}`}>👋</span>
+          <span className={`grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full border-[3px] border-white bg-[#e8f8ef] text-lg shadow-[0_2px_6px_rgba(31,90,128,.2)] ${count === 4 ? "" : "opacity-70 grayscale-[.6]"}`}><Icon name="wave" size={24} /></span>
           <span>{count === 4 ? <>미션 완료! 스티커판에 <b>웰컴 배지</b>가 붙었어요</> : <>4개 모두 완료하면 스티커판에 <b>웰컴 배지</b>가 붙어요</>}</span>
         </div>
       </section>

@@ -39,9 +39,9 @@ test("특강 마감 기본값은 전날 17:00 (10/17 → 10/16 17:00)", () => {
 
 test("마감 배지: 24시간 넘게 남음 / 24시간 이내 / 1시간 이내 / 지남", () => {
   const e = { event_date: "2026-10-17", starts_at: "10:00" };
-  assert.equal(deadlineBadge(e, Date.parse("2026-10-14T12:00:00+09:00")), "⏰ 10/16(금) 17:00 마감");
-  assert.equal(deadlineBadge(e, Date.parse("2026-10-16T09:30:00+09:00")), "⏰ 마감 D-1 · 7시간 남음");
-  assert.equal(deadlineBadge(e, Date.parse("2026-10-16T16:30:00+09:00")), "⏰ 곧 마감");
+  assert.equal(deadlineBadge(e, Date.parse("2026-10-14T12:00:00+09:00")), "10/16(금) 17:00 마감");
+  assert.equal(deadlineBadge(e, Date.parse("2026-10-16T09:30:00+09:00")), "마감 D-1 · 7시간 남음");
+  assert.equal(deadlineBadge(e, Date.parse("2026-10-16T16:30:00+09:00")), "곧 마감");
   assert.equal(deadlineBadge(e, Date.parse("2026-10-16T17:30:00+09:00")), null);
 });
 

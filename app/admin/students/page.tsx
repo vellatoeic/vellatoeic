@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { KINDS, classSlotLabel, cohortLabel } from "@/lib/config";
@@ -29,7 +30,7 @@ export default async function StudentSearch({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-5 pt-8">
       <AdminTabs active="apps" />
-      <h2 className="font-jua text-2xl text-sky-ink">🔍 &apos;{raw}&apos; 찾기 <span className="text-base text-slate-500">· {found.length}건 (최근 달이 위)</span></h2>
+      <h2 className="flex flex-wrap items-center gap-1.5 font-jua text-2xl text-sky-ink"><Icon name="search" size={26} />&apos;{raw}&apos; 찾기 <span className="text-base text-slate-500">· {found.length}건 (최근 달이 위)</span></h2>
       {!q ? <p className="card text-center text-slate-500">위 검색창에 이름을 입력해 주세요.</p> : found.length === 0 ? <p className="card text-center text-slate-500">찾는 학생이 없어요.</p> : (
         <div className="card overflow-x-auto !p-4">
           <table className="min-w-full text-sm">

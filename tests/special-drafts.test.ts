@@ -68,6 +68,6 @@ test("마감 팝업 대상: 그 달 납부 완료 + 아직 신청 안 한 학생
   assert.equal(specialDeadlineNotices([ev], [{ id: "p3", cohort: "2026-10", status: "paid" }], [], now).length, 0); // 다른 달
   assert.equal(specialDeadlineNotices([{ ...ev, published: false }], [paidNov], [], now).length, 0); // 초안
   const n = specialDeadlineNotices([ev], [paidNov], [], now)[0];
-  assert.equal(n.title, "🎤 11/6(금) 특강 · 11/5(목) 17:00 신청 마감!");
+  assert.equal(n.title, "11/6(금) 특강 · 11/5(목) 17:00 신청 마감!");
   assert.equal(n.link_url, "/special");
 });

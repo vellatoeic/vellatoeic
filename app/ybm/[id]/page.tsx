@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import { notFound } from "next/navigation";
 import { getSetting, getYbmOrder } from "@/lib/db";
 import { depositDeadline, expireUnpaid, ruleFrom } from "@/lib/cancellations";
@@ -27,7 +28,7 @@ export default async function YbmOrderDone({ params, searchParams }: { params: P
     <div className="space-y-3 pt-6">
       {again && <p className="card !bg-sky-soft text-center font-bold text-sky-ink">이미 접수된 신청이 있어요. 다시 신청하지 않아도 돼요.</p>}
       <div className="py-3 text-center">
-        <h1 className="font-jua text-3xl text-sky-ink">{step === 1 ? "신청 완료!" : step === 2 ? "입금 확인 완료! ☁️" : "교재를 발송했어요 📦"}</h1>
+        <h1 className="font-jua text-3xl text-sky-ink"><span className="inline-flex items-center gap-2"><Icon name={step === 1 ? "check" : step === 2 ? "cloud" : "parcel"} size={36} />{step === 1 ? "신청 완료!" : step === 2 ? "입금 확인 완료!" : "교재를 발송했어요"}</span></h1>
         <p className="mt-1 text-sm text-slate-500">{step === 1 ? `${o.name}님, 아래 계좌로 입금해 주세요` : `${o.name}님, 확인 감사합니다`}</p>
       </div>
       <section className="card">
@@ -49,12 +50,12 @@ export default async function YbmOrderDone({ params, searchParams }: { params: P
         </section>
       ) : (
         <section className="card space-y-2 text-center leading-relaxed text-slate-700">
-          <p>확인 감사합니다<br />교재 잘 준비해서 수령할 수 있도록 도와드리겠습니다:)<br />좋은 하루 되세요☁️</p>
+          <p>확인 감사합니다<br />교재 잘 준비해서 수령할 수 있도록 도와드리겠습니다:)<br />좋은 하루 되세요 <Icon name="cloud" size={18} /></p>
           <p className="rounded-2xl bg-sky-soft p-3 text-sm text-sky-ink">✔️ 택배 접수 이후 수령까지 평일 기준 평균 2-3일 소요되니 참고해주세요</p>
         </section>
       )}
       <section className="card text-sm">
-        <p className="font-jua text-lg text-sky-ink">📦 신청 내용</p>
+        <p className="flex items-center gap-1.5 font-jua text-lg text-sky-ink"><Icon name="parcel" size={26} />신청 내용</p>
         <dl className="mt-2 grid grid-cols-[5.5rem_1fr] gap-y-1.5">
           <dt className="text-slate-500">교재</dt><dd>벨라토익 &apos;개념 zip&apos; 1권</dd>
           <dt className="text-slate-500">받는 곳</dt><dd>{o.address}</dd>

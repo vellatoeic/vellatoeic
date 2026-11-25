@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import Link from "next/link";
 import { YBM_ORDER_AMOUNT, won } from "@/lib/config";
 import OrderForm from "./OrderForm";
@@ -10,7 +11,7 @@ export default function YbmOrderPage() {
   return (
     <div className="space-y-3 pt-6">
       <p className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-800">
-        💻 <b>YBM 인강 수강생 전용</b> 교재 신청이에요.<br />
+        <Icon name="laptop" size={22} className="mr-1" /><b>YBM 인강 수강생 전용</b> 교재 신청이에요.<br />
         학원 현장·불라방 수강생은 <Link href="/" className="font-bold text-amber-700 underline">여기</Link>에서 신청해 주세요.
       </p>
       <div className="py-3 text-center">

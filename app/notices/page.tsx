@@ -1,3 +1,5 @@
+import Icon from "@/components/Icon";
+import IconText from "@/components/IconText";
 import { listCurrentNotices, listNoticeReads } from "@/lib/db";
 import { noticeIdentity, withLinks } from "@/lib/noticeView";
 import { isForEveryone, isLive, myNotices, noticeEnded, sortNotices } from "@/lib/notices";
@@ -20,7 +22,7 @@ export default async function NoticesPage() {
 
   return (
     <div className="space-y-4 pt-8">
-      <h1 className="font-jua text-3xl text-sky-ink">🔔 공지</h1>
+      <h1 className="flex items-center gap-2 font-jua text-3xl text-sky-ink"><Icon name="bell" size={34} />공지</h1>
       {mine.length === 0 && <p className="card text-center text-slate-500">아직 공지가 없어요.</p>}
       {mine.map((n) => {
         const unread = loggedIn && !reads.has(n.id) && isLive(n, today);
@@ -28,7 +30,7 @@ export default async function NoticesPage() {
           <details key={n.id} open={unread} className="overflow-hidden rounded-3xl bg-white shadow-[0_2px_0_#d5ecf9]">
             <summary className="flex cursor-pointer list-none items-start gap-2 px-5 py-4">
               <span className="flex-1">
-                <span className="block font-jua text-lg text-sky-ink">{n.pinned && "📌 "}{n.title}</span>
+                <span className="block font-jua text-lg text-sky-ink">{n.pinned && <Icon name="pin" size={18} className="mr-1" />}<IconText text={n.title} /></span>
                 <span className="text-xs text-slate-400">{specialDay(n.starts_on)} ~ {specialDay(n.ends_on)}{n.to_label ? ` · ${n.to_label}` : ""}{!isLive(n, today) ? " · 지난 공지" : ""}</span>
               </span>
               {unread && <span className="shrink-0 rounded-full bg-[#e5484d] px-2 py-0.5 text-xs font-bold text-white">NEW</span>}

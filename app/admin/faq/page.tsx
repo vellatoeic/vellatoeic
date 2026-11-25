@@ -18,7 +18,7 @@ function Fields({ item, categories }: { item?: FaqItem; categories: string[] }) 
             <option value="">+ 새 카테고리 (오른쪽에 입력)</option>
           </select>
         </label>
-        <label><span className="text-xs text-slate-500">새 카테고리 이름 (새로 만들 때만)</span><input name="new_category" placeholder="예: 🧾 기타" className="input !py-2" /></label>
+        <label><span className="text-xs text-slate-500">새 카테고리 이름 (새로 만들 때만)</span><input name="new_category" placeholder="예: 기타" className="input !py-2" /></label>
       </div>
       <label><span className="text-xs text-slate-500">질문</span><input name="question" defaultValue={item?.question} required className="input !py-2" /></label>
       <label><span className="text-xs text-slate-500">답</span><textarea name="answer" defaultValue={item?.answer} rows={3} className="input !py-2" /></label>

@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import { isAdmin } from "@/lib/auth";
 import { listApplications, expireSpecialDeposits, listDepositEvents, listSpecialLectures, listSpecialMaterials, listSpecialRegistrations, listWaitingDeposits, isPreview, type SpecialLecture, type SpecialRegistration } from "@/lib/db";
 import { addSpecialMaterialLink, cleanupSpecialFiles, publishSpecials, markDepositRefunded, addSpecialLecture, bulkSpecialOnsite, removeSpecialLecture, removeSpecialMaterial, removeSpecialRegistration, resolveDepositEvent, saveSpecialLecture } from "@/app/actions";
@@ -63,7 +64,7 @@ function Roster({ title, items, onsiteForm, refunded }: { title: string; items: 
                   {onsiteForm && <input type="checkbox" name="ids" value={r.id} form={onsiteForm} aria-label={`${r.name} 선택`} className="h-4 w-4 accent-sky-deep" />}
                   {r.application_id ? <a href={`/admin/students/${r.application_id}`} className="font-bold text-sky-ink underline decoration-sky-main underline-offset-2">{r.name}</a> : <b className="text-sky-ink">{r.name}</b>}
                   {r.application_id && refunded.has(r.application_id) && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-600">수강 환불</span>}
-                  {r.deposit_refunded_at && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">💸 보증금 환불 완료</span>}
+                  {r.deposit_refunded_at && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">보증금 환불 완료</span>}
                   {onsiteForm && <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${DEPOSIT_TONE[d]}`}>{d === "review" ? "입금 대기" : DEPOSIT_LABEL[d]}</span>}
                   <span className="text-xs text-slate-400">신청 {kst(r.created_at)}</span>
                 </span>
@@ -110,7 +111,7 @@ export default async function SpecialAdminPage({ searchParams }: { searchParams:
       {drafts.length > 0 && (
         <form action={publishSpecials} className="flex flex-wrap items-center gap-3 rounded-3xl border-2 border-dashed border-amber-300 bg-amber-50 p-4 text-sm">
           {drafts.map((d) => <input key={d.id} type="hidden" name="ids" value={d.id} />)}
-          <p className="font-jua text-lg text-amber-700">📝 공개 전 초안 {drafts.length}개</p>
+          <p className="font-jua text-lg text-amber-700"><Icon name="doc" size={22} className="mr-1" />공개 전 초안 {drafts.length}개</p>
           <p className="text-slate-600">{drafts.map((d) => `${specialDay(d.event_date)} ${d.title}`).join(" · ")} — 날짜·시간·제목을 확인하고 공개해 주세요.</p>
           <button className="btn ml-auto !py-2 !text-sm">초안 모두 공개</button>
         </form>
@@ -118,7 +119,7 @@ export default async function SpecialAdminPage({ searchParams }: { searchParams:
 
       {refundsDue.length > 0 && (
         <CloseOnSubmitForm id="refunds" action={markDepositRefunded} className="block rounded-3xl border-2 border-red-300 bg-red-50 p-5">
-          <p className="font-jua text-2xl text-red-600">💸 특강 보증금 환불 필요 {refundsDue.length}명</p>
+          <p className="flex items-center gap-1.5 font-jua text-2xl text-red-600"><Icon name="coins" size={30} />특강 보증금 환불 필요 {refundsDue.length}명</p>
           <p className="mt-1 text-sm text-slate-600">수강을 환불한 학생이 아직 열리지 않은 특강에 보증금을 냈어요. 보증금 {won(SPECIAL_DEPOSIT)}을 계좌로 돌려준 뒤 체크하고 [환불 완료]를 눌러 주세요. (신청은 취소로 바뀌어요)</p>
           <label className="mt-3 flex items-center gap-2 text-sm font-bold text-sky-ink"><SelectAll group="refunds" /> {refundsDue.length}명 전체 선택</label>
           <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
@@ -139,7 +140,7 @@ export default async function SpecialAdminPage({ searchParams }: { searchParams:
 
       {toCheck.length > 0 && (
         <section className="rounded-3xl border-2 border-red-200 bg-red-50 p-5">
-          <p className="font-jua text-xl text-red-600">⚠️ 입금 문자 확인 필요 {toCheck.length}건</p>
+          <p className="flex items-center gap-1.5 font-jua text-xl text-red-600"><Icon name="siren" size={26} />입금 문자 확인 필요 {toCheck.length}건</p>
           <p className="mt-1 text-sm text-slate-600">자동으로 확정하지 못한 입금이에요. 맞는 신청을 골라 확정하거나, 관계없는 입금이면 [무시]를 눌러 주세요.</p>
           <ul className="mt-3 space-y-2">
             {toCheck.map((e) => (
@@ -162,7 +163,7 @@ export default async function SpecialAdminPage({ searchParams }: { searchParams:
       )}
 
       <details className="card">
-        <summary className="font-jua cursor-pointer text-lg text-sky-ink">📩 입금 문자 자동 확인 {webhookOn ? "· 켜짐" : "· 꺼짐 (토큰 설정 필요)"}</summary>
+        <summary className="font-jua cursor-pointer text-lg text-sky-ink"><Icon name="mail" size={22} className="mr-1" />입금 문자 자동 확인 {webhookOn ? "· 켜짐" : "· 꺼짐 (토큰 설정 필요)"}</summary>
         <div className="mt-3 space-y-3 text-sm text-slate-600">
           <p>아이폰 단축어가 은행 입금 문자를 보내면, 입금자명과 {won(SPECIAL_DEPOSIT)}이 맞는 &apos;입금 대기&apos; 현장 신청을 자동으로 확정해요. 문자 원문은 저장하지 않아요.</p>
           <p className="font-bold text-sky-ink">은행 문자가 잘 읽히는지 확인하기</p>
@@ -172,7 +173,7 @@ export default async function SpecialAdminPage({ searchParams }: { searchParams:
 
       <section className="card space-y-3">
         <div className="flex items-baseline justify-between">
-          <h2 className="font-jua text-xl text-sky-ink">📨 입금 문자 수신 기록</h2>
+          <h2 className="flex items-center gap-1 font-jua text-xl text-sky-ink"><Icon name="mail" size={24} />입금 문자 수신 기록</h2>
           <span className="text-xs text-slate-400">최근 20건 · 특강 보증금·교재비</span>
         </div>
         {depositEvents.length === 0 ? (
@@ -225,11 +226,11 @@ export default async function SpecialAdminPage({ searchParams }: { searchParams:
         </CloseOnSubmitForm>
       </details>
 
-      {cleaned !== undefined && <p className="card !bg-emerald-50 text-center font-bold text-emerald-700">🧹 보관함에서 지운 특강의 자료 파일 {Number(cleaned) || 0}개를 정리했어요</p>}
+      {cleaned !== undefined && <p className="card !bg-emerald-50 text-center font-bold text-emerald-700"><Icon name="trash" size={20} className="mr-1" />보관함에서 지운 특강의 자료 파일 {Number(cleaned) || 0}개를 정리했어요</p>}
       <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
-        {pastCount > 0 && <span>📦 열람 기간이 끝난 특강 {pastCount}개 {old ? "도 함께 보고 있어요" : "는 숨겨 뒀어요 (기록은 보관)"}</span>}
+        {pastCount > 0 && <span><Icon name="parcel" size={16} className="mr-1" />열람 기간이 끝난 특강 {pastCount}개 {old ? "도 함께 보고 있어요" : "는 숨겨 뒀어요 (기록은 보관)"}</span>}
         {pastCount > 0 && <a href={old ? "/admin/special" : "/admin/special?old=1"} className="font-bold text-sky-deep underline">{old ? "숨기기" : "지난 특강 보기"}</a>}
-        <form action={cleanupSpecialFiles} className="ml-auto"><button className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-300">🧹 지운 특강의 자료 파일 보관함 정리</button></form>
+        <form action={cleanupSpecialFiles} className="ml-auto"><button className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-300"><Icon name="trash" size={14} className="mr-1" />지운 특강의 자료 파일 보관함 정리</button></form>
       </div>
 
       {rows.length === 0 && <p className="card text-center text-slate-500">{events.length === 0 ? "등록된 특강이 없어요." : "다가오거나 열람 중인 특강이 없어요."}</p>}
@@ -285,8 +286,8 @@ export default async function SpecialAdminPage({ searchParams }: { searchParams:
                   {materials.map((material) => (
                     <li key={material.id} className="flex items-center justify-between gap-2 text-sm">
                       {material.link_url
-                        ? <a href={material.link_url} target="_blank" rel="noreferrer" className="text-sky-deep underline">🔗 {material.file_name}</a>
-                        : <span>📄 {material.file_name} <span className="text-xs font-bold text-amber-600">예전 파일 (이사 후 없음 → 링크로 다시 등록하고 삭제해 주세요)</span></span>}
+                        ? <a href={material.link_url} target="_blank" rel="noreferrer" className="text-sky-deep underline"><Icon name="link" size={16} className="mr-1" />{material.file_name}</a>
+                        : <span><Icon name="doc" size={16} className="mr-1" />{material.file_name} <span className="text-xs font-bold text-amber-600">예전 파일 (이사 후 없음 → 링크로 다시 등록하고 삭제해 주세요)</span></span>}
                       <form action={removeSpecialMaterial}>
                         <input type="hidden" name="id" value={material.id} />
                         <button className="text-red-400 underline">자료 삭제</button>

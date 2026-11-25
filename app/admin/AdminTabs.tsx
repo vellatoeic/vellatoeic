@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import Link from "next/link";
 import { logout, markAppsSeen } from "@/app/actions";
 import { adminAlerts } from "@/lib/adminAlerts";
@@ -35,7 +36,7 @@ export default async function AdminTabs({ active }: { active: "apps" | "roster" 
         </div>
         <div className="flex items-center gap-3">
           <form action="/admin/students" className="flex items-center gap-1.5">
-            <input name="q" placeholder="🔍 학생 이름·번호" autoComplete="off" className="input !w-40 !rounded-full !py-2 text-sm" />
+            <input name="q" placeholder="학생 이름·번호" autoComplete="off" className="input !w-40 !rounded-full !py-2 text-sm" />
             <button className="btn !rounded-full !py-2 !text-sm">찾기</button>
           </form>
           <form action={logout}>
@@ -46,19 +47,19 @@ export default async function AdminTabs({ active }: { active: "apps" | "roster" 
 
       {appsTodo + delivery > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-3xl border-2 border-red-200 bg-white p-3 shadow-sm">
-          <span className="font-jua px-1 text-lg text-red-500">🔔 할 일</span>
+          <span className="inline-flex items-center gap-1 font-jua px-1 text-lg text-red-500"><Icon name="bell" size={22} />할 일</span>
           {fresh.length > 0 && (
             <form action={markAppsSeen} className="flex flex-wrap items-center gap-1.5 rounded-full bg-sky-soft py-1 pl-3 pr-1">
               <Link href="/admin#recent" className="text-sm font-bold text-sky-ink">
-                🆕 새 신청 {fresh.length}건
+                <Icon name="new" size={16} className="mr-1" />새 신청 {fresh.length}건
                 <span className="ml-1 font-normal text-slate-500">{fresh.slice(0, 3).map((x) => `${x.name}(${x.type})`).join(", ")}{fresh.length > 3 ? " 외" : ""}</span>
               </Link>
               <button className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-sky-deep">확인했어요 ✓</button>
             </form>
           )}
-          {waiting > 0 && <Link href="/admin" className={`${chip} bg-amber-50 text-amber-700`}>💰 입금 대기 {waiting}명</Link>}
-          {checks > 0 && <Link href="/admin" className={`${chip} bg-red-50 text-red-600`}>⚠️ 입금 문자 확인 {checks}건</Link>}
-          {delivery > 0 && <Link href="/admin/delivery" className={`${chip} bg-sky-deep text-white`}>📦 택배 발송 대기 {delivery}건</Link>}
+          {waiting > 0 && <Link href="/admin" className={`${chip} bg-amber-50 text-amber-700`}><Icon name="coins" size={16} className="mr-1" />입금 대기 {waiting}명</Link>}
+          {checks > 0 && <Link href="/admin" className={`${chip} bg-red-50 text-red-600`}><Icon name="alert" size={16} className="mr-1" />입금 문자 확인 {checks}건</Link>}
+          {delivery > 0 && <Link href="/admin/delivery" className={`${chip} bg-sky-deep text-white`}><Icon name="parcel" size={16} className="mr-1" />택배 발송 대기 {delivery}건</Link>}
         </div>
       )}
     </div>
