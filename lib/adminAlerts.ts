@@ -1,5 +1,5 @@
 import { COURSES, TRACKS, TIME_SLOTS, KINDS } from "./config";
-import { currentCohort, getSetting, listApplications, listDepositEvents, listYbmOrders } from "./db";
+import { currentCohort, getSetting, listApplications, listDepositEvents, listReceiptChecks, listYbmOrders } from "./db";
 import { specialRefundsDue } from "./specialRefunds";
 import { classCohortNow } from "./classCohort";
 import { visibleToAdmin } from "./cancellations";
@@ -42,5 +42,11 @@ export async function adminAlerts() {
   const delivery =
     apps.filter((a) => (a.cohort === cohort || a.cohort === classNow) && a.kind === "online" && a.pickup === "delivery" && a.status === "paid").length +
     ybm.filter((o) => o.status === "paid").length;
-  return { since, fresh, recent, waiting, checks, delivery, refunds: refunds.length };
+  // 선생님 확인이 필요한 수강증 (취소·환불된 신청 제외)
+  const byId = new Map(apps.map((a) => [a.id, a]));
+  const receipts = (await listReceiptChecks("review").catch(() => [])).filter((c) => {
+    const a = c.application_id ? byId.get(c.application_id) : undefined;
+    return !!a && a.status !== "cancelled" && a.status !== "refunded";
+  }).length;
+  return { since, fresh, recent, waiting, checks, delivery, refunds: refunds.length, receipts };
 }

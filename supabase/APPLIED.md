@@ -43,6 +43,7 @@
 | `38_december_schedule.sql` | 완료 · 2026-11-25 · SQL Editor(Vella 실행 확인) | 12월(2026-12) 수업일 7개 반 저장(종합·속성 12/1~12/24 16회, 격일 8회 회차 기준: 월수 12/1~12/23 · 화목 12/2~12/24), 공휴일 12/25 성탄절, 특강 요일 토, 수업일 확인. 특강 초안 12/5 PART 5·12/19 적중 모의고사 추가(없을 때만). 수업일이 틀리면 전부 되돌리는 안전장치 포함. 실행 후 공개 신청 페이지에 '12월 수업 · 12/1~12/24' 확인 |
 | `39_social_login.sql` | 완료 · 2026-11-25 · npm run sql | 구글·카카오 로그인 준비: 신청서에 학생 번호 칸(account_id, 모두 비어 있음)·로그인 연결 표(login_links, 0건) 추가. 기존 데이터 그대로(신청 149건) |
 | `39_google_login.sql` | 완료 · 2026-11-25 · npm run sql | (쓰지 않음 — 39_social_login 방식으로 결정) 구글 로그인 회원(members)과 수강 신청 연결(member_links) 표 추가 (2026-11-25, 기존 표·데이터는 그대로) |
+| `40_receipt_checks.sql` | 완료 · 2026-11-26 · npm run sql | 수강증 자동 확인: 읽은 기록 표(receipt_checks) · 신청서의 수강증 상태 칸(applications.receipt_status) · 비공개 사진 보관함(receipts) 추가 |
 
 > 2026-11-13 새 Supabase 프로젝트(서울)로 이사: `scripts/migrate-db.mjs --run`으로 옛 DB의 public 구조·데이터·권한·RLS·보관함 설정을 그대로 복사했어요. 위 기록(1~32)은 새 DB에도 그대로 들어 있어요.
 > `33_speed_cleanup.sql`: 옛 DB 확인 결과 ①인덱스 4개만 들어 있고 ②10월 이전 정리는 실행되지 않은 상태로 이사됐어요(완료로 기록하지 않음). 정리는 `35_october_cleanup.sql`로 따로 해요.

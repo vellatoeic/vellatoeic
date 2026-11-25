@@ -120,6 +120,17 @@
 - 신청 [관리] '교재 직접 수정': 그 반 교재 체크 → 금액 자동 계산(택배비 포함), applications.books_adjusted=true('⚠️ 교재 조정' 배지). LC 음원·교재 지급/발송은 고른 교재 기준. 회차 재계산·반 변경·기수 이동에서 교재를 자동으로 바꾸지 않고(회차 저장 안내에 ⚠️ 이름), 반·기수만 바뀌어요.
 - 학생 검색(🔍)은 30분 자동 취소 신청도 '자동 취소됨'으로 보여줘요(다른 목록은 숨김). 테스트 tests/manual-link.test.ts.
 
+## 수강증 자동 확인 (SQL 40, 1단계)
+- 신청서(/guide/[kind]) 맨 위 'YBM 수강증 올리기'(필수, app/guide/[kind]/ReceiptStep.tsx): 휴대폰에서 가로 1600px JPEG로 줄여 서버 동작 readReceiptAction(app/receiptActions.ts)으로 보내면 서버에서 tesseract.js(한국어+영어, 외부 전송·요금 없음)로 읽고 lib/receipt/analyze.ts가 판정해요. 수강증 자동 등업 키트(같은 서면센터 다른 강사 사이트 규칙)의 판독기·반 대조·판정·엔진은 lib/receipt/(config·receipt·match·decision·approve-rules·ocr/) 그대로, 반 목록은 lib/receipt/classes.ts가 config(KLASS_TIME·SINGLE_TIME 단과 시간)로 신청받는 달(signupMonths)마다 만들어요(매달 SQL 없음).
+- 결과: match(반 하나 + 자동 확인 조건 전부) → 수강 월·반·과정·시간을 채우고 잠가요('수강증과 다른 반이 나왔나요? 직접 고를게요' → 풀리고 선생님 확인). review(반 못 찾음·애매) → 찾은 반을 미리 골라 두거나 직접 고르기. reject(서면센터·벨라토익 수강증 아님, 신청받는 달이 아닌 수강증) → 안내 + 다시 올리기('계속 안 되나요? 직접 고를게요'로 진행 가능). 결과에 '12월 시작반 650+ · 주 4일(종합반) · 오전반 · 현장'처럼 우리 반 이름과 레벨(LEVEL_TAG: 시작반 650+ · 문풀반 750+ · 속성반 750+)을 함께 보여줘요.
+- 벨라토익 실물 규칙(2026-11-25, 실물 8장 모두 정확): 큰 제목 첫 글자를 렐·켈·킬로 자주 잘못 읽어서, 강사 칸 '강사 벨라(김지민)'(config instructorField)이 정확하면 한 글자 차이를 인정해요. 격일반 2개월 수강증은 둘째 달 반대 요일까지 찾아요(11월 화목 → 12월 월수).
+- 제출(submitApplication + lib/receipt/verdict.ts): 수강증과 다른 반 → 막음, 불라방 수강증으로 현장 신청 → 막음(현장 수강증 → 불라방은 전환이라 허용), '직접 고르기'면 review로 받아요. 이름(수강생 칸 = 신청서 이름), 같은 사진 지문·같은 초 캡처를 다른 이름이 썼으면 review. applications.receipt_status = auto · review · approved(비어 있음 = 예전 신청).
+- 사진: 줄인 사진(가로 900px, 약 50~150KB)을 receipts 비공개 보관함에 잠깐 두고, 자동 확인되면 제출 즉시 삭제, review는 [확인했어요] 7일 뒤 사진·원문 삭제, 제출 안 한 기록은 하루 뒤 삭제(lib/db.ts purgeReceipts, 관리 화면 열 때). 읽은 값·까닭은 남겨요(같은 수강증 다시 쓰기 확인용).
+- 무료 한도 보호(lib/receipt/usage.ts): 이번 달 읽은 장수 settings receipt_ocr_count:YYYY-MM, 상한 receipt_ocr_cap(기본 400장, Vercel 계산 시간 월 4시간 보호), 스위치 receipt_ocr('off'). 끄거나 상한이면 글자를 안 읽고 학생이 직접 골라 선생님이 확인해요(신청은 계속). 같은 IP 10분에 6번까지, 한 장 읽기 30초 제한·한 장씩 줄 세우기(키트 엔진).
+- 관리: [신청 관리] '수강증 확인 필요 n명'(app/admin/ReceiptReviewBox.tsx: 신청 반 vs 수강증 반·이름·까닭·사진(10분 서명 주소), 체크 → [체크한 수강증 확인했어요], [설정]에서 켜기·끄기·한 달 상한, 이번 달 n/상한 · 보관 사진 장수·용량, 70%를 넘으면 빨간 경고). 신청 줄 배지(수강증 자동 확인·확인·확인 필요), 🔔 할 일 '수강증 확인 n명'. 반이 틀리면 학생 화면에서 반을 고친 뒤 [확인했어요].
+- next.config: serverExternalPackages tesseract.js + outputFileTracingIncludes '/guide/*'(엔진 파일). 빠지면 배포 뒤 글자 읽기가 멈추고 모두 선생님 확인으로 가요.
+- 2단계(아직 안 함): 실물로 1~2주 확인한 뒤 강의실 조건을 '수강증 + 교재비'로(lib/access.ts). 테스트 tests/receipt.test.ts · tests/receipt-db.test.ts · tests/receipt-kit/(키트 시험, vitest-shim).
+
 ## 남은 주의사항
 - 격일반 이어듣기·두 달째 요일은 서버가 자동 판단(lib/altContinue.ts): 지난달 기수 + 같은 이름·비밀번호 + 같은 반 격일반 + 납부 완료 신청이 있으면 두 달째. 시작반 격일반 두 달째는 이어듣기 자동(LC만), 없으면 교재 3권(학생 선택보다 서버 판단 우선, '네'인데 기록 없으면 확인 창에 안내). 두 달째는 반대 요일만(월·수 → 화·목, 화·목 → 월·수), 다르면 제출·확인 창에서 막아요. 처음 듣는 학생은 제한 없음. 확인 창의 교재·금액은 서버 미리 확인(previewApplication) 결과.
 - 이미 들어온 신청 점검: 신청 관리 '⚠️ 격일반 확인 필요'(이번 달·다음 달 격일반): 지난달 기록과 같은 요일 → '요일: ○반이어야 해요', 시작반 이어듣기인데 기록 없음 → '교재 3권이어야 해요', 기록 있는데 이어듣기 아님 → '이어듣기 대상'. [바로 고치기](요일은 반 변경, 이어듣기는 교재·금액 재계산, 납부 완료면 금액 유지하고 차이만 표시) / [동명이인 · 무시](settings alt_ignore). 관리 화면은 비밀번호 비교가 불가능해 같은 이름으로 찾아요. 할 일 카드에도 n건(lib/altIssuesServer.ts).

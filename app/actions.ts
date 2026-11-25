@@ -10,6 +10,7 @@ import {
 import {
   createApplication, listApplications, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, setHomeworkStar, drawGift, getGiftDraw, saveGiftItem, deleteGiftItem, setGiftSent, type GiftDraw, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
   appsByAccount, getLoginLink, saveLoginLink, linkAccount, deleteLoginLink, type Application,
+  getReceiptCheck, findReceiptTwins, updateReceiptChecks, listReceiptChecks, dropReceiptImage,
   saveMission, type Mission, createYbmOrder, listYbmOrders, updateYbmOrders, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, setTestDouble, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudioLink, setAudioOrder, deleteAudios, createSpecialMaterialLink, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, listDepositEvents, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture, cleanupOrphanSpecialFiles,
 } from "@/lib/db";
 import { canWatch, isActive, loginApps } from "@/lib/access";
@@ -38,6 +39,8 @@ import { altFixResult, altTrackError, findPrevAlt, planBooks } from "@/lib/altCo
 import { currentAltIssues } from "@/lib/altIssuesServer";
 import { adjustedBooks } from "@/lib/manualLink";
 import { safe } from "@/lib/safe";
+import { receiptVerdict } from "@/lib/receipt/verdict";
+import { OCR_CAP_KEY, OCR_SWITCH_KEY } from "@/lib/receipt/usage";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
   setAccount, getAccountId, getPendingLink, clearPendingLink,
@@ -116,6 +119,16 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   if (!fd.get("ybm_registered")) return { error: "YBM 학원 수강 등록을 먼저 마쳐 주세요. (등록했다면 체크)" };
   if (!fd.get("agree")) return { error: "필독 사항 확인에 체크해 주세요." };
 
+  // YBM 수강증 (신청서 맨 위에서 올린 것): 수강증과 같은 반·형태인지, 이름이 같은지, 다른 학생이 같은 수강증을 썼는지 (lib/receipt/verdict.ts)
+  const receipt = await getReceiptCheck(clean(fd.get("receipt_id")));
+  if (!receipt || receipt.status !== "read" || Date.parse(receipt.created_at) < Date.now() - 6 * 3600 * 1000) {
+    return { error: "YBM 수강증을 신청서 맨 위에서 다시 올려 주세요." };
+  }
+  const twins = await findReceiptTwins(receipt.image_hash, receipt.captured_at);
+  const twinNames = (await getApplications(twins.flatMap((c) => (c.application_id ? [c.application_id] : [])))).map((a) => a.name);
+  const verdict = receiptVerdict(receipt, { cohort, course, track, slot, kind, name }, !!fd.get("receipt_override"), twinNames);
+  if ("error" in verdict) return { error: verdict.error };
+
   // 격일반 두 달째·이어듣기는 서버가 지난달 기록(같은 이름·비밀번호·반·격일반·납부 완료)으로 판단해요
   const plan = await applicationPlan({ cohort, course, track, pickup, name, pin, wantContinuing: !!fd.get("continuing"), accountId });
   if (plan.error) return { error: plan.error };
@@ -153,6 +166,16 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
     amount: calcAmount(books, pickup),
     pin_hash: social ? null : hashPin(pin),
     ...(account ? { account_id: account } : {}),
+    receipt_status: verdict.status,
+  });
+  // 수강증 기록을 신청서에 연결해요. 자동 확인이면 사진과 이름 확인용 원문을 바로 지워요.
+  if (verdict.status === "auto") await safe("dropReceiptImage", () => dropReceiptImage(receipt.id, receipt.image_path), undefined);
+  await updateReceiptChecks([receipt.id], {
+    application_id: id,
+    status: verdict.status,
+    reasons: verdict.reasons,
+    ocr_text: verdict.status === "auto" ? null : receipt.ocr_text,
+    decided_at: verdict.status === "auto" ? new Date().toISOString() : null,
   });
   // 신청서보다 먼저 온 입금이 있으면 바로 연결해서 납부 확인해요
   await linkWaitingDeposit({ kind: "app", id, depositor, amount: calcAmount(books, pickup) });
@@ -321,6 +344,30 @@ export async function resetPin(fd: FormData) {
   if (!/^\d{4}$/.test(pin)) return;
   await updateApplication(clean(fd.get("id")), { pin_hash: hashPin(pin) });
   revalidatePath("/admin");
+}
+
+// [신청 관리] 수강증 확인: 선생님이 수강증과 신청 반을 비교하고 [확인했어요] (반이 틀리면 먼저 [관리]에서 반을 고쳐요)
+// 확인한 수강증 사진·원문은 7일 뒤 자동으로 지워요(purgeReceipts).
+export async function approveReceipts(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const ids = fd.getAll("receipt_ids").map(clean).filter(Boolean);
+  const checks = (await listReceiptChecks("review")).filter((c) => ids.includes(c.id));
+  if (checks.length === 0) return;
+  await updateReceiptChecks(checks.map((c) => c.id), { status: "approved", decided_at: new Date().toISOString() });
+  await updateApplications(checks.flatMap((c) => (c.application_id ? [c.application_id] : [])), { receipt_status: "approved" });
+  revalidatePath("/admin", "layout");
+}
+
+// [신청 관리] 수강증 자동 읽기 켜기·끄기 · 한 달 상한 (무료 요금제 계산 시간 보호)
+export async function saveReceiptOcr(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const on = clean(fd.get("on"));
+  if (on === "on" || on === "off") await setSetting(OCR_SWITCH_KEY, on === "off" ? "off" : "");
+  if (fd.has("cap")) {
+    const cap = Number(clean(fd.get("cap")));
+    if (Number.isInteger(cap) && cap >= 0 && cap <= 3000) await setSetting(OCR_CAP_KEY, String(cap));
+  }
+  revalidatePath("/admin", "layout");
 }
 
 // '이번 달 할 일': 다음 달 수업일을 확인했어요

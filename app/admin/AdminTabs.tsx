@@ -4,18 +4,21 @@ import { logout, markAppsSeen } from "@/app/actions";
 import { adminAlerts } from "@/lib/adminAlerts";
 import { expireUnpaid, purgeTimedOut } from "@/lib/cancellations";
 import { safe } from "@/lib/safe";
+import { purgeReceipts } from "@/lib/db";
 
 export default async function AdminTabs({ active }: { active: "apps" | "roster" | "stamps" | "lectures" | "schedule" | "special" | "delivery" | "audio" | "faq" | "tests" | "notices" }) {
   // 관리 화면을 열 때마다: 30분 지난 입금 대기 자동 취소 + 자동 취소 7일 지난 것 삭제
   await safe("expireUnpaid", () => expireUnpaid(Date.now()), null);
   await safe("purgeTimedOut", () => purgeTimedOut(), undefined);
-  const { fresh, waiting, checks, delivery, refunds } = await adminAlerts();
+  // 수강증: 제출 안 한 기록은 하루 뒤, 확인이 끝난 사진·원문은 7일 뒤 자동으로 지워요 (무료 보관함 1GB 보호)
+  await safe("purgeReceipts", () => purgeReceipts(), { dropped: 0, stripped: 0 });
+  const { fresh, waiting, checks, delivery, refunds, receipts } = await adminAlerts();
   const tab = (on: boolean) =>
     `relative rounded-full px-4 py-2 font-bold ${on ? "bg-sky-deep text-white" : "bg-white text-sky-ink"}`;
   const dot = (n: number) => n > 0 && (
     <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[11px] text-white">{n}</span>
   );
-  const appsTodo = fresh.length + waiting + checks;
+  const appsTodo = fresh.length + waiting + checks + receipts;
   const chip = "rounded-full px-3 py-1.5 text-sm font-bold";
   return (
     <div className="space-y-3 print:hidden">
@@ -59,6 +62,7 @@ export default async function AdminTabs({ active }: { active: "apps" | "roster" 
           )}
           {waiting > 0 && <Link href="/admin" className={`${chip} bg-amber-50 text-amber-700`}><Icon name="coins" size={16} className="mr-1" />입금 대기 {waiting}명</Link>}
           {checks > 0 && <Link href="/admin" className={`${chip} bg-red-50 text-red-600`}><Icon name="alert" size={16} className="mr-1" />입금 문자 확인 {checks}건</Link>}
+          {receipts > 0 && <Link href="/admin#receipts" className={`${chip} bg-amber-50 text-amber-700`}><Icon name="clipboard" size={16} className="mr-1" />수강증 확인 {receipts}명</Link>}
           {delivery > 0 && <Link href="/admin/delivery" className={`${chip} bg-sky-deep text-white`}><Icon name="parcel" size={16} className="mr-1" />택배 발송 대기 {delivery}건</Link>}
         </div>
       )}
