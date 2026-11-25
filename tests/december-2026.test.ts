@@ -69,8 +69,8 @@ test("11월 열람 마감 11/30 · 11/26 종강 팝업 문구", async () => {
   const input = { cohort: "2026-11", end, until: "2026-11-30", kind: "online" as const, hasNext: false };
   assert.equal(courseEndNotices([input], "2026-11-25").length, 0);
   const [n] = courseEndNotices([input], "2026-11-26");
-  assert.equal(n.title, "🎁 종강 기념! 11월 강의를 11/30(월)까지 열어 둘게요");
-  assert.equal(n.lead, "한 달 동안 수고 많았어요 :) 놓친 강의와 특강은 **11/30(월)까지** 강의실 📚 지난 강의와 특강 페이지에서 다시 볼 수 있어요.");
+  assert.equal(n.title, "종강 기념! 11월 강의를 11/30(월)까지 열어 둘게요");
+  assert.equal(n.lead, "한 달 동안 수고 많았어요 :) 놓친 강의와 특강은 **11/30(월)까지** 강의실 지난 강의와 특강 페이지에서 다시 볼 수 있어요.");
   assert.equal(n.link_label, "12월 수강 신청하기");
   assert.equal(courseEndNotices([input], "2026-11-30").length, 1);
   assert.equal(courseEndNotices([input], "2026-12-01").length, 0);

@@ -28,11 +28,31 @@ body { font-family: var(--font-body); color: #1f2d3a; -webkit-font-smoothing: an
 .btn:hover { box-shadow: 0 4px 0 #1f6f9e, 0 10px 26px rgba(43, 143, 199, 0.38); }
 .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #1f6f9e; }
 .btn-ghost { @apply inline-flex items-center justify-center rounded-full border border-sky-deep/35 bg-white px-5 py-3 font-bold text-sky-ink transition hover:border-sky-deep hover:bg-sky-soft; }
-.input { @apply w-full rounded-2xl border-2 border-sky-main/60 bg-white px-4 py-3 text-base outline-none focus:border-sky-deep; }
+/* 입력칸: 토스처럼 옅은 바탕 + 누르면 하늘색 테두리와 은은한 빛 */
+.input { @apply w-full rounded-2xl border-2 border-transparent bg-[#f1f6fa] px-4 py-3 text-base outline-none transition placeholder:text-slate-400 focus:border-sky-deep focus:bg-white focus:shadow-[0_0_0_4px_rgba(159,216,245,0.35)]; }
 .label { @apply mb-2 block font-bold text-sky-ink; }
+
+/* 화면이 열릴 때 부드럽게 · 카드가 차례로 (새 디자인 움직임, '동작 줄이기' 설정이면 꺼요) */
+/* 움직임이 끝나면 아무 효과도 남지 않게(backwards): 남아 있으면 안쪽의 화면 전체 창이 카드 안에 갇힐 수 있어요 */
+main { animation: vt-pagein 0.4s ease-out backwards; }
+@keyframes vt-pagein { from { opacity: 0; } }
+.stagger > * { animation: vt-up 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+.stagger > *:nth-child(2) { animation-delay: 0.05s; }
+.stagger > *:nth-child(3) { animation-delay: 0.1s; }
+.stagger > *:nth-child(4) { animation-delay: 0.15s; }
+.stagger > *:nth-child(5) { animation-delay: 0.2s; }
+.stagger > *:nth-child(n + 6) { animation-delay: 0.25s; }
+@keyframes vt-up { from { opacity: 0; transform: translateY(14px); } }
+@media (prefers-reduced-motion: reduce) { main, .stagger > * { animation: none; } }
 
 /* 굵은 글씨는 Pretendard 굵게 */
 b, strong, .font-bold, .btn, .btn-ghost, .label { font-family: var(--font-jua); font-weight: 700; }
+
+/* 아이콘 (components/Icon.tsx): 글자 옆에서는 줄 가운데에 맞춰요 */
+.vt-icon { display: inline-block; flex: none; vertical-align: -0.2em; object-fit: contain; }
+.vt-pulse { animation: vt-pulse 1.6s ease-in-out infinite; }
+@keyframes vt-pulse { 50% { transform: scale(1.18); opacity: 0.75; } }
+@media (prefers-reduced-motion: reduce) { .vt-pulse { animation: none; } }
 
 /* ── 머리 (로고 VELLA TOEIC · 🔔 · 강의실 · ☰) ── */
 .wordmark { font-family: var(--font-serif); font-weight: 600; font-size: 1.2rem; letter-spacing: 0.06em; color: var(--color-sky-ink); white-space: nowrap; display: inline-flex; align-items: center; }
@@ -47,6 +67,24 @@ b, strong, .font-bold, .btn, .btn-ghost, .label { font-family: var(--font-jua); 
 .hdr-class:hover { border-color: var(--color-sky-deep); }
 .icon-btn { width: 44px; height: 44px; display: inline-grid; place-items: center; border-radius: 12px; color: var(--color-sky-ink); }
 .icon-btn:hover { background: rgba(18, 64, 92, 0.06); }
+
+/* 학생 화면 아래 메뉴 막대 (휴대폰만) */
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 6px 6px max(6px, env(safe-area-inset-bottom)); background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 -6px 20px rgba(18, 64, 92, 0.08); border-top: 1px solid rgba(43, 143, 199, 0.12); }
+.tabbar a { display: grid; justify-items: center; gap: 2px; padding: 4px 0; font-size: 0.72rem; font-weight: 700; color: var(--color-sky-muted); }
+.tabbar img { width: 28px; height: 28px; object-fit: contain; filter: grayscale(0.6) opacity(0.7); transition: transform 0.2s, filter 0.2s; }
+.tabbar a[aria-current="page"] { color: var(--color-sky-deep); }
+.tabbar a[aria-current="page"] img { filter: none; transform: translateY(-2px) scale(1.06); }
+@media (min-width: 1024px) { .tabbar { display: none; } }
+body:has(.tabbar) .site-foot { padding-bottom: 104px; }
+@media (min-width: 1024px) { body:has(.tabbar) .site-foot { padding-bottom: 40px; } }
+
+/* [학생 | 강사] 전환 (강사 로그인 때만) */
+.mode-switch { display: inline-grid; grid-auto-flow: column; gap: 2px; padding: 3px; border-radius: 99px; background: #fff; border: 1px solid rgba(43, 143, 199, 0.25); }
+.mode-switch a { min-height: 32px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: 99px; font-size: 0.82rem; font-weight: 700; color: var(--color-sky-muted); transition: background 0.2s, color 0.2s; }
+.mode-switch a.on { background: var(--color-sky-deep); color: #fff; box-shadow: 0 2px 8px rgba(43, 143, 199, 0.35); }
+/* 학생 화면 미리보기 띠 */
+.view-strip { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 7px 16px; background: var(--color-sky-ink); color: #fff; font-size: 0.82rem; }
+.view-strip button { padding: 3px 12px; border-radius: 99px; background: #fff; color: var(--color-sky-ink); font-weight: 700; font-size: 0.8rem; }
 
 /* ── 메뉴 서랍 ── */
 .drawer-bg { position: fixed; inset: 0; z-index: 60; background: rgba(18, 64, 92, 0.32); backdrop-filter: blur(2px); animation: fadein 0.2s both; }

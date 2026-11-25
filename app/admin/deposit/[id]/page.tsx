@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BOOKS, BOOK_PRICE, COURSES, KINDS, TRACKS, cohortLabel, thisMonthKST, won } from "@/lib/config";
@@ -43,7 +44,7 @@ export default async function LinkDeposit({ params, searchParams }: { params: Pr
       <AdminTabs active="apps" />
       <Link href="/admin" className="text-sm text-sky-deep underline">← 신청 관리로</Link>
       <section className="card space-y-1">
-        <p className="font-jua text-2xl text-sky-ink">💳 입금 학생 연결</p>
+        <p className="flex items-center gap-2 font-jua text-2xl text-sky-ink"><Icon name="card" size={28} />입금 학생 연결</p>
         <p className="text-[15px]"><b className="text-sky-ink">{event.name || "(이름 못 읽음)"}</b> · <b>{won(event.amount)}</b> · <span className="text-slate-500">{when(event.received_at)}</span></p>
         <form className="flex items-center gap-2 pt-2">
           <input name="q" defaultValue={q} placeholder="이름·입금자명으로 찾기" className="input !w-52 !py-2" />

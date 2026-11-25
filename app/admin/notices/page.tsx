@@ -1,3 +1,5 @@
+import IconText from "@/components/IconText";
+import Icon from "@/components/Icon";
 import { isAdmin } from "@/lib/auth";
 import { currentCohort, isPreview, listCohortApplications, listNoticeReads, listNotices } from "@/lib/db";
 import { COURSES, TRACKS, KINDS, TIME_SLOTS, todayKST } from "@/lib/config";
@@ -51,7 +53,7 @@ export default async function NoticesAdmin({ searchParams }: { searchParams: Pro
 
       {ended.length > 0 && (
         <p className="flex flex-wrap items-center gap-2 rounded-2xl bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
-          📦 끝난 공지 {ended.length}개 {old ? "도 함께 보고 있어요" : "는 숨겨 뒀어요 (기록은 보관)"}
+          <Icon name="parcel" size={16} className="mr-1" />끝난 공지 {ended.length}개 {old ? "도 함께 보고 있어요" : "는 숨겨 뒀어요 (기록은 보관)"}
           <a href={old ? "/admin/notices" : "/admin/notices?old=1"} className="ml-auto font-bold text-sky-deep underline">{old ? "끝난 공지 숨기기" : "지난 공지 보기"}</a>
         </p>
       )}
@@ -67,10 +69,10 @@ export default async function NoticesAdmin({ searchParams }: { searchParams: Pro
           <section key={n.id} className="card space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <p className="font-jua text-xl text-sky-ink">{n.pinned && "📌 "}{n.title}</p>
+                <p className="font-jua text-xl text-sky-ink">{n.pinned && <Icon name="pin" size={18} className="mr-1" />}<IconText text={n.title} /></p>
                 <p className="text-sm text-slate-500">
                   {n.repeat_monthly
-                    ? <>🔁 매달 반복 · 개강일부터 {n.repeat_days ?? 7}일 · {specialDay(n.starts_on)}부터</>
+                    ? <><Icon name="repeat" size={16} className="mr-1" />매달 반복 · 개강일부터 {n.repeat_days ?? 7}일 · {specialDay(n.starts_on)}부터</>
                     : <>{specialDay(n.starts_on)} ~ {specialDay(n.ends_on)} · {isLive(n, today) ? "게시 중" : n.starts_on > today ? "게시 예정" : "게시 끝"}</>} · {n.popup ? "팝업 O" : "팝업 X"}
                 </p>
                 <p className="text-sm text-slate-500">대상: {describe(n.targets)}</p>

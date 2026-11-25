@@ -1,5 +1,6 @@
 "use client";
 
+import Icon from "@/components/Icon";
 import { startTransition, useActionState, useRef, useState, type FormEvent } from "react";
 import { previewApplication, submitApplication, type FormState } from "@/app/actions";
 import { BRING_BOOKS_TEXT, lateDeliveryWarning, LATE_DELIVERY_TEXT } from "@/lib/altContinue";
@@ -241,7 +242,7 @@ export default function ApplyForm({ kind, months, today }: { kind: Kind; months:
           {/* 개강 직전(학생 반 첫 수업일 3일 전 ~ 마지막 수업일)에 택배를 고르면 안내만 (막지는 않아요) */}
           {pickup === "delivery" && chosen && course && (() => {
             const w = chosen.windows[scheduleClassFor(course, track)];
-            return w && lateDeliveryWarning(today, w.first, w.last) ? <p className="mt-2 rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-800">{LATE_DELIVERY_TEXT}</p> : null;
+            return w && lateDeliveryWarning(today, w.first, w.last) ? <p className="mt-2 rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-800"><Icon name="parcel" size={18} className="mr-1" />{LATE_DELIVERY_TEXT}</p> : null;
           })()}
         </div>
       )}
@@ -361,9 +362,9 @@ export default function ApplyForm({ kind, months, today }: { kind: Kind; months:
               <dt className="text-slate-500">교재</dt><dd>{(plan?.books ?? books.map((b) => BOOKS[b])).join(", ")}</dd>
               <dt className="text-slate-500">교재비</dt><dd className="font-jua text-xl text-sky-ink">{won(plan?.amount ?? amount)}</dd>
             </dl>
-            {plan?.continuing && <p className="rounded-xl bg-yellow-100 p-3 text-sm font-bold text-yellow-900">{BRING_BOOKS_TEXT}</p>}
+            {plan?.continuing && <p className="rounded-xl bg-yellow-100 p-3 text-sm font-bold text-yellow-900"><Icon name="book" size={18} className="mr-1" />{BRING_BOOKS_TEXT}</p>}
             <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">반·시간을 잘못 고르면 다른 교재가 준비돼요.<br />학원에 등록한 반과 같은지 꼭 확인해 주세요.</p>
-            <p className="rounded-xl bg-red-50 p-3 text-center text-sm font-bold text-red-600">⏰ 제출 후 30분 안에 입금해 주세요</p>
+            <p className="rounded-xl bg-red-50 p-3 text-center text-sm font-bold text-red-600"><Icon name="clock" size={18} className="mr-1" />제출 후 30분 안에 입금해 주세요</p>
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => setConfirm(null)} className="btn-ghost">수정하기</button>
               <button type="button" onClick={submit} className="btn">맞아요, 제출</button>

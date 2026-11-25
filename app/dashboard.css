@@ -1,0 +1,83 @@
+/* 학생 대시보드 (.sd 안에서만). 토스처럼 깔끔하게 + 새 디자인 움직임 */
+.sd { --ink: #12405c; --deep: #2b8fc7; --muted: #5d7f95; --line: rgba(43, 143, 199, 0.12); display: grid; gap: 12px; padding: 20px 0 96px; color: var(--ink); }
+.sd > * { animation: sd-up 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+.sd > *:nth-child(2) { animation-delay: 0.04s; }
+.sd > *:nth-child(3) { animation-delay: 0.08s; }
+.sd > *:nth-child(4) { animation-delay: 0.12s; }
+.sd > *:nth-child(5) { animation-delay: 0.16s; }
+.sd > *:nth-child(6) { animation-delay: 0.2s; }
+.sd > *:nth-child(n + 7) { animation-delay: 0.24s; }
+@keyframes sd-up { from { opacity: 0; transform: translateY(14px); } }
+
+.sd-head { padding: 4px 4px 6px; }
+.sd-hello { color: var(--muted); font-size: 0.95rem; font-weight: 600; }
+.sd-head h1 { margin-top: 2px; font-size: 1.85rem; font-weight: 800; letter-spacing: -0.03em; }
+.sd-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.sd-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 99px; background: #fff; border: 1px solid var(--line); font-size: 0.8rem; font-weight: 700; color: var(--ink); }
+
+.sd-card { display: block; background: #fff; border-radius: 22px; padding: 18px; box-shadow: 0 6px 22px rgba(18, 64, 92, 0.07); border: 1px solid var(--line); }
+a.sd-card { transition: transform 0.2s, box-shadow 0.2s; }
+a.sd-card:active { transform: scale(0.98); }
+.sd-title { font-size: 1.05rem; font-weight: 800; margin-bottom: 10px; }
+.sd-eyebrow { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; color: var(--deep); }
+.sd-muted { color: var(--muted); font-size: 0.88rem; margin-top: 2px; }
+.sd-big { font-size: 1.35rem; font-weight: 800; color: var(--deep); }
+.sd em { font-style: normal; color: var(--deep); }
+
+/* 줄 (아이콘 · 글 · 화살표) */
+.sd-row, .sd-notice, .sd-live { display: flex; align-items: center; gap: 12px; }
+.sd-row-txt { flex: 1; min-width: 0; display: grid; }
+.sd-row-txt b { font-size: 1rem; font-weight: 800; }
+.sd-row-txt small { color: var(--muted); font-size: 0.82rem; }
+.sd-chev { color: #a9c9dd; }
+
+/* 라이브 */
+.sd-live { padding: 16px 18px; border-radius: 22px; background: #fff; border: 1px solid var(--line); box-shadow: 0 6px 22px rgba(18, 64, 92, 0.07); }
+.sd-live.on { background: linear-gradient(135deg, #ff7a7f, #e5484d); border-color: transparent; color: #fff; box-shadow: 0 6px 0 #b8383c, 0 12px 30px rgba(229, 72, 77, 0.3); }
+.sd-live.on small, .sd-live.on .sd-chev { color: rgba(255, 255, 255, 0.9); }
+.sd-live.on:active { transform: translateY(3px); box-shadow: 0 3px 0 #b8383c; }
+.sd-live.soon { background: #fff1f1; border-color: #ffd0d1; color: #c4383d; }
+
+/* 진행 링 */
+.sd-progress { display: flex; align-items: center; gap: 18px; background: linear-gradient(150deg, #dff2fd, #fff); }
+.sd-progress h2 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; margin-top: 2px; }
+.sd-ring { position: relative; width: 108px; height: 108px; flex: none; }
+.sd-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.sd-ring circle { fill: none; stroke-width: 11; stroke-linecap: round; }
+.sd-ring-bg { stroke: rgba(43, 143, 199, 0.12); }
+.sd-ring-fg { stroke: var(--deep); animation: sd-ring 1.4s 0.15s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes sd-ring { from { stroke-dashoffset: var(--c); } }
+.sd-ring-txt { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; line-height: 1.1; }
+.sd-ring-txt b { font-size: 2rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.sd-ring-txt span { font-size: 0.78rem; color: var(--muted); font-weight: 700; }
+.sd-stats { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 0.86rem; color: var(--muted); }
+.sd-stats span { display: inline-flex; align-items: center; gap: 4px; }
+.sd-stats b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* 오늘 할 일 */
+.sd-todo { display: grid; gap: 4px; }
+.sd-todo li { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--line); font-size: 0.94rem; }
+.sd-todo li:last-child { border-bottom: 0; }
+.sd-todo li span { flex: 1; min-width: 0; }
+.sd-todo li.ok span { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(18, 64, 92, 0.25); }
+.sd-link { flex: none; padding: 5px 12px; border-radius: 99px; background: #e6f5fe; color: var(--deep); font-size: 0.8rem; font-weight: 800; }
+
+/* 카드 묶음 */
+.sd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sd-mini { display: grid; gap: 2px; align-content: start; padding: 16px; }
+.sd-mini b { margin-top: 6px; font-size: 0.98rem; font-weight: 800; }
+.sd-mini small { color: var(--muted); font-size: 0.8rem; }
+.sd-badge { justify-self: start; margin-top: 6px; padding: 2px 8px; border-radius: 99px; background: #e5484d; color: #fff !important; font-size: 0.7rem; font-weight: 800; }
+
+/* 메뉴 목록 */
+.sd-menu { padding: 6px 14px; }
+.sd-menu .sd-row { padding: 12px 2px; border-bottom: 1px solid var(--line); }
+.sd-menu .sd-row:last-child { border-bottom: 0; }
+.sd-notice { padding: 14px 16px; }
+
+@media (min-width: 640px) {
+  .sd-grid { grid-template-columns: repeat(4, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sd > *, .sd-ring-fg { animation: none; }
+}

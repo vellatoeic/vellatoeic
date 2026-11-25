@@ -1,5 +1,6 @@
 "use client";
 
+import Icon from "./Icon";
 import { useState } from "react";
 import { KLASS_TIME, type Klass, type TimeSlot } from "@/lib/config";
 
@@ -15,11 +16,11 @@ export default function Timetable({ initial = "am" }: { initial?: TimeSlot }) {
   const i = slot === "am" ? 0 : 1;
   return (
     <section className="card space-y-3">
-      <p className="font-jua text-2xl text-sky-ink">🗓️ 수업 시간표</p>
+      <p className="flex items-center gap-2 font-jua text-2xl text-sky-ink"><Icon name="calendar" size={30} />수업 시간표</p>
       <div className="grid grid-cols-2 gap-1 rounded-2xl bg-sky-soft p-1">
         {(["am", "pm"] as const).map((s) => (
           <button key={s} type="button" onClick={() => setSlot(s)} className={`rounded-xl py-2.5 font-jua text-lg ${slot === s ? "bg-sky-deep text-white" : "text-sky-ink"}`}>
-            {s === "am" ? "☀️ 오전반" : "🌙 저녁반"}
+            <span className="inline-flex items-center justify-center gap-1.5"><Icon name={s === "am" ? "sun" : "moon"} size={20} />{s === "am" ? "오전반" : "저녁반"}</span>
           </button>
         ))}
       </div>

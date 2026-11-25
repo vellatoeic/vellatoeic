@@ -52,7 +52,7 @@ export default async function KindGuide({ params }: { params: Promise<{ kind: st
   const months = await Promise.all((await signupMonths()).map(async (m) => ({ ...m, round: await roundFor(m.cohort), windows: await windowsOf(m.cohort) })));
 
   return (
-    <div className="space-y-6 pt-8">
+    <div className="stagger space-y-6 pt-8">
       <div className="text-center">
         <span className="rounded-full bg-sky-main px-4 py-1.5 text-sm font-bold text-sky-ink">
           {KINDS[kind].label}

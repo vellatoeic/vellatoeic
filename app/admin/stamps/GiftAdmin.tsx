@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import { cohortLabel, todayKST } from "@/lib/config";
 import { listGiftDraws, listGiftItems } from "@/lib/db";
 import { cohortBoards, kindText, klassText, type StudentBoard } from "@/lib/gifts";
@@ -29,7 +30,7 @@ export default async function GiftAdmin({ cohort, q }: { cohort: string; q: stri
 
   return (
     <details className="card !p-4" open>
-      <summary className="font-jua cursor-pointer text-xl text-sky-ink">🎁 스티커판 완성 선물 · {cohortLabel(cohort)}</summary>
+      <summary className="font-jua cursor-pointer text-xl text-sky-ink"><Icon name="gift" size={26} className="mr-1" />스티커판 완성 선물 · {cohortLabel(cohort)}</summary>
       <div className="mt-3 space-y-4">
         <form className="flex flex-wrap items-center gap-2 text-sm">
           <input type="month" name="gc" defaultValue={cohort} className="input !w-44 !py-1.5" />
@@ -38,18 +39,18 @@ export default async function GiftAdmin({ cohort, q }: { cohort: string; q: stri
         </form>
 
         <div className="grid grid-cols-3 gap-2 text-center">
-          {[["🎉 완성", done.length], ["⏳ 마지막 날 출석만", lastOnly.length], ["🟡 1~2개 모자람", near.length]].map(([t, n]) => (
-            <div key={t as string} className="rounded-2xl bg-sky-soft p-2.5"><p className="text-xs text-slate-500">{t}</p><p className="font-jua text-2xl text-sky-ink">{n}명</p></div>
+          {[["sparkle", "완성", done.length], ["hourglass", "마지막 날 출석만", lastOnly.length], ["dot", "1~2개 모자람", near.length]].map(([ic, t, n]) => (
+            <div key={t as string} className="rounded-2xl bg-sky-soft p-2.5"><p className="flex items-center gap-1 text-xs text-slate-500"><Icon name={ic as string} size={16} />{t}</p><p className="font-jua text-2xl text-sky-ink">{n}명</p></div>
           ))}
         </div>
 
         {[
-          { title: `🎉 완성 (${done.length}명)`, list: done },
-          { title: `⏳ 마지막 날 출석만 남음 (${lastOnly.length}명)`, list: lastOnly },
+          { icon: "sparkle", title: `완성 (${done.length}명)`, list: done },
+          { icon: "hourglass", title: `마지막 날 출석만 남음 (${lastOnly.length}명)`, list: lastOnly },
         ].map((g) => (
           <div key={g.title} className="rounded-2xl bg-white p-3 ring-1 ring-sky-main">
             <div className="flex items-center justify-between gap-2">
-              <p className="font-jua text-lg text-sky-ink">{g.title}</p>
+              <p className="flex items-center gap-1 font-jua text-lg text-sky-ink"><Icon name={g.icon} size={22} />{g.title}</p>
               <CopyText label="명단 복사" text={g.list.map(line).join("\n")} />
             </div>
             <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm">{g.list.length ? g.list.map((b) => <span key={b.app.id}>{who(b)}</span>) : <span className="text-slate-400">없어요</span>}</p>
@@ -58,7 +59,7 @@ export default async function GiftAdmin({ cohort, q }: { cohort: string; q: stri
 
         <div className="rounded-2xl bg-white p-3 ring-1 ring-amber-200">
           <div className="flex items-center justify-between gap-2">
-            <p className="font-jua text-lg text-amber-700">🟡 1~2개 모자람 ({near.length}명) <span className="text-xs font-normal text-slate-500">· 날짜를 누르면 바로 스티커를 붙여요</span></p>
+            <p className="font-jua text-lg text-amber-700"><Icon name="dot" size={18} className="mr-1" />1~2개 모자람 ({near.length}명) <span className="text-xs font-normal text-slate-500">· 날짜를 누르면 바로 스티커를 붙여요</span></p>
             <CopyText label="명단 복사" text={near.map((b) => `${line(b)}\t${b.status.missing.map((m) => `${specialDay(m.day)} ${m.kind}`).join(", ")}`).join("\n")} />
           </div>
           <ul className="mt-1 space-y-1 text-sm">
@@ -69,7 +70,7 @@ export default async function GiftAdmin({ cohort, q }: { cohort: string; q: stri
                   <form key={`${m.day}${m.kind}`} action={m.kind === "출석" ? cycleAttendance : cycleHomework} className="inline">
                     <input type="hidden" name="id" value={b.app.id} />
                     <input type="hidden" name="day" value={m.day} />
-                    <button className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200">{specialDay(m.day)} {m.kind === "출석" ? "☁️ 출석" : "⭐ 숙제"} +</button>
+                    <button className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200">{specialDay(m.day)} <Icon name={m.kind === "출석" ? "cloud" : "star"} size={14} className="mx-0.5" />{m.kind} +</button>
                   </form>
                 ))}
               </li>
@@ -78,7 +79,7 @@ export default async function GiftAdmin({ cohort, q }: { cohort: string; q: stri
         </div>
 
         <div className="rounded-2xl bg-sky-soft p-3">
-          <p className="font-jua text-lg text-sky-ink">🎁 선물 목록 <span className="text-xs font-normal text-slate-500">· 수량을 비우면 무제한 기본 선물 (수량 있는 선물이 다 떨어지면 이걸로)</span></p>
+          <p className="font-jua text-lg text-sky-ink"><Icon name="gift" size={22} className="mr-1" />선물 목록 <span className="text-xs font-normal text-slate-500">· 수량을 비우면 무제한 기본 선물 (수량 있는 선물이 다 떨어지면 이걸로)</span></p>
           <ul className="mt-2 space-y-1.5">
             {items.map((g) => (
               <li key={g.id} className="flex flex-wrap items-center gap-2 text-sm">
@@ -104,7 +105,7 @@ export default async function GiftAdmin({ cohort, q }: { cohort: string; q: stri
 
         <div className="rounded-2xl bg-white p-3 ring-1 ring-sky-main">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="font-jua text-lg text-sky-ink">🏆 당첨 명단 ({draws.length}명 · 보냄 {draws.filter((d) => d.sent_at).length})</p>
+            <p className="font-jua text-lg text-sky-ink"><Icon name="trophy" size={22} className="mr-1" />당첨 명단 ({draws.length}명 · 보냄 {draws.filter((d) => d.sent_at).length})</p>
             <form className="flex items-center gap-1.5">
               <input type="hidden" name="gc" value={cohort} />
               <input name="gq" defaultValue={q} placeholder="이름 또는 확인 코드" className="input !w-40 !py-1.5 text-sm" />
@@ -132,7 +133,7 @@ export default async function GiftAdmin({ cohort, q }: { cohort: string; q: stri
                         <td className="pr-3 font-bold text-[#e5707e]">{d.gift_name}</td>
                         <td className="pr-3 font-mono font-bold tracking-widest">{d.code}</td>
                         <td className="whitespace-nowrap pr-3 text-xs text-slate-500">{when(d.drawn_at)}</td>
-                        <td><button name="one" value={`${d.id}|${d.sent_at ? "0" : "1"}`} className={`rounded-full px-2.5 py-1 text-xs font-bold ${d.sent_at ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{d.sent_at ? "✅ 보냄" : "보냄"}</button></td>
+                        <td><button name="one" value={`${d.id}|${d.sent_at ? "0" : "1"}`} className={`rounded-full px-2.5 py-1 text-xs font-bold ${d.sent_at ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{d.sent_at ? <><Icon name="check" size={14} className="mr-0.5" />보냄</> : "보냄"}</button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -144,7 +145,7 @@ export default async function GiftAdmin({ cohort, q }: { cohort: string; q: stri
 
         <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
           <div className="flex items-center justify-between gap-2">
-            <p className="font-jua text-lg text-slate-600">⌛ 완성했지만 아직 안 뽑은 학생 ({notDrawn.length}명)</p>
+            <p className="font-jua text-lg text-slate-600"><Icon name="hourglass" size={22} className="mr-1" />완성했지만 아직 안 뽑은 학생 ({notDrawn.length}명)</p>
             <CopyText label="명단 복사" text={notDrawn.map(line).join("\n")} />
           </div>
           <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm">{notDrawn.length ? notDrawn.map((b) => <span key={b.app.id}>{who(b)}</span>) : <span className="text-slate-400">없어요</span>}</p>

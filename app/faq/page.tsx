@@ -24,7 +24,7 @@ export default async function FaqPage() {
     );
   }
   return (
-    <div className="space-y-6 pt-8">
+    <div className="stagger space-y-6 pt-8">
       <div className="text-center">
         <p className="text-xs font-bold tracking-[0.12em] text-sky-deep">FAQ</p>
         <h1 className="font-jua mt-1 text-4xl text-sky-ink">자주 묻는 질문</h1>

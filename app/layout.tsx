@@ -6,6 +6,12 @@ import "@fontsource/playfair-display/latin-700-italic.css";
 import "@fontsource/great-vibes/latin-400.css";
 import "./globals.css";
 import SiteMenu from "@/components/SiteMenu";
+import IconDefs from "@/components/IconDefs";
+import ModeSwitch from "@/components/ModeSwitch";
+import { getViewing, isAdmin } from "@/lib/auth";
+import { stopViewing } from "@/app/actions";
+import { safe } from "@/lib/safe";
+import { ensureDemo } from "@/lib/demoSeed";
 import { INSTAGRAM_URL, SITE_URL } from "@/lib/config";
 import { BRAND } from "@/lib/homeContent";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/seo";
@@ -34,10 +40,14 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#9fd8f5" };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  await safe("demo", () => ensureDemo(), undefined); // DB 없는 미리보기 + VELLA_DEMO=1 일 때만 예시 학생 (운영 DB에서는 아무것도 안 해요)
   const notice = await safeNoticeSummary(); // 공지 계산이 실패해도 페이지는 떠요
+  // 강사로 로그인했으면 [학생 | 강사] 전환 버튼, 학생 화면 미리보기 중이면 위에 띠
+  const [admin, viewing] = await Promise.all([safe("layout.isAdmin", () => isAdmin(), false), safe("layout.viewing", () => getViewing(), null)]);
   return (
     <html lang="ko">
       <body className="min-h-dvh">
+        <IconDefs />
         <header className="site-hdr print:hidden">
           <nav className="site-hdr-in">
             <Link href="/" className="wordmark" aria-label="벨라토익 첫 화면">VELLA <i>TOEIC</i></Link>
@@ -51,10 +61,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </div>
             <div className="ml-auto flex items-center gap-1.5">
               <Bell count={notice.unread} visitorKeys={notice.visitorKeys} />
-              <Link href="/class" className="hdr-class">강의실</Link>
+              {admin ? <ModeSwitch /> : <Link href="/class" className="hdr-class">강의실</Link>}
               <SiteMenu />
             </div>
           </nav>
+          {viewing && (
+            <form action={stopViewing} className="view-strip">
+              <input type="hidden" name="app_id" value={viewing.appId} />
+              <span><b>{viewing.name}</b> 학생 화면 미리보기 중 · 보기만 돼요</span>
+              <button type="submit">끝내기</button>
+            </form>
+          )}
         </header>
         <main className="mx-auto max-w-3xl px-4 pb-16">{children}</main>
         <footer className="site-foot print:hidden">

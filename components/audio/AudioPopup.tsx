@@ -1,5 +1,6 @@
 "use client";
 
+import Icon from "../Icon";
 import { useEffect, useState } from "react";
 import { popupKey, readFlag, scrollToAudio, writeFlag } from "./store";
 
@@ -17,7 +18,8 @@ export default function AudioPopup({ cohort, end }: { cohort: string; end: strin
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center" role="dialog" aria-modal="true">
       <div className="w-full max-w-md space-y-3 rounded-3xl bg-white p-6 text-center shadow-xl">
-        <p className="font-jua text-2xl text-sky-ink">🎧 LC 음원은 {m}/{d}까지 받을 수 있어요</p>
+        <Icon name="headphones" size={56} className="mx-auto mb-1 block" />
+          <p className="font-jua text-2xl text-sky-ink">LC 음원은 {m}/{d}까지 받을 수 있어요</p>
         <p className="text-slate-700">종강일이 지나면 다시 받을 수 없어요.<br />미리 전체 다운로드해 두세요!</p>
         <div className="grid grid-cols-2 gap-2 pt-1">
           <button type="button" onClick={() => close(false)} className="btn-ghost">확인했어요</button>

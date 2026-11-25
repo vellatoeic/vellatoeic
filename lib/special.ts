@@ -25,9 +25,9 @@ export function kstLabel(iso: string) {
 export function deadlineBadge(e: DeadlineEvent, nowMs = Date.now()): string | null {
   const left = Date.parse(deadlineOf(e)) - nowMs;
   if (left <= 0) return null;
-  if (left <= 3600 * 1000) return "⏰ 곧 마감";
-  if (left <= 24 * 3600 * 1000) return `⏰ 마감 D-1 · ${Math.floor(left / 3600 / 1000)}시간 남음`;
-  return `⏰ ${kstLabel(deadlineOf(e))} 마감`;
+  if (left <= 3600 * 1000) return "곧 마감";
+  if (left <= 24 * 3600 * 1000) return `마감 D-1 · ${Math.floor(left / 3600 / 1000)}시간 남음`;
+  return `${kstLabel(deadlineOf(e))} 마감`;
 }
 
 // 예: 10/17(토)

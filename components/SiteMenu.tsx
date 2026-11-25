@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
-// 머리 오른쪽 ☰ 메뉴 서랍. 첫 화면 구역 + 수강생 메뉴 + YBM 수강 신청.
+// 머리 오른쪽 메뉴 서랍. 첫 화면 구역 + 수강생 메뉴 + YBM 수강 신청.
+// 서랍은 body 바로 아래에 그려요(포털): 머리의 흐림 효과(backdrop-filter) 안에 두면
+// 아이폰 사파리 등에서 화면 전체가 아니라 머리 높이 안에 갇혀 보여요.
 const SITE: [string, string, string][] = [
   ["/#teacher", "laurel", "벨라쌤 소개"],
   ["/#project", "hourglass", "한 달 최단 프로젝트"],
@@ -51,7 +54,7 @@ export default function SiteMenu() {
       <button type="button" className="icon-btn" aria-label="메뉴 열기" aria-expanded={open} onClick={() => setOpen(true)}>
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10" /></svg>
       </button>
-      {open && (
+      {open && createPortal(
         <div className="drawer-bg" onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
           <aside className="drawer" role="dialog" aria-modal="true" aria-label="메뉴">
             <div className="dr-head">
@@ -71,7 +74,8 @@ export default function SiteMenu() {
               </a>
             </nav>
           </aside>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );

@@ -62,6 +62,7 @@ export async function clearStudent() {
   forget("student:");
   forget("apps:active");
   (await cookies()).delete("vella_student");
+  (await cookies()).delete("vella_view");
 }
 
 // ── 관리자 ─────────────────────────────────────
@@ -81,4 +82,34 @@ export async function isAdmin() {
 }
 export async function clearAdmin() {
   (await cookies()).delete("vella_admin");
+  (await cookies()).delete("vella_view");
+}
+
+// ── 강사의 '학생 화면으로 보기' (보기 전용) ──
+// 관리자가 학생 한 명을 골라 그 학생 화면(대시보드·강의실)을 그대로 봐요.
+// 이 표시가 있으면 학생 쪽 기록을 바꾸는 동작(테스트 제출·숙제 별·미션·특강 신청·교재 수령·공지 확인·선물)은 막혀요.
+export async function setViewing(appId: string, name: string) {
+  forget("student:");
+  forget("apps:active");
+  const jar = await cookies();
+  jar.set("vella_student", seal(appId), { ...cookieOpts, maxAge: 60 * 60 * 4 });
+  jar.set("vella_view", seal(`${appId}|${name}`), { ...cookieOpts, maxAge: 60 * 60 * 4 });
+}
+// 보기 전용 중이면 { appId, name }. 관리자 로그인이 풀렸으면 보기 전용도 아니에요.
+export async function getViewing(): Promise<{ appId: string; name: string } | null> {
+  const v = unseal((await cookies()).get("vella_view")?.value);
+  if (!v || !(await isAdmin())) return null;
+  const [appId, name] = v.split("|");
+  return appId ? { appId, name: name ?? "" } : null;
+}
+// 학생 쪽 기록을 바꾸는 동작 맨 앞에서 불러요: 보기 전용이면 true (아무것도 바꾸지 않아요)
+export async function isViewOnly() {
+  return !!unseal((await cookies()).get("vella_view")?.value);
+}
+export async function clearViewing() {
+  forget("student:");
+  forget("apps:active");
+  const jar = await cookies();
+  jar.delete("vella_view");
+  jar.delete("vella_student");
 }

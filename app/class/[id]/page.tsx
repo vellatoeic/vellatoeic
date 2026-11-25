@@ -21,7 +21,7 @@ export default async function Watch({ params }: { params: Promise<{ id: string }
   if (!canOpenLecture(apps.filter((a) => today <= (info.get(a.id)?.until ?? "")), lecture)) redirect("/class?expired=1");
 
   return (
-    <div className="space-y-5 pt-8">
+    <div className="stagger space-y-5 pt-8">
       <Link href="/class" className="text-sm text-sky-deep underline">← 강의실로</Link>
       <div>
         <p className="text-sm text-slate-500">

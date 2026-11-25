@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import Link from "next/link";
 import { COURSES, KINDS, TIME_SLOTS, TRACKS, cohortLabel, dayLabel, todayKST, type CourseId, type Track } from "@/lib/config";
 import { listCohortApplications, listStamps, currentCohort, isPreview, type Application, type Attendance } from "@/lib/db";
@@ -21,7 +22,7 @@ export const metadata = { title: "출결 · vella_toeic", robots: { index: false
 
 const SLOT_FILTERS = [["am", "오전반"], ["pm", "저녁반"], ["all", "전체"]] as const;
 type SlotKey = "am" | "pm" | null;
-const SLOT_NAME = (s: SlotKey) => (s === "am" ? "☀️ 오전반" : s === "pm" ? "🌙 저녁반" : "시간 미정");
+const SLOT_NAME = (s: SlotKey) => (s === "am" ? "오전반" : s === "pm" ? "저녁반" : "시간 미정");
 
 // 칸 표시: ● 출석 / ◐ 지각 / · 결석 / 빈칸 = 아직 안 온 날(오늘 이후, 오늘 아직 기록 없음)
 function mark(rec: Attendance | undefined, day: string, today: string) {
@@ -118,7 +119,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
       {/* ── 학생 검색 ── */}
       <section className="card space-y-3 !p-4">
         <form className="flex items-center gap-2">
-          <span className="font-jua text-lg text-sky-ink">🔍 학생 찾기</span>
+          <span className="inline-flex items-center gap-1 font-jua text-lg text-sky-ink"><Icon name="search" size={22} />학생 찾기</span>
           <input name="q" defaultValue={sp.q ?? ""} placeholder="이름 입력" className="input !w-44 !py-2" autoComplete="off" />
           <button className="btn !py-2 !text-sm">검색</button>
           {q && <a href="/admin/stamps" className="text-sm text-slate-400 underline">지우기</a>}
@@ -132,9 +133,9 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            {prev ? <a href={`/admin/stamps?d=${prev}&b=${current?.key ?? ""}`} className="btn-ghost !px-3 !py-2 text-sm">◀ {dayLabel(prev)}</a> : <span className="w-16" />}
+            {prev ? <a href={`/admin/stamps?d=${prev}&b=${current?.key ?? ""}`} className="btn-ghost gap-1 !px-3 !py-2 text-sm"><Icon name="chevronLeft" size={14} />{dayLabel(prev)}</a> : <span className="w-16" />}
             <h2 className="font-jua text-2xl text-sky-ink">{specialDay(d)} 수업 {d === today && <span className="text-base text-sky-deep">· 오늘</span>}</h2>
-            {next ? <a href={`/admin/stamps?d=${next}&b=${current?.key ?? ""}`} className="btn-ghost !px-3 !py-2 text-sm">{dayLabel(next)} ▶</a> : null}
+            {next ? <a href={`/admin/stamps?d=${next}&b=${current?.key ?? ""}`} className="btn-ghost gap-1 !px-3 !py-2 text-sm">{dayLabel(next)}<Icon name="chevronRight" size={14} /></a> : null}
           </div>
           {d !== allDays.filter((x) => x <= today).at(-1) && <a href="/admin/stamps" className="text-sm text-sky-deep underline">최근 수업일로</a>}
         </div>
@@ -164,11 +165,11 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
             return (
               <article key={c.key + sl} className="card space-y-3 !p-4">
                 <div className="flex items-baseline justify-between gap-2">
-                  <p className="font-jua text-lg text-sky-ink">{c.title} · {SLOT_NAME(sl)}</p>
+                  <p className="font-jua text-lg text-sky-ink">{c.title} · <Icon name={sl === "am" ? "sun" : sl === "pm" ? "moon" : "clock"} size={20} className="mr-0.5" />{SLOT_NAME(sl)}</p>
                   <p className="shrink-0 text-sm text-slate-500">{group.length}명</p>
                 </div>
                 <div>
-                  <p className="mb-1.5 text-sm font-bold text-sky-ink">☁️ 출석 {came.length} / {group.length}{came.some((a) => rec(a.id, d)?.late) ? ` · 지각 ${came.filter((a) => rec(a.id, d)?.late).length}` : ""}</p>
+                  <p className="mb-1.5 text-sm font-bold text-sky-ink"><Icon name="cloud" size={18} className="mr-1" />출석 {came.length} / {group.length}{came.some((a) => rec(a.id, d)?.late) ? ` · 지각 ${came.filter((a) => rec(a.id, d)?.late).length}` : ""}</p>
                   <div className="flex flex-wrap gap-1.5">{came.map((a) => chip(a, "in"))}</div>
                   {notYet.length > 0 && (
                     <>
@@ -178,7 +179,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
                   )}
                 </div>
                 <div className="border-t border-sky-soft pt-2">
-                  <p className="mb-1.5 text-sm font-bold text-amber-600">⭐ 숙제 {did.length} / {group.length} <span className="font-normal text-slate-400">· 이름을 누르면 ⭐ 붙이기/떼기</span></p>
+                  <p className="mb-1.5 text-sm font-bold text-amber-600"><Icon name="star" size={18} className="mr-1" />숙제 {did.length} / {group.length} <span className="font-normal text-slate-400">· 이름을 누르면 별 붙이기/떼기</span></p>
                   <div className="flex flex-wrap gap-1.5">
                     {[...did, ...notDid].map((a) => {
                       const h = hw(a.id, d);
@@ -188,7 +189,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
                           <input type="hidden" name="id" value={a.id} />
                           <input type="hidden" name="day" value={d} />
                           <button className={`rounded-full px-3 py-1.5 text-sm font-bold ${star ? "bg-amber-100 text-amber-700" : h ? "bg-amber-50 text-amber-600 ring-1 ring-amber-200" : "bg-white text-slate-400 ring-1 ring-slate-200"}`}>
-                            {star ? "⭐ " : h ? "✓ " : ""}{a.name}
+                            {star ? <Icon name="star" size={16} className="mr-0.5" /> : h ? "✓ " : ""}{a.name}
                           </button>
                         </form>
                       );
@@ -204,7 +205,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
 
       {/* ── 월간 출결표 (필요할 때만 펼쳐요) ── */}
       <details className="card !p-4">
-        <summary className="font-jua cursor-pointer text-lg text-sky-ink">📅 반별 월간 출결표 · 학생별 기록</summary>
+        <summary className="font-jua cursor-pointer text-lg text-sky-ink"><Icon name="calendar" size={24} className="mr-1" />반별 월간 출결표 · 학생별 기록</summary>
         <div className="mt-3 space-y-3">
           <div className="flex flex-wrap gap-2">
             {classTabs.map((c) => (
@@ -218,7 +219,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
             const group = current.students.filter((a) => (a.slot ?? null) === sl);
             return (
               <section key={String(sl)} className="card overflow-x-auto !p-4">
-                <h3 className="font-jua text-xl text-sky-ink">{cohortLabel(cohort)} {current.title} · {SLOT_NAME(sl)} <span className="text-sm text-slate-400">· {group.length}명 · 수업 {current.days.length}회</span></h3>
+                <h3 className="font-jua text-xl text-sky-ink">{cohortLabel(cohort)} {current.title} · <Icon name={sl === "am" ? "sun" : sl === "pm" ? "moon" : "clock"} size={20} className="mr-0.5" />{SLOT_NAME(sl)} <span className="text-sm text-slate-400">· {group.length}명 · 수업 {current.days.length}회</span></h3>
                 <p className="mt-1 text-xs text-slate-500">● 출석 · ◐ 지각 · <span className="text-red-400">·</span> 결석 · 빈칸 = 아직 안 온 날 · 칸을 누르면 출석 → 지각 → 결석 순서로 바뀌어요 · 이름을 누르면 학생별 기록</p>
                 {group.length === 0 ? <p className="mt-3 text-sm text-slate-400">학생이 없어요.</p> : (
                   <table className="mt-3 min-w-full text-center text-sm">
@@ -271,7 +272,7 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
       </details>
 
       <details className="card !p-4">
-        <summary className="font-jua cursor-pointer text-lg text-sky-ink">🧷 스티커 일괄 붙이기 (QR이 안 됐던 날)</summary>
+        <summary className="font-jua cursor-pointer text-lg text-sky-ink"><Icon name="pin" size={24} className="mr-1" />스티커 일괄 붙이기 (QR이 안 됐던 날)</summary>
       <form action={bulkStamp} className="mt-3 space-y-3">
         <div>
           <p className="font-jua text-xl text-sky-ink">스티커 일괄 붙이기</p>
@@ -303,8 +304,8 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
             </div>
             <div className="flex flex-wrap items-end gap-2">
               <label><span className="label">수업 날짜</span><input type="date" name="day" defaultValue={today} max={today} required className="input !py-2" /></label>
-              <button name="what" value="attendance" className="btn-ghost !py-2.5">선택 학생 출석 ☁️</button>
-              <button name="what" value="both" className="btn !py-2.5 !text-base">선택 학생 출석 ☁️ + 숙제 ⭐</button>
+              <button name="what" value="attendance" className="btn-ghost gap-1 !py-2.5">선택 학생 출석 <Icon name="cloud" size={18} /></button>
+              <button name="what" value="both" className="btn gap-1 !py-2.5 !text-base">선택 학생 출석 <Icon name="cloud" size={18} /> + 숙제 <Icon name="star" size={18} /></button>
             </div>
           </>
         )}
@@ -319,10 +320,10 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
       {/* ── 관리 필요 학생 (카테고리·반·시간대로 나눠 보기) ── */}
       <details id="watch" className="card !p-4" open={flagged.length > 0 && !q}>
         <summary className="font-jua cursor-pointer text-lg text-sky-ink">
-          🚨 관리 필요 학생 <span className={flagged.length ? "text-red-500" : "text-slate-400"}>{flagged.length}명</span>
+          <Icon name="siren" size={24} className="mr-1" />관리 필요 학생 <span className={flagged.length ? "text-red-500" : "text-slate-400"}>{flagged.length}명</span>
         </summary>
         <p className="mt-1 text-xs text-slate-500">결석 {WATCH_RULES.absent}회 이상 · 최근 {WATCH_RULES.streak}회 연속 결석 · 숙제 미제출 {WATCH_RULES.homework}회 이상. 오늘 수업과 아직 제출 기한이 남은 숙제는 세지 않아요. 고른 항목에서 심한 순서로 보여요.</p>
-        {flagged.length === 0 ? <p className="mt-3 text-sm text-slate-500">지금은 없어요 ☁️</p> : (
+        {flagged.length === 0 ? <p className="mt-3 text-sm text-slate-500">지금은 없어요 <Icon name="cloud" size={18} /></p> : (
           <div className="mt-3 space-y-3">
             <div className="space-y-2 text-sm">
               <div className="flex flex-wrap items-center gap-1.5">
@@ -344,9 +345,9 @@ export default async function Stamps({ searchParams }: { searchParams: Promise<{
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="w-12 shrink-0 font-bold text-slate-500">시간</span>
-                {([["all", "전체"], ["am", "☀️ 오전반"], ["pm", "🌙 저녁반"]] as const).map(([v, label]) => (
+                {([["all", "전체"], ["am", "오전반"], ["pm", "저녁반"]] as const).map(([v, label]) => (
                   <a key={v} href={wLink({ wt: v })} className={`rounded-full px-3 py-1.5 font-bold ${wt === v ? "bg-sky-deep text-white" : "bg-sky-soft text-sky-ink"}`}>
-                    {label} {flagged.filter((x) => inCat(x) && inClass(x) && inSlot(x, v)).length}
+                    {v !== "all" && <Icon name={v === "am" ? "sun" : "moon"} size={16} className="mr-0.5" />}{label} {flagged.filter((x) => inCat(x) && inClass(x) && inSlot(x, v)).length}
                   </a>
                 ))}
               </div>

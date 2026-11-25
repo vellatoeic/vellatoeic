@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import Link from "next/link";
 import { isAdmin } from "@/lib/auth";
 import { isPreview, type TestResult } from "@/lib/db";
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "오늘의 테스트 · vella_toeic", robots: { index: false } };
 
 const GROUPS: [string, string][] = [["all", "전체"], ["solve-all", "문풀 종합"], ["solve-mw", "문풀 격일 월수"], ["solve-tt", "문풀 격일 화목"], ["intensive-all", "속성반"]];
-const SLOTS: [string, string][] = [["all", "전체"], ["am", "☀️ 오전반"], ["pm", "🌙 저녁반"]];
+const SLOTS: [string, string][] = [["all", "전체"], ["am", "오전반"], ["pm", "저녁반"]];
 
 // 점수 분포: 문항 수를 5칸으로 나눠요 (예: 30문항 → 0~5, 6~11, …)
 function distribution(results: TestResult[], questions: number) {
@@ -77,7 +78,7 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
                   <td>{s.avg.word ?? "-"}{s.avg.word !== null && "%"}</td>
                   <td>{s.avg.rc ?? "-"}{s.avg.rc !== null && "%"}</td>
                   <td className={s.missing > 0 ? "font-bold text-amber-600" : ""}>{s.missing}회</td>
-                  <td>{s.declining ? <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-600">📉 연속 하락</span> : ""}</td>
+                  <td>{s.declining ? <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-600"><Icon name="chart" size={14} className="mr-1" />연속 하락</span> : ""}</td>
                 </tr>
               ))}
             </tbody>
@@ -94,7 +95,7 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
   const byClass = stats.filter((s) => g === "all" || s.klass === g); // 나란히 보기는 반만 거르고 시간대는 칸으로 나눠요
   const slotsShown: ("am" | "pm" | null)[] = ["am", "pm"];
   if (byClass.some((s) => !s.app.slot)) slotsShown.push(null); // 예전 신청 중 시간 미정이 남아 있으면 따로
-  const slotName = (sl: "am" | "pm" | null) => (sl ? (sl === "am" ? "☀️ 오전반" : "🌙 저녁반") : "시간 미정");
+  const slotName = (sl: "am" | "pm" | null) => (sl ? (sl === "am" ? "오전반" : "저녁반") : "시간 미정");
   const view = (spec: TestSpec, sl: "am" | "pm" | null) => {
     const expected = byClass.filter((s) => (s.app.slot ?? null) === sl && (classDays.get(s.klass) ?? []).includes(d));
     const results = expected
@@ -111,7 +112,7 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
     return (
       <div className="space-y-8 pt-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="font-jua text-4xl text-sky-ink">📝 {specialDay(d)} 오늘의 테스트{tv !== "1" ? ` · ${slotName(tv as "am" | "pm")}` : ""}</p>
+          <p className="font-jua text-4xl text-sky-ink"><Icon name="stopwatch" size={44} className="mr-1" />{specialDay(d)} 오늘의 테스트{tv !== "1" ? ` · ${slotName(tv as "am" | "pm")}` : ""}</p>
           <div className="flex items-center gap-3"><AutoRefresh /><Link href={link({ tv: "" })} className="text-sm text-slate-400 underline">관리 화면으로</Link></div>
         </div>
         {specs.length === 0 && <p className="font-jua text-3xl text-slate-400">오늘은 테스트가 없어요</p>}
@@ -148,12 +149,12 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           {dayNo ? <p className="text-sm text-slate-500">문풀 종합 DAY {dayNo}</p> : null}
-          <h2 className="font-jua text-2xl text-sky-ink">📝 {specialDay(d)} 오늘의 테스트</h2>
+          <h2 className="flex items-center gap-1 font-jua text-2xl text-sky-ink"><Icon name="stopwatch" size={30} />{specialDay(d)} 오늘의 테스트</h2>
         </div>
         <div className="flex flex-wrap gap-2">
           <form className="flex gap-1"><input type="date" name="d" defaultValue={d} className="input !w-auto !py-2" /><input type="hidden" name="g" value={g} /><input type="hidden" name="sort" value={sort} /><button className="btn-ghost !py-2 text-sm">날짜 보기</button></form>
-          <Link href={link({ tv: "am" })} className="btn !py-2 !text-sm">📺 오전반 수업용</Link>
-          <Link href={link({ tv: "pm" })} className="btn !py-2 !text-sm">📺 저녁반 수업용</Link>
+          <Link href={link({ tv: "am" })} className="btn gap-1 !py-2 !text-sm"><Icon name="sun" size={18} />오전반 수업용</Link>
+          <Link href={link({ tv: "pm" })} className="btn gap-1 !py-2 !text-sm"><Icon name="moon" size={18} />저녁반 수업용</Link>
           <Link href={link({ view: "students" })} className="btn-ghost !py-2 text-sm">학생별 기록</Link>
         </div>
       </div>
@@ -177,7 +178,7 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
               return (
                 <div key={String(sl)} className="space-y-4 rounded-2xl bg-sky-soft/60 p-4">
                   <div className="flex items-baseline justify-between">
-                    <p className="font-jua text-xl text-sky-ink">{slotName(sl)}</p>
+                    <p className="flex items-center gap-1 font-jua text-xl text-sky-ink"><Icon name={sl === "am" ? "sun" : sl === "pm" ? "moon" : "clock"} size={22} />{slotName(sl)}</p>
                     <p className="text-sm text-slate-500">제출 <b className="text-sky-ink">{results.length}</b>/{expected.length}명 · 평균 <b className="text-sky-ink">{results.length ? avg.toFixed(1) : "-"}</b>점</p>
                   </div>
                   <div>
@@ -213,7 +214,7 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
       ))}
 
       <section className="card space-y-2 text-sm">
-        <p className="font-jua text-lg text-sky-ink">➕ {specialDay(d)} 테스트 두 개 보는 날</p>
+        <p className="flex items-center gap-1 font-jua text-lg text-sky-ink"><Icon name="plus" size={22} />{specialDay(d)} 테스트 두 개 보는 날</p>
         <p className="text-xs text-slate-500">켜면 그날 그 테스트를 2개 보고, 다음 수업부터 번호가 하나씩 밀려요. 학생 화면에 바로 반영돼요. (미리 낸 다음 수업 테스트가 있으면 번호가 바뀌기 전에 정해 주세요)</p>
         <div className="flex flex-wrap gap-2">
           {(["word", "rc"] as const).map((kind) => {
@@ -236,7 +237,7 @@ export default async function TestsAdmin({ searchParams }: { searchParams: Promi
       </section>
 
       <details className="card">
-        <summary className="font-jua cursor-pointer text-lg text-sky-ink">✏️ 이 날짜 테스트 번호·문항 수 직접 고치기 (예외용)</summary>
+        <summary className="font-jua cursor-pointer text-lg text-sky-ink"><Icon name="edit" size={22} className="mr-1" />이 날짜 테스트 번호·문항 수 직접 고치기 (예외용)</summary>
         <div className="mt-3 space-y-3 text-sm">
           {(["word", "rc"] as const).map((kind) => {
             const auto = autoPlan.get(d)?.find((x) => x.kind === kind);
@@ -266,7 +267,7 @@ function Filters({ link, g, t }: { link: (p: Record<string, string>) => string; 
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">{GROUPS.map(([k, l]) => <Link key={k} href={link({ g: k })} className={chip(g === k)}>{l}</Link>)}</div>
-      <div className="flex flex-wrap gap-2">{SLOTS.map(([k, l]) => <Link key={k} href={link({ t: k })} className={chip(t === k)}>{l}</Link>)}</div>
+      <div className="flex flex-wrap gap-2">{SLOTS.map(([k, l]) => <Link key={k} href={link({ t: k })} className={chip(t === k)}>{k !== "all" && <Icon name={k === "am" ? "sun" : "moon"} size={16} className="mr-1" />}{l}</Link>)}</div>
     </div>
   );
 }

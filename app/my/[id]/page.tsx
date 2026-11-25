@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BOOKS, CLASSROOM, COURSES, KINDS, TRACKS, cohortLabel, pickupLabel, slotLabel, won } from "@/lib/config";
@@ -56,7 +57,7 @@ export default async function MyPage({ params, searchParams }: { params: Promise
   const done = a.status === "pending" ? 1 : a.status === "paid" && online ? 2 : 3;
 
   return (
-    <div className="space-y-6 pt-8">
+    <div className="stagger space-y-6 pt-8">
       <div className="text-center">
         <p className="mb-2 inline-block rounded-full bg-sky-deep px-5 py-1.5 font-jua text-2xl text-white">{Number(a.cohort.slice(5, 7))}월 수업</p>
         <h1 className="font-jua text-4xl text-sky-ink">
@@ -66,7 +67,7 @@ export default async function MyPage({ params, searchParams }: { params: Promise
       </div>
 
       {a.continuing && a.course === "start" && (
-        <p className="rounded-3xl border-2 border-yellow-300 bg-yellow-100 p-5 text-center font-jua text-xl leading-relaxed text-yellow-900">{BRING_BOOKS_TEXT}</p>
+        <p className="rounded-3xl border-2 border-yellow-300 bg-yellow-100 p-5 text-center font-jua text-xl leading-relaxed text-yellow-900"><Icon name="book" size={26} className="mr-1" />{BRING_BOOKS_TEXT}</p>
       )}
 
       {again && (
@@ -75,7 +76,7 @@ export default async function MyPage({ params, searchParams }: { params: Promise
 
       {a.status === "pending" && (
         <div className="rounded-3xl border-2 border-red-300 bg-red-50 p-5 text-center">
-          <p className="font-jua text-2xl text-red-600">⚠️ 신청서만 제출된 상태예요</p>
+          <p className="flex items-center justify-center gap-2 font-jua text-2xl text-red-600"><Icon name="alert" size={30} />신청서만 제출된 상태예요</p>
           <p className="mt-2 text-[15px] text-slate-700">아래 계좌로 <b>입금해야 신청이 완료</b>돼요.<br />입금이 확인되면 이 화면이 &apos;납부 확인&apos;으로 바뀌어요.</p>
         </div>
       )}
@@ -107,8 +108,8 @@ export default async function MyPage({ params, searchParams }: { params: Promise
           </p>
           {deadline && <DepositCountdown deadline={deadline} />}
           <p className="text-xs text-slate-400">입금이 확인되면 이 화면이 &apos;납부 확인&apos;으로 바뀌어요. 보통 몇 분 안에 자동 확인돼요.</p>
-          {a.pickup === "delivery" && <p className="text-xs text-slate-500">입금이 확인되면 바로 택배를 접수해요 📦</p>}
-          {lateDelivery && <p className="rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-800">{LATE_DELIVERY_TEXT}</p>}
+          {a.pickup === "delivery" && <p className="text-xs text-slate-500">입금이 확인되면 바로 택배를 접수해요 <Icon name="parcel" size={16} /></p>}
+          {lateDelivery && <p className="rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-800"><Icon name="parcel" size={18} className="mr-1" />{LATE_DELIVERY_TEXT}</p>}
         </section>
       )}
 
@@ -118,14 +119,14 @@ export default async function MyPage({ params, searchParams }: { params: Promise
             {a.pickup === "delivery"
               ? a.status === "shipped"
                 ? <>교재를 택배로 보냈어요.<br />곧 도착해요!</>
-                : <><b className="font-jua text-xl text-sky-ink">불라방 택배 접수 완료!</b><br />다다다닥 달려갑니다💨<br /><span className="text-base text-slate-500">수령일까지 평일 기준 2~3일 소요됩니다.</span></>
+                : <><b className="font-jua text-xl text-sky-ink">불라방 택배 접수 완료!</b><br />다다다닥 달려갑니다 <Icon name="parcel" size={20} /><br /><span className="text-base text-slate-500">수령일까지 평일 기준 2~3일 소요됩니다.</span></>
               : a.kind === "onsite"
                 ? <>납부가 확인됐어요.<br />첫 수업 날 {CLASSROOM}에서 교재를 일괄 지급해요.<br />수강 시간에 맞춰 등원해 주세요!</>
                 : a.status === "shipped"
                   ? "교재 수령이 확인됐어요. 수업 준비 완료!"
                   : <>납부가 확인됐어요.<br />{a.pickup_date ? <><b>{specialDay(a.pickup_date)} {a.pickup_time}</b>에 </> : ""}1층 데스크에서 교재를 받아 가세요!</>}
           </p>
-          {lateDelivery && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-800">{LATE_DELIVERY_TEXT}</p>}
+          {lateDelivery && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-800"><Icon name="parcel" size={18} className="mr-1" />{LATE_DELIVERY_TEXT}</p>}
         </section>
       )}
 

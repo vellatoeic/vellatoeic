@@ -29,16 +29,16 @@ export function specialDeadlineNotices(events: Ev[], apps: App[], regs: Reg[], n
       const today = new Date(nowMs + 9 * 3600 * 1000).toISOString().slice(0, 10);
       return {
         id: `${SPECIAL_POPUP_PREFIX}${e.id}`,
-        title: `🎤 ${specialDay(e.event_date)} 특강 · ${deadline} 신청 마감!`,
+        title: `${specialDay(e.event_date)} 특강 · ${deadline} 신청 마감!`,
         to_label: "특강 신청 안내",
         lead: `특강 신청이 **${deadline}에 마감**돼요. 아직 신청 안 했다면 지금 신청해 주세요 :)`,
         sections: [
-          { icon: "⏰", title: "신청 마감", body: `**${deadline}까지**` },
-          { icon: "🏫", title: "현장 참여", body: `신청 후 **30분 안에 보증금 1만 원**을 입금하면 확정돼요. 참석하면 현장에서 100% 돌려드려요. 당일 **10시까지 필기구를 챙겨 ${CLASSROOM}**로 와 주세요.` },
-          { icon: "💻", title: "불라방 참여", body: "신청하면 바로 확정돼요. 특강 페이지에 자료와 유튜브 링크가 올라와요." },
-          { icon: "✅", title: "확정 확인", body: "특강 페이지 아래 **'내 특강 신청'**에서 확인할 수 있어요." },
+          { icon: "clock", title: "신청 마감", body: `**${deadline}까지**` },
+          { icon: "school", title: "현장 참여", body: `신청 후 **30분 안에 보증금 1만 원**을 입금하면 확정돼요. 참석하면 현장에서 100% 돌려드려요. 당일 **10시까지 필기구를 챙겨 ${CLASSROOM}**로 와 주세요.` },
+          { icon: "laptop", title: "불라방 참여", body: "신청하면 바로 확정돼요. 특강 페이지에 자료와 유튜브 링크가 올라와요." },
+          { icon: "check", title: "확정 확인", body: "특강 페이지 아래 **'내 특강 신청'**에서 확인할 수 있어요." },
         ],
-        link_label: "🎤 특강 신청하러 가기",
+        link_label: "특강 신청하러 가기",
         link_url: "/special",
         targets: [],
         starts_on: today,

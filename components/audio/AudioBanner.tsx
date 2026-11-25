@@ -1,5 +1,6 @@
 "use client";
 
+import Icon from "../Icon";
 import { useEffect, useState } from "react";
 import { AUDIO_EVENT, readDone, readGot, scrollToAudio, writeDone } from "./store";
 
@@ -25,7 +26,7 @@ export default function AudioBanner({ cohort, ids, end, left, today }: { cohort:
   const tone = all ? "border-emerald-300 bg-emerald-50 text-emerald-700" : left <= 3 ? "border-red-300 bg-red-50 text-red-600" : "border-amber-300 bg-amber-50 text-amber-800";
   return (
     <button type="button" onClick={scrollToAudio} className={`block w-full rounded-2xl border-2 px-4 py-3 text-left font-jua text-lg ${tone}`}>
-      {all ? "✅ LC 음원 다 받았어요" : `🎧 LC 음원 ${left === 0 ? "D-DAY" : `D-${left}`} · ${m}/${d}까지 · ${ids.length}개 중 ${got}개 받음`}
+      <span className="inline-flex items-center gap-1.5"><Icon name={all ? "check" : "headphones"} size={22} />{all ? "LC 음원 다 받았어요" : `LC 음원 ${left === 0 ? "D-DAY" : `D-${left}`} · ${m}/${d}까지 · ${ids.length}개 중 ${got}개 받음`}</span>
       {!all && <span className="float-right text-sm">받으러 가기 ↓</span>}
     </button>
   );

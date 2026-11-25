@@ -1,22 +1,21 @@
 import "server-only";
-import { getSetting, listCohortApplications, listTestDoubles, listTestOverrides, listTestResults, type Application, type TestResult } from "./db";
+import { listCohortApplications, listTestDoubles, listTestOverrides, listTestResults, type Application, type TestResult } from "./db";
 import { canWatch } from "./access";
-import { scheduleClassFor, scheduleKey, schoolDaysFor, type ScheduleClass } from "./schedule";
+import { scheduleClassFor, type ScheduleClass } from "./schedule";
+import { classDaysOf as calendarDays, scheduleDays } from "./classCalendar";
 import { earlyTestDay, testPlan, testsForClassDay, type TestSpec } from "./tests";
 import { studentDays } from "./studentDays";
 
 // 문풀반·속성반(속성반도 문풀반 수업을 들어요) 납부 완료 학생만 테스트를 봐요. 시작반은 X
 export const takesTests = (a: Application) => canWatch(a) && (a.course === "solve" || a.course === "intensive");
 
-export async function classDaysOf(a: Application) {
-  const klass = scheduleClassFor(a.course, a.track);
-  return schoolDaysFor(await getSetting(scheduleKey(a.cohort, klass)), a.cohort, klass);
-}
+// 학생 반 수업일 (공휴일 제외, lib/classCalendar 한곳)
+export const classDaysOf = (a: Application) => calendarDays(a);
 
 // 그 달 문풀반 종합 수업일 + 관리자 수정 → 날짜별 테스트
 export async function planFor(cohort: string) {
-  const [raw, overrides, doubles] = await Promise.all([getSetting(scheduleKey(cohort, "solve-all")), listTestOverrides(cohort), listTestDoubles(cohort)]);
-  const solveAllDays = schoolDaysFor(raw, cohort, "solve-all");
+  // DAY 번호 = 문풀반 종합 수업일 순서 (공휴일은 빼요 → 공휴일에 테스트가 잡히거나 번호가 밀리지 않아요)
+  const [solveAllDays, overrides, doubles] = await Promise.all([scheduleDays(cohort, "solve-all"), listTestOverrides(cohort), listTestDoubles(cohort)]);
   return { plan: testPlan(cohort, solveAllDays, overrides, doubles), solveAllDays, overrides, doubles };
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Icon from "@/components/Icon";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
@@ -31,7 +32,7 @@ export default function AutoRefresh({ seconds = 30 }: { seconds?: number }) {
   };
   return (
     <div className="print:hidden flex flex-wrap items-center gap-2 text-sm">
-      <button type="button" onClick={refresh} disabled={pending} className="btn !py-2 !text-sm">{pending ? "불러오는 중…" : "🔄 새로고침"}</button>
+      <button type="button" onClick={refresh} disabled={pending} className="btn !py-2 !text-sm">{pending ? "불러오는 중…" : <span className="inline-flex items-center gap-1"><Icon name="refresh" size={18} />새로고침</span>}</button>
       <button type="button" onClick={toggle} className={`rounded-full px-3 py-1.5 font-bold ${on ? "bg-sky-deep text-white" : "bg-white text-sky-ink ring-1 ring-sky-main"}`}>
         자동 새로고침 {on ? `켜짐 (${seconds}초마다)` : "꺼짐"}
       </button>

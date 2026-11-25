@@ -1,8 +1,8 @@
 import "server-only";
 import { todayKST } from "./config";
-import { getSetting, type Application } from "./db";
-import { classDaysOf, holidaysOf } from "./classCalendar";
-import { SCHEDULE_CLASSES, scheduleKey, schoolDaysFor, type ScheduleClass } from "./schedule";
+import type { Application } from "./db";
+import { classDaysOf, holidaysOf, scheduleDays } from "./classCalendar";
+import { SCHEDULE_CLASSES, type ScheduleClass } from "./schedule";
 
 // ── 수업 기수 (날짜 기준) ──
 // '현재 모집 기수(current_cohort)'는 새 신청 저장·입금 대기·관리자 기본 기수에만 써요.
@@ -45,7 +45,7 @@ export async function classCohortNow(today = todayKST()): Promise<string> {
   const candidates = [shiftMonth(month, -1), month, shiftMonth(month, 1)];
   const windows = await Promise.all(candidates.map(async (cohort) => {
     const all = (await Promise.all((Object.keys(SCHEDULE_CLASSES) as ScheduleClass[]).map(async (k) =>
-      schoolDaysFor(await getSetting(scheduleKey(cohort, k)), cohort, k)))).flat().sort();
+      scheduleDays(cohort, k)))).flat().sort(); // 공휴일 제외
     return { cohort, start: all[0] ?? "", end: all.at(-1) ?? "" };
   }));
   return pickCohort(windows, today) ?? month;

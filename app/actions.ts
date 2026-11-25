@@ -15,6 +15,8 @@ import { canWatch, isActive, loginApps } from "@/lib/access";
 import { parseBankSms } from "@/lib/bankSms";
 import { checkTestAnswer, earlyTestDay, testsForClassDay, type TestKind } from "@/lib/tests";
 import { classDaysOf, planFor, takesTests } from "@/lib/dailyTests";
+import { classDaysOf as calendarDaysOf } from "@/lib/classCalendar";
+import { currentClassApp } from "@/lib/dashboard";
 import { noticeIdentity } from "@/lib/noticeView";
 import type { NoticeSection, NoticeTarget } from "@/lib/notices";
 import { activeStudentApps } from "@/lib/student";
@@ -37,9 +39,13 @@ import { adjustedBooks } from "@/lib/manualLink";
 import { safe } from "@/lib/safe";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
+  isViewOnly, setViewing, clearViewing,
 } from "@/lib/auth";
 
 export type FormState = { error?: string; ok?: string };
+
+// 강사가 '학생 화면으로 보기' 중일 때 학생 쪽 기록을 바꾸려 하면 보여요
+const VIEW_ONLY = "학생 화면 미리보기 중이라 저장하지 않았어요 (보기 전용)";
 
 const clean = (v: FormDataEntryValue | null) => String(v ?? "").trim().slice(0, 200);
 const largeField = (fd: FormData, key: string) => String(fd.get(key) ?? "").trim().slice(0, 6000);
@@ -175,12 +181,32 @@ export async function studentLogin(_: FormState, fd: FormData): Promise<FormStat
   }
   await setStudent(result.apps.map((a) => a.id));
   const next = clean(fd.get("next"));
-  redirect(next === "/check" || next.startsWith("/check?") || next === "/class" || next === "/mission" || next === "/faq" ? next : "/class");
+  if (next === "/check" || next.startsWith("/check?") || next === "/class" || next === "/mission" || next === "/faq") redirect(next);
+  // 이번 달 수강생이면 첫 화면(학생 대시보드)으로, 아니면 강의실로
+  const current = await safe("login.current", () => currentClassApp(result.apps!), null);
+  redirect(current ? "/" : "/class");
 }
 
 export async function studentLogout() {
   await clearStudent();
   redirect("/class");
+}
+
+// ── 강사 ↔ 학생 화면 ───────────────────────────
+// 학생 통합 화면 [이 학생 화면으로 보기]: 그 학생 화면을 보기 전용으로 열어요 (4시간 뒤 자동으로 풀려요)
+export async function viewAsStudent(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const id = clean(fd.get("app_id"));
+  const [app] = await getApplications([id]);
+  if (!app) return;
+  await setViewing(app.id, app.name);
+  redirect("/");
+}
+// 보기 전용 끝내기 → 그 학생 통합 화면으로 돌아가요
+export async function stopViewing(fd: FormData) {
+  const id = clean(fd.get("app_id"));
+  await clearViewing();
+  redirect(id && (await isAdmin()) ? `/admin/students/${id}` : "/admin");
 }
 
 // ── 관리자 ─────────────────────────────────────
@@ -508,6 +534,7 @@ export async function confirmYbmPayments(fd: FormData) {
 // ── 공지 ───────────────────────────────────────
 // 학생: [확인했어요] → 이번 기수 본인 신청 모두에 확인 기록 (다시 안 떠요)
 export async function readNotice(fd: FormData) {
+  if (await isViewOnly()) return; // 강사 학생 화면 미리보기: 기록을 바꾸지 않아요
   const { apps } = await noticeIdentity();
   await markNoticeRead(clean(fd.get("id")), apps.map((a) => ({ id: a.id, cohort: a.cohort })));
   revalidatePath("/", "layout");
@@ -522,7 +549,7 @@ export async function saveNoticeAction(fd: FormData) {
   const parse = <T,>(k: string): T[] => { try { const v = JSON.parse(String(fd.get(k) ?? "[]")); return Array.isArray(v) ? v : []; } catch { return []; } };
   const text = (v: unknown, n: number) => String(v ?? "").trim().slice(0, n);
   const sections: NoticeSection[] = parse<NoticeSection>("sections_json")
-    .map((x) => ({ icon: text(x.icon, 8) || "📌", title: text(x.title, 60), body: text(x.body, 1000), gray: !!x.gray }))
+    .map((x) => ({ icon: text(x.icon, 20) || "pin", title: text(x.title, 60), body: text(x.body, 1000), gray: !!x.gray })) // 아이콘은 이름(components/Icon)으로 저장
     .filter((x) => x.title || x.body)
     .slice(0, 12);
   const pick = <T extends string>(arr: unknown, allowed: readonly T[]) => (Array.isArray(arr) ? arr.filter((v): v is T => allowed.includes(v as T)) : []);
@@ -571,6 +598,7 @@ export async function deleteNoticeAction(fd: FormData) {
 // ── 문풀반 데일리 테스트 ───────────────────────
 // 학생: 결과 입력. 그날 23:59까지는 제출·수정, 같은 달 지난 테스트는 '밀린 테스트'로 한 번 제출. (늦게 낸 것은 저장만 하고 화면에 표시하지 않아요)
 export async function submitTestResult(_: FormState, fd: FormData): Promise<FormState> {
+  if (await isViewOnly()) return { error: VIEW_ONLY };
   const appId = clean(fd.get("app_id"));
   const day = clean(fd.get("day"));
   const kind = clean(fd.get("kind")) as TestKind;
@@ -724,7 +752,7 @@ export async function promoteQuestion(fd: FormData) {
   const q = await getQuestion(clean(fd.get("id")));
   if (!q) return;
   const last = (await listFaq()).reduce((m, f) => Math.max(m, f.sort_order), 0);
-  await createFaq({ category: "💬 기타", question: q.content.slice(0, 200), answer: "", published: false, sort_order: last + 10 });
+  await createFaq({ category: "기타", question: q.content.slice(0, 200), answer: "", published: false, sort_order: last + 10 });
   await updateQuestion(q.id, { checked: true });
   revalidatePath("/admin/faq");
 }
@@ -739,6 +767,7 @@ function missionBase(mission: Mission | null) {
 }
 
 export async function saveMissionIntro(_: FormState, fd: FormData): Promise<FormState> {
+  if (await isViewOnly()) return { error: VIEW_ONLY };
   const current = await studentMission();
   if (!current) return { error: "강의실에 로그인해 주세요." };
   const short = (k: string) => clean(fd.get(k)).slice(0, 40);
@@ -764,6 +793,7 @@ export async function saveMissionIntro(_: FormState, fd: FormData): Promise<Form
 }
 
 export async function markMission(fd: FormData) {
+  if (await isViewOnly()) return;
   const step = clean(fd.get("step")) as MissionStep;
   if (!MISSION_STEPS.includes(step) || step === "intro_at") return;
   const current = await studentMission();
@@ -779,6 +809,7 @@ const validTime = (v: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
 const validDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 export async function registerSpecialLecture(_: FormState, fd: FormData): Promise<FormState> {
+  if (await isViewOnly()) return { error: VIEW_ONLY };
   const eventId = clean(fd.get("event_id"));
   const mode = clean(fd.get("mode"));
   const name = clean(fd.get("name"));
@@ -933,6 +964,7 @@ export async function resolveBookDepositEvent(fd: FormData) {
 
 // 학생이 1층 데스크에서 교재를 받고 직접 '받았어요'를 눌러요. (본인 신청 · 불라방 데스크 수령 · 납부 완료만)
 export async function confirmBookReceived(fd: FormData) {
+  if (await isViewOnly()) return;
   const id = clean(fd.get("id"));
   const { apps } = await activeStudentApps();
   const app = apps.find((a) => a.id === id);
@@ -1054,30 +1086,28 @@ export async function removeApplication(fd: FormData) {
 
 // ── 숙제 스티커 ────────────────────────────────
 export async function markHomeworkDone(fd: FormData) {
+  if (await isViewOnly()) return;
   const id = clean(fd.get("app_id"));
   const day = clean(fd.get("day"));
   const ids = await getStudentIds();
   if (!ids.includes(id) || !/^\d{4}-\d{2}-\d{2}$/.test(day) || day > todayKST()) return;
   const [app] = await getApplications([id]);
   if (!app || !canWatch(app)) return;
-  const klass = scheduleClassFor(app.course, app.track);
-  const rawDays = await getSetting(scheduleKey(app.cohort, klass));
-  const savedDays = schoolDaysFor(rawDays, app.cohort, klass);
+  const savedDays = await calendarDaysOf(app); // 공휴일 제외 (lib/classCalendar 한곳)
   if (!homeworkAssignmentDays(savedDays).includes(day)) return;
   await addHomeworkSticker(app.id, day);
   revalidatePath("/class");
 }
 
 export async function cancelMyHomeworkDone(fd: FormData) {
+  if (await isViewOnly()) return;
   const id = clean(fd.get("app_id"));
   const day = clean(fd.get("day"));
   const ids = await getStudentIds();
   if (!ids.includes(id) || !/^\d{4}-\d{2}-\d{2}$/.test(day) || day > todayKST()) return;
   const [app] = await getApplications([id]);
   if (!app || !canWatch(app)) return;
-  const klass = scheduleClassFor(app.course, app.track);
-  const rawDays = await getSetting(scheduleKey(app.cohort, klass));
-  const savedDays = schoolDaysFor(rawDays, app.cohort, klass);
+  const savedDays = await calendarDaysOf(app); // 공휴일 제외 (lib/classCalendar 한곳)
   if (!homeworkAssignmentDays(savedDays).includes(day)) return;
   await deleteHomeworkSticker(app.id, day);
   revalidatePath("/class");
@@ -1222,6 +1252,7 @@ export async function bulkChangeClass(fd: FormData) {
 // 학생: 🎁 선물 뽑기. 수업 기수 신청 중 선물 대상(격일반 제외)이고 스티커판 완성, 마지막 수업일 당일만.
 // 학생 1명(같은 로그인)당 기수마다 1번. 이미 뽑았으면 같은 결과를 돌려줘요.
 export async function drawMyGift(): Promise<{ draw?: GiftDraw; error?: string }> {
+  if (await isViewOnly()) return { error: VIEW_ONLY };
   const { apps } = await activeStudentApps();
   const { cohort, apps: mine } = await classAppsFor(apps.filter(canWatch));
   if (!cohort || mine.length === 0) return { error: "강의실에 로그인해 주세요." };
