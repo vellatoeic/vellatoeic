@@ -1,10 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
-import Cloud from "@/components/Cloud";
-import "@fontsource/jua";
-import "@fontsource/gowun-dodum";
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+import "@fontsource/playfair-display/latin-600.css";
+import "@fontsource/playfair-display/latin-700-italic.css";
+import "@fontsource/great-vibes/latin-400.css";
 import "./globals.css";
+import SiteMenu from "@/components/SiteMenu";
 import { INSTAGRAM_URL, SITE_URL } from "@/lib/config";
+import { BRAND } from "@/lib/homeContent";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/seo";
 import Bell from "@/components/notices/Bell";
 import { safeNoticeSummary } from "@/lib/noticeView";
@@ -35,29 +38,34 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="ko">
       <body className="min-h-dvh">
-        <header className="print:hidden sticky top-0 z-10 border-b border-sky-main/40 bg-sky-soft/90 backdrop-blur">
-          <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 lg:px-8">
-            <Link href="/" className="font-jua leading-tight text-sky-ink">
-              <span className="block text-xs text-sky-ink/60">토익의 시작</span>
-              <span className="flex items-center gap-1.5 text-2xl">
-                vella_toeic
-                <Cloud className="cloud-a h-6 w-auto fill-sky-main drop-shadow-[0_1px_0_rgba(43,143,199,0.25)]" />
-              </span>
-            </Link>
-            <div className="flex items-center gap-2">
+        <header className="site-hdr print:hidden">
+          <nav className="site-hdr-in">
+            <Link href="/" className="wordmark" aria-label="벨라토익 첫 화면">VELLA <i>TOEIC</i></Link>
+            <div className="site-hdr-nav" aria-label="첫 화면 바로가기">
+              <Link href="/#teacher">벨라쌤 소개</Link>
+              <Link href="/#project">최단 프로젝트</Link>
+              <Link href="/#finder">반 찾기</Link>
+              <Link href="/#proof">성적 인증</Link>
+              <Link href="/#courses">강좌</Link>
+              <Link href="/faq">FAQ</Link>
+            </div>
+            <div className="ml-auto flex items-center gap-1.5">
               <Bell count={notice.unread} visitorKeys={notice.visitorKeys} />
-              <Link href="/class" className="rounded-full bg-sky-main px-3 py-2 text-sm font-bold text-sky-ink">
-                강의실
-              </Link>
+              <Link href="/class" className="hdr-class">강의실</Link>
+              <SiteMenu />
             </div>
           </nav>
         </header>
         <main className="mx-auto max-w-3xl px-4 pb-16">{children}</main>
-        <footer className="print:hidden mx-auto max-w-3xl px-4 pb-10 text-center text-sm text-sky-ink/60">
-          <a href={INSTAGRAM_URL} target="_blank" rel="noreferrer" className="underline">
-            @vella_toeic
-          </a>
-          <span className="mx-2">·</span>부산 서면
+        <footer className="site-foot print:hidden">
+          <p className="wordmark">VELLA <i>TOEIC</i></p>
+          <p>{BRAND.center} · 벨라토익 · 문의 {BRAND.phone}</p>
+          <p>
+            <a href={INSTAGRAM_URL} target="_blank" rel="noreferrer" className="underline">@vella_toeic</a>
+            <span className="mx-2">·</span>
+            <a href={BRAND.youtubeUrl} target="_blank" rel="noreferrer" className="underline">유튜브 벨라토익</a>
+            <span className="mx-2">·</span>부산 서면
+          </p>
         </footer>
       </body>
     </html>

@@ -1,5 +1,6 @@
 import { listFaq } from "@/lib/db";
 import { pageMeta } from "@/lib/seo";
+import FaqList from "@/components/FaqList";
 
 export const dynamic = "force-dynamic";
 export const metadata = pageMeta("자주 묻는 질문 | 부산 서면 토익 벨라토익", "부산 서면 토익 벨라토익 자주 묻는 질문. 교재비 납부, 교재 수령, 강의실·라이브, 출석·숙제, 특강 안내를 모았어요.", "/faq");
@@ -22,40 +23,13 @@ export default async function FaqPage() {
       </div>
     );
   }
-  const published = items.filter((f) => f.published);
-  // 카테고리는 맨 앞 항목 순서대로 보여줘요.
-  const categories = [...new Set(published.map((f) => f.category))];
-
   return (
     <div className="space-y-6 pt-8">
       <div className="text-center">
-        <h1 className="font-jua text-4xl text-sky-ink">자주 묻는 질문</h1>
+        <p className="text-xs font-bold tracking-[0.12em] text-sky-deep">FAQ</p>
+        <h1 className="font-jua mt-1 text-4xl text-sky-ink">자주 묻는 질문</h1>
       </div>
-
-      {categories.length === 0 && <p className="card text-center text-slate-500">아직 등록된 질문이 없어요.</p>}
-
-      {/* 큰 제목(카테고리)마다 접어 두고, 누르면 그 안의 질문이 보여요. */}
-      {categories.map((c) => (
-        <details key={c} className="group/cat rounded-3xl bg-sky-main/30 p-2">
-          <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5">
-            <span className="font-jua text-xl text-sky-ink">{c}</span>
-            <span className="text-sky-deep transition group-open/cat:rotate-90">›</span>
-          </summary>
-          <div className="mt-1 space-y-2">
-          {published.filter((f) => f.category === c).map((f) => (
-            <details key={f.id} className="group rounded-2xl bg-white shadow-[0_2px_0_#d5ecf9]">
-              <summary className="flex cursor-pointer list-none items-start gap-2 px-4 py-3.5">
-                <span className="font-jua text-sky-deep">Q.</span>
-                <span className="flex-1 text-[15px] font-bold text-slate-800">{f.question}</span>
-                <span className="text-sky-main transition group-open:rotate-90">›</span>
-              </summary>
-              <p className="whitespace-pre-line border-t border-sky-soft px-4 py-3 text-[15px] leading-relaxed text-slate-700">{f.answer}</p>
-            </details>
-          ))}
-          </div>
-        </details>
-      ))}
-
+      <FaqList items={items} />
     </div>
   );
 }

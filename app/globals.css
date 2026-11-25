@@ -5,22 +5,66 @@
   --color-sky-main: #9fd8f5;   /* 대표 연하늘 */
   --color-sky-deep: #2b8fc7;   /* 버튼·강조 */
   --color-sky-ink: #12405c;    /* 제목 글자 */
-  --font-jua: "Jua", "Gowun Dodum", sans-serif;
-  --font-body: "Gowun Dodum", "Apple SD Gothic Neo", sans-serif;
+  /* 글꼴 (2026-11 새 디자인): 본문·제목·숫자 Pretendard, 로고 영문 Playfair Display, 서명 Great Vibes.
+     예전 이름 font-jua는 '굵은 제목 글씨'라는 뜻으로 그대로 써요 (이제 Pretendard). */
+  --font-jua: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --font-body: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
 }
 
-html { background: var(--color-sky-soft); }
-body { font-family: var(--font-body); color: #1f2d3a; -webkit-font-smoothing: antialiased; word-break: keep-all; }
-.font-jua { font-family: var(--font-jua); letter-spacing: -0.01em; }
+/* 테마 밖 변수 (Tailwind가 지우지 않게 일반 CSS 변수로) */
+:root {
+  --color-sky-muted: #5d7f95; /* 흐린 글씨 (새 디자인) */
+  --font-serif: "Playfair Display", "Times New Roman", serif;
+  --font-script: "Great Vibes", cursive;
+}
 
-.card { @apply rounded-3xl bg-white p-6 shadow-[0_4px_24px_rgba(43,143,199,0.10)]; }
-.btn { @apply inline-flex items-center justify-center rounded-2xl bg-sky-deep px-6 py-4 text-lg font-bold text-white transition hover:brightness-110 active:scale-[0.98] disabled:opacity-40; }
-.btn-ghost { @apply inline-flex items-center justify-center rounded-2xl border-2 border-sky-main bg-white px-5 py-3 font-bold text-sky-ink transition hover:bg-sky-soft; }
+html { background: var(--color-sky-soft); scroll-padding-top: 76px; }
+body { font-family: var(--font-body); color: #1f2d3a; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-x: clip; }
+.font-jua { font-family: var(--font-jua); font-weight: 800; letter-spacing: -0.02em; }
+
+/* 카드·버튼 (새 디자인: 흰 카드 + 옅은 그림자, 진한 하늘 그라데이션 버튼 + 아래 그림자) */
+.card { @apply rounded-[20px] border border-sky-deep/10 bg-white p-6 shadow-[0_6px_22px_rgba(18,64,92,0.08)]; }
+.btn { @apply inline-flex items-center justify-center rounded-full bg-sky-deep px-6 py-4 text-lg font-bold text-white transition disabled:opacity-40; background-image: linear-gradient(135deg, #4fb3e8, #2b8fc7 60%, #1f78ad); box-shadow: 0 4px 0 #1f6f9e, 0 8px 20px rgba(43, 143, 199, 0.25); }
+.btn:hover { box-shadow: 0 4px 0 #1f6f9e, 0 10px 26px rgba(43, 143, 199, 0.38); }
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #1f6f9e; }
+.btn-ghost { @apply inline-flex items-center justify-center rounded-full border border-sky-deep/35 bg-white px-5 py-3 font-bold text-sky-ink transition hover:border-sky-deep hover:bg-sky-soft; }
 .input { @apply w-full rounded-2xl border-2 border-sky-main/60 bg-white px-4 py-3 text-base outline-none focus:border-sky-deep; }
 .label { @apply mb-2 block font-bold text-sky-ink; }
 
-/* 둥근 글꼴: 굵은 글씨는 모두 Jua로 */
-b, strong, .font-bold, .btn, .btn-ghost, .label { font-family: var(--font-jua); font-weight: 400; }
+/* 굵은 글씨는 Pretendard 굵게 */
+b, strong, .font-bold, .btn, .btn-ghost, .label { font-family: var(--font-jua); font-weight: 700; }
+
+/* ── 머리 (로고 VELLA TOEIC · 🔔 · 강의실 · ☰) ── */
+.wordmark { font-family: var(--font-serif); font-weight: 600; font-size: 1.2rem; letter-spacing: 0.06em; color: var(--color-sky-ink); white-space: nowrap; display: inline-flex; align-items: center; }
+.wordmark i { font-weight: 700; color: var(--color-sky-deep); margin-left: 6px; }
+.site-hdr { position: sticky; top: 0; z-index: 20; background: rgba(234, 246, 253, 0.88); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid rgba(43, 143, 199, 0.14); }
+.site-hdr-in { max-width: 72rem; margin: 0 auto; height: 60px; padding: 0 8px 0 16px; display: flex; align-items: center; gap: 12px; }
+.site-hdr-nav { display: none; flex: 1; justify-content: center; gap: 2px; }
+.site-hdr-nav a { padding: 8px 12px; border-radius: 99px; color: var(--color-sky-muted); font-size: 0.9rem; font-weight: 600; white-space: nowrap; }
+.site-hdr-nav a:hover { color: var(--color-sky-ink); background: rgba(43, 143, 199, 0.14); }
+@media (min-width: 1024px) { .site-hdr-nav { display: flex; } }
+.hdr-class { display: inline-flex; align-items: center; min-height: 38px; padding: 0 14px; border-radius: 99px; border: 1px solid rgba(43, 143, 199, 0.34); background: #fff; color: var(--color-sky-ink); font-size: 0.88rem; font-weight: 700; }
+.hdr-class:hover { border-color: var(--color-sky-deep); }
+.icon-btn { width: 44px; height: 44px; display: inline-grid; place-items: center; border-radius: 12px; color: var(--color-sky-ink); }
+.icon-btn:hover { background: rgba(18, 64, 92, 0.06); }
+
+/* ── 메뉴 서랍 ── */
+.drawer-bg { position: fixed; inset: 0; z-index: 60; background: rgba(18, 64, 92, 0.32); backdrop-filter: blur(2px); animation: fadein 0.2s both; }
+.drawer { position: absolute; top: 0; right: 0; bottom: 0; width: min(86vw, 340px); background: #fff; display: flex; flex-direction: column; box-shadow: -20px 0 50px rgba(18, 64, 92, 0.18); animation: drawer-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.dr-head { display: flex; align-items: center; justify-content: space-between; height: 60px; padding: 0 8px 0 18px; border-bottom: 1px solid rgba(43, 143, 199, 0.14); }
+.dr-body { flex: 1; overflow-y: auto; padding: 8px 10px 24px; }
+.dr-label { margin: 14px 10px 6px; font-size: 0.74rem; font-weight: 800; letter-spacing: 0.08em; color: var(--color-sky-muted); }
+.dr-item { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 10px; border-radius: 12px; font-weight: 700; color: var(--color-sky-ink); }
+.dr-item img { width: 30px; height: 30px; object-fit: contain; flex: none; }
+.dr-item:hover, .dr-item[aria-current="true"] { background: #e6f5fe; }
+@keyframes fadein { from { opacity: 0; } }
+@keyframes drawer-in { from { transform: translateX(100%); } }
+
+/* ── 바닥글 ── */
+.site-foot { max-width: 48rem; margin: 0 auto; padding: 28px 16px 40px; border-top: 1px solid rgba(43, 143, 199, 0.14); text-align: center; font-size: 0.85rem; color: var(--color-sky-muted); display: grid; gap: 6px; }
+.site-foot .wordmark { justify-content: center; font-size: 1.3rem; }
+
+@media (prefers-reduced-motion: reduce) { .drawer-bg, .drawer { animation: none; } }
 
 /* 구름이 천천히 떠다니는 효과 */
 @keyframes drift { 0%,100% { transform: translateX(0); } 50% { transform: translateX(14px); } }

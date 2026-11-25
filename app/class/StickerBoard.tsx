@@ -6,6 +6,9 @@ import { homeworkAssignmentDays, isHomeworkStickerEligible, weekDaysInMonth, typ
 import Cloud from "@/components/Cloud";
 import { boardStatus } from "@/lib/stickerComplete";
 
+// 스티커판 이미지 저장 글꼴 (사이트 글꼴과 같은 Pretendard, 2026-11 새 디자인)
+const CANVAS_FONT = "'Pretendard Variable', Pretendard, sans-serif";
+
 type StampAttendance = { day: string };
 
 export default function StickerBoard({
@@ -128,6 +131,9 @@ export default function StickerBoard({
 
   const downloadBoard = async () => {
     await document.fonts.ready;
+    // 저장 이미지 글꼴(Pretendard)은 글자 묶음별로 나눠 받아요 → 그릴 글자를 미리 불러와요 (실패해도 기본 글꼴로 저장)
+    const canvasText = [`${firstName}의 ${monthName} 스티커판`, classSummary, displayClass, ...Object.values(holidays), "0123456789 출석 숙제 강의 완주 토익의 시작 @vella_toeic"].join(" ");
+    await Promise.all([document.fonts.load(`800 40px ${CANVAS_FONT}`, canvasText), document.fonts.load(`500 34px ${CANVAS_FONT}`, classSummary)]).catch(() => undefined);
     const canvas = document.createElement("canvas");
     canvas.width = 1080;
     canvas.height = 1920;
@@ -151,10 +157,10 @@ export default function StickerBoard({
     drawStoryCloud(ctx, 800, 1500, 135, "rgba(255,255,255,.7)");
     ctx.textAlign = "center";
     ctx.fillStyle = "#1f5a80";
-    ctx.font = "72px Jua, sans-serif";
+    ctx.font = `800 72px ${CANVAS_FONT}`;
     ctx.fillText(`${firstName}의 ${monthName} 스티커판`, 540, 210);
     ctx.fillStyle = "#5b88a6";
-    ctx.font = "34px 'Gowun Dodum', sans-serif";
+    ctx.font = `500 34px ${CANVAS_FONT}`;
     ctx.fillText(classSummary, 540, 275);
 
     const cols = 5;
@@ -176,7 +182,7 @@ export default function StickerBoard({
       ctx.fillStyle = isLesson ? "#fff" : "#f4fbff";
       roundRect(ctx, x, y, cellWidth, cellHeight, 26, ctx.fillStyle, isLesson ? "#c9e4f5" : "transparent", 2, isLesson ? [10, 8] : []);
       ctx.textAlign = "center";
-      ctx.font = "36px Jua, sans-serif";
+      ctx.font = `800 36px ${CANVAS_FONT}`;
       ctx.fillStyle = isHoliday ? "#e5707e" : isLesson ? "#5b88a6" : "#c6dceb";
       ctx.fillText(String(Number(day.slice(-2))), x + cellWidth / 2, y + 51);
       if (isLesson) {
@@ -187,7 +193,7 @@ export default function StickerBoard({
         if (homeworkDone) drawStoryStar(ctx, x + cellWidth / 2 + 10, y + 78, 48);
         else drawStoryCircle(ctx, x + cellWidth / 2 + 25, y + 104, 13);
       } else if (isHoliday) {
-        ctx.font = "22px Jua, sans-serif";
+        ctx.font = `800 22px ${CANVAS_FONT}`;
         ctx.fillText(holidays[day], x + cellWidth / 2, y + 91);
       }
     }));
@@ -195,19 +201,19 @@ export default function StickerBoard({
     if (complete) {
       ctx.textAlign = "center";
       ctx.fillStyle = "#e0567a";
-      ctx.font = "58px Jua, sans-serif";
+      ctx.font = `800 58px ${CANVAS_FONT}`;
       ctx.fillText(`🌈 ${monthName} 강의 완주! 🌈`, 540, 1395);
     }
     ctx.textAlign = "center";
     ctx.fillStyle = "#1f5a80";
-    ctx.font = "44px Jua, sans-serif";
+    ctx.font = `800 44px ${CANVAS_FONT}`;
     ctx.fillText(`☁️ 출석 ${attendanceCount}     ⭐ 숙제 ${homeworkCount}`, 540, 1515);
-    ctx.font = "42px Jua, sans-serif";
+    ctx.font = `800 42px ${CANVAS_FONT}`;
     ctx.fillText(displayClass, 540, 1600);
-    ctx.font = "38px Jua, sans-serif";
+    ctx.font = `800 38px ${CANVAS_FONT}`;
     ctx.fillStyle = "#2b8fc7";
     ctx.fillText("토익의 시작", 540, 1770);
-    ctx.font = "30px Jua, sans-serif";
+    ctx.font = `800 30px ${CANVAS_FONT}`;
     ctx.fillStyle = "#7aa3bd";
     ctx.fillText("@vella_toeic ☁️", 540, 1815);
 
