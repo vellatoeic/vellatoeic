@@ -55,7 +55,7 @@ export default async function AboutPage() {
 
       <section className="card space-y-4">
         <h2 className="font-jua text-2xl text-sky-ink">📚 반 구성</h2>
-        <p className="text-[15px] text-slate-600">모든 과정은 <b>4주 16회</b>(주 4회, 월~목)이고 매달 첫째 월요일에 개강해요. 반마다 오전반·저녁반이 있어요.</p>
+        <p className="text-[15px] text-slate-600">모든 과정은 <b>4주 16회</b>(주 4회, 월~목)이고 매달 첫째 주에 개강해요. 반마다 오전반·저녁반이 있어요.</p>
         <ul className="grid gap-3 sm:grid-cols-2">
           {CLASSES.map((c) => (
             <li key={c.name} className="rounded-2xl bg-sky-soft p-4">
