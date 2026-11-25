@@ -42,6 +42,34 @@ select date '2026-12-19', '적중 모의고사 + 풀이', '10:00', null, null, f
 where not exists (select 1 from public.special_lectures where event_date = date '2026-12-19')
   and not exists (select 1 from public.special_lectures where title = '적중 모의고사 + 풀이' and event_date between date '2026-12-01' and date '2026-12-31');
 
+-- 안전장치: 수업일이 하나라도 틀리면(붙여 넣기 중 잘림 등) 오류를 내고 전부 되돌려요.
+--   종합·속성 3개 반은 똑같은 16회, 시작·문풀 월수반끼리·화목반끼리 같은 8회, 월수 + 화목 = 종합 16일(겹침 없음),
+--   공휴일·특강 요일·수업일 확인 값도 확인해요. (특강 초안은 결과 표에서 확인)
+do $$
+declare
+  a jsonb; s jsonb; i jsonb; smw jsonb; vmw jsonb; stt jsonb; vtt jsonb;
+begin
+  select value::jsonb into a from public.settings where key = 'schooldays_2026-12_start-all';
+  select value::jsonb into s from public.settings where key = 'schooldays_2026-12_solve-all';
+  select value::jsonb into i from public.settings where key = 'schooldays_2026-12_intensive-all';
+  select value::jsonb into smw from public.settings where key = 'schooldays_2026-12_start-mw';
+  select value::jsonb into vmw from public.settings where key = 'schooldays_2026-12_solve-mw';
+  select value::jsonb into stt from public.settings where key = 'schooldays_2026-12_start-tt';
+  select value::jsonb into vtt from public.settings where key = 'schooldays_2026-12_solve-tt';
+  if coalesce(jsonb_array_length(a), 0) <> 16 or a is distinct from s or a is distinct from i
+     or coalesce(jsonb_array_length(smw), 0) <> 8 or smw is distinct from vmw
+     or coalesce(jsonb_array_length(stt), 0) <> 8 or stt is distinct from vtt
+     or exists (select 1 from jsonb_array_elements_text(a) as t(d) where d !~ '^2026-12-(0[1-9]|1[0-9]|2[0-4])$')
+     or (select array_agg(u.d order by u.d) from (select t.d from jsonb_array_elements_text(smw) as t(d) union select t.d from jsonb_array_elements_text(stt) as t(d)) as u)
+        is distinct from (select array_agg(t.d order by t.d) from jsonb_array_elements_text(a) as t(d))
+     or (select value from public.settings where key = 'holidays_2026-12') is distinct from '{"2026-12-25":"성탄절"}'
+     or (select value from public.settings where key = 'special_weekday:2026-12') is distinct from '6'
+     or (select value from public.settings where key = 'schedule_confirmed:2026-12') is distinct from '1'
+  then
+    raise exception '12월 수업일 확인 실패: 붙여 넣은 내용이 잘렸을 수 있어요. 아무것도 저장하지 않았어요.';
+  end if;
+end $$;
+
 commit;
 
 -- 6) 결과 확인 (조회만): 12월 설정 10줄 · 12월 특강 · 11월 수업일(11월 종강일 점검용) · '월요일' 문구가 있는 FAQ·공지
