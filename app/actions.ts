@@ -39,8 +39,10 @@ import { adjustedBooks } from "@/lib/manualLink";
 import { safe } from "@/lib/safe";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
-  isViewOnly, setViewing, clearViewing,
+  isViewOnly, setViewing, clearViewing, getMemberId,
 } from "@/lib/auth";
+import { linkMemberApps } from "@/lib/db";
+import { safeNext } from "@/lib/google";
 
 export type FormState = { error?: string; ok?: string };
 
@@ -116,8 +118,10 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   // 이름이 같아도 비밀번호가 다르면 동명이인으로 보고 새로 받아요.
   const mine = (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash) && isActive(a));
   const existing = mine.find((a) => a.cohort === cohort);
+  const memberId = await getMemberId();
   if (existing) {
     await setStudent(mine.map((a) => a.id));
+    if (memberId) await safe("link.existing", () => linkMemberApps(memberId, mine.map((a) => a.id)), undefined);
     redirect(`/my/${existing.id}?again=1`);
   }
 
@@ -142,6 +146,8 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   // 신청서보다 먼저 온 입금이 있으면 바로 연결해서 납부 확인해요
   await linkWaitingDeposit({ kind: "app", id, depositor, amount: calcAmount(books, pickup) });
   await setStudent([id]); // 신청하면 바로 강의실 로그인 상태
+  // 구글로 로그인한 채 낸 신청은 계정에 자동 연결 (같은 이름·비밀번호의 예전 신청도 함께)
+  if (memberId) await safe("link.new", () => linkMemberApps(memberId, [id, ...mine.map((a) => a.id)]), undefined);
   redirect(`/my/${id}`);
 }
 
@@ -188,8 +194,31 @@ export async function studentLogin(_: FormState, fd: FormData): Promise<FormStat
 }
 
 export async function studentLogout() {
-  await clearStudent();
-  redirect("/class");
+  await clearStudent(); // 이름+비밀번호 로그인 · 구글 로그인 모두 풀려요
+  redirect("/");
+}
+
+// ── 구글 로그인 처음 연결: 신청서의 이름 + 강의실 비밀번호로 내 신청을 계정에 이어요 (한 번만) ──
+export async function linkMemberByPin(_: FormState, fd: FormData): Promise<FormState> {
+  const memberId = await getMemberId();
+  if (!memberId) return { error: "구글 로그인부터 해 주세요." };
+  if (await isViewOnly()) return { error: VIEW_ONLY };
+  const name = clean(fd.get("name"));
+  const pin = clean(fd.get("pin"));
+  if (!name || !/^\d{4}$/.test(pin)) return { error: "신청서의 이름과 강의실 비밀번호 4자리를 입력해 주세요." };
+  after(() => safe("expireUnpaid", () => expireUnpaid(), null));
+  const result = loginApps(await findByName(name), (a) => checkPin(pin, a.pin_hash));
+  if (result.cancelledId) redirect(`/my/${result.cancelledId}`);
+  if (!result.apps) {
+    await sleep(800);
+    return { error: result.error };
+  }
+  await linkMemberApps(memberId, result.apps.map((a) => a.id));
+  await setStudent(result.apps.map((a) => a.id));
+  const next = safeNext(clean(fd.get("next")));
+  if (next !== "/") redirect(next);
+  const current = await safe("link.current", () => currentClassApp(result.apps!), null);
+  redirect(current ? "/" : "/class");
 }
 
 // ── 강사 ↔ 학생 화면 ───────────────────────────

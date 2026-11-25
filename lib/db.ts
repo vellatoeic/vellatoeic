@@ -194,6 +194,8 @@ type Mem = {
   notices: Notice[];
   noticeReads: NoticeRead[];
   ybmOrders: YbmOrder[];
+  members?: Member[];
+  memberLinks?: MemberLink[];
 };
 const g = globalThis as unknown as { __vellaMem?: Mem };
 const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [], testResults: [], testOverrides: [], testDoubles: [], notices: [], noticeReads: [], ybmOrders: [] });
@@ -214,6 +216,8 @@ mem.testOverrides ??= [];
 mem.notices ??= [];
 mem.noticeReads ??= [];
 mem.ybmOrders ??= [];
+mem.members ??= [];
+mem.memberLinks ??= [];
 
 // 그 달 날짜 범위: 1일 이상 ~ 다음 달 1일 미만 (11월처럼 30일까지인 달에 '-31'을 만들면 DB 오류가 나요)
 export function monthRange(cohort: string) {
@@ -1481,4 +1485,65 @@ export async function listPendingYbmOrders(): Promise<YbmOrder[]> {
     return data as YbmOrder[];
   }
   return mem.ybmOrders.filter((o) => o.status === "pending");
+}
+
+// ── 구글 로그인 회원 (SQL 39: members · member_links) ──
+// 회원 = 구글 계정 하나. 연결 = 회원 ↔ 수강 신청 (처음 한 번 이름+비밀번호로 연결, 로그인한 채 낸 신청서는 자동 연결)
+export type Member = { id: string; provider: string; provider_id: string; email: string | null; name: string | null; created_at: string; last_login_at: string | null };
+export type MemberLink = { member_id: string; application_id: string; created_at: string };
+
+// 같은 구글 계정이면 같은 회원 (처음이면 만들어요). 로그인할 때마다 이름·이메일·마지막 로그인 시각을 새로 적어요.
+export async function upsertMember(m: Pick<Member, "provider" | "provider_id" | "email" | "name">): Promise<Member> {
+  const now = new Date().toISOString();
+  if (sb) {
+    const { data, error } = await sb.from("members")
+      .upsert({ ...m, last_login_at: now }, { onConflict: "provider,provider_id" })
+      .select("*").single();
+    if (error) throw error;
+    return data as Member;
+  }
+  const list = (mem.members ??= []);
+  const found = list.find((x) => x.provider === m.provider && x.provider_id === m.provider_id);
+  if (found) return Object.assign(found, m, { last_login_at: now });
+  const row: Member = { ...m, id: crypto.randomUUID(), created_at: now, last_login_at: now };
+  list.push(row);
+  return row;
+}
+
+export async function getMember(id: string): Promise<Member | null> {
+  if (!isUuid(id)) return null;
+  if (sb) {
+    const { data } = await sb.from("members").select("*").eq("id", id).maybeSingle();
+    return (data as Member) ?? null;
+  }
+  return (mem.members ?? []).find((x) => x.id === id) ?? null;
+}
+
+// 회원에게 연결된 신청 id (없는 신청은 화면에서 걸러져요)
+export async function memberAppIds(memberId: string): Promise<string[]> {
+  if (!isUuid(memberId)) return [];
+  if (sb) {
+    const { data, error } = await sb.from("member_links").select("application_id").eq("member_id", memberId);
+    if (error) throw error;
+    return (data as { application_id: string }[]).map((x) => x.application_id);
+  }
+  return (mem.memberLinks ?? []).filter((x) => x.member_id === memberId).map((x) => x.application_id);
+}
+
+// 회원 ↔ 신청 연결 (이미 있으면 그대로)
+export async function linkMemberApps(memberId: string, appIds: string[]) {
+  const ids = [...new Set(appIds.filter(isUuid))];
+  if (!isUuid(memberId) || ids.length === 0) return;
+  if (sb) {
+    const { error } = await sb.from("member_links")
+      .upsert(ids.map((application_id) => ({ member_id: memberId, application_id })), { onConflict: "member_id,application_id", ignoreDuplicates: true });
+    if (error) throw error;
+    return;
+  }
+  const links = (mem.memberLinks ??= []);
+  for (const application_id of ids) {
+    if (!links.some((x) => x.member_id === memberId && x.application_id === application_id)) {
+      links.push({ member_id: memberId, application_id, created_at: new Date().toISOString() });
+    }
+  }
 }

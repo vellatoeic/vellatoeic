@@ -8,7 +8,7 @@ import "./globals.css";
 import SiteMenu from "@/components/SiteMenu";
 import IconDefs from "@/components/IconDefs";
 import ModeSwitch from "@/components/ModeSwitch";
-import { getViewing, isAdmin } from "@/lib/auth";
+import { getMemberId, getStudentIds, getViewing, isAdmin } from "@/lib/auth";
 import { stopViewing } from "@/app/actions";
 import { safe } from "@/lib/safe";
 import { ensureDemo } from "@/lib/demoSeed";
@@ -43,7 +43,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   await safe("demo", () => ensureDemo(), undefined); // DB 없는 미리보기 + VELLA_DEMO=1 일 때만 예시 학생 (운영 DB에서는 아무것도 안 해요)
   const notice = await safeNoticeSummary(); // 공지 계산이 실패해도 페이지는 떠요
   // 강사로 로그인했으면 [학생 | 강사] 전환 버튼, 학생 화면 미리보기 중이면 위에 띠
-  const [admin, viewing] = await Promise.all([safe("layout.isAdmin", () => isAdmin(), false), safe("layout.viewing", () => getViewing(), null)]);
+  const [admin, viewing, loggedIn] = await Promise.all([
+    safe("layout.isAdmin", () => isAdmin(), false),
+    safe("layout.viewing", () => getViewing(), null),
+    safe("layout.loggedIn", async () => (await getStudentIds()).length > 0 || !!(await getMemberId()), false),
+  ]);
   return (
     <html lang="ko">
       <body className="min-h-dvh">
@@ -61,8 +65,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </div>
             <div className="ml-auto flex items-center gap-1.5">
               <Bell count={notice.unread} visitorKeys={notice.visitorKeys} />
-              {admin ? <ModeSwitch /> : <Link href="/class" className="hdr-class">강의실</Link>}
-              <SiteMenu />
+              {admin ? <ModeSwitch /> : loggedIn ? <Link href="/class" className="hdr-class">강의실</Link> : <Link href="/login" className="hdr-login">로그인</Link>}
+              <SiteMenu loggedIn={loggedIn} />
             </div>
           </nav>
           {viewing && (

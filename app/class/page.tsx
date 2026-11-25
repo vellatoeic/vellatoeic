@@ -22,7 +22,7 @@ import { studentLogout } from "@/app/actions";
 import AudioBanner from "@/components/audio/AudioBanner";
 import AudioList from "@/components/audio/AudioList";
 import AudioPopup from "@/components/audio/AudioPopup";
-import StudentLogin from "./StudentLogin";
+import LoginCard from "./LoginCard";
 import StickerBoard from "./StickerBoard";
 import { defaultHolidays, holidayKey, parseHolidays, schoolDaysFor, scheduleClassFor, scheduleKey } from "@/lib/schedule";
 import { classAppsFor } from "@/lib/classCohort";
@@ -51,7 +51,7 @@ export const metadata = { title: "강의실 · vella_toeic", robots: { index: fa
 export default async function ClassRoom({ searchParams }: { searchParams: Promise<{ t?: string; expired?: string }> }) {
   after(() => safe("expireUnpaid", () => expireUnpaid(), null)); // 30분 지난 입금 대기 자동 취소는 화면을 보낸 뒤에 (1분에 한 번, 실패해도 강의실은 열려요)
   const { loggedIn, apps } = await activeStudentApps();
-  if (!loggedIn) return <StudentLogin />;
+  if (!loggedIn) return <LoginCard />;
   // 환불·삭제된 수강생은 아무것도 볼 수 없어요. 취소된 신청만 있으면 취소 안내를 보여줘요.
   if (apps.length === 0) {
     const cancelled = (await safe("cancelledApps", async () => getApplications(await getStudentIds()), [])).filter((a) => a.status === "cancelled").sort((a, b) => b.created_at.localeCompare(a.created_at))[0];

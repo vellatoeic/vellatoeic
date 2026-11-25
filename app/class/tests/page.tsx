@@ -7,7 +7,7 @@ import { listTestResults } from "@/lib/db";
 import { TEST_LABEL, type TestKind } from "@/lib/tests";
 import TestForm from "@/components/tests/TestForm";
 import LineChart from "@/components/tests/LineChart";
-import StudentLogin from "../StudentLogin";
+import LoginCard from "../LoginCard";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "테스트 기록 · vella_toeic", robots: { index: false } };
@@ -16,7 +16,7 @@ const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`;
 
 export default async function TestsPage() {
   const { loggedIn, apps } = await activeStudentApps();
-  if (!loggedIn) return <StudentLogin next="/class" />;
+  if (!loggedIn) return <LoginCard next="/class" />;
   const today = todayKST();
   const testApps = apps.filter(takesTests).sort((a, b) => b.cohort.localeCompare(a.cohort));
   if (testApps.length === 0) {

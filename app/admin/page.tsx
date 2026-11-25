@@ -1,4 +1,5 @@
 import Icon from "@/components/Icon";
+import GoogleSetupCard from "./GoogleSetupCard";
 import { adminAlerts } from "@/lib/adminAlerts";
 import { BOOKS, COURSES, KINDS, TRACKS, TRACK_ORDER, slotTag, bookStatusLabel, cohortLabel, roundOf, thisMonthKST, won, type BookId, type CourseId, type TimeSlot } from "@/lib/config";
 import { listApplications, listDepositEvents, listWaitingDepositEvents, listYbmOrders, listMissions, getSetting, currentCohort, roundFor, isPreview, type Application, type Mission } from "@/lib/db";
@@ -476,8 +477,9 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
       </details>
 
       <details id="settings" className="card !p-4">
-        <summary className="font-jua cursor-pointer text-lg text-sky-ink"><Icon name="settings" size={24} className="mr-1" />기본 설정 (모집 기수 · 계좌 · 카페·블로그 주소)</summary>
+        <summary className="font-jua cursor-pointer text-lg text-sky-ink"><Icon name="settings" size={24} className="mr-1" />기본 설정 (모집 기수 · 계좌 · 카페·블로그 주소 · 구글 로그인)</summary>
         <div className="mt-4">
+          <GoogleSetupCard />
           <CloseOnSubmitForm action={saveSettings} className="card grid gap-4 sm:grid-cols-[10rem_7rem_1fr_auto] sm:items-end">
           <label>
             <span className="label">현재 모집 기수 <span className="font-normal text-slate-400">(비우면 자동: {cohortLabel(now)})</span></span>

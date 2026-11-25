@@ -10,7 +10,7 @@ export const SITE_DESCRIPTION = "부산 서면 토익 벨라토익. 혼토익에
 export const PUBLIC_PATHS = ["/", "/about", "/guide", "/guide/onsite", "/guide/online", "/faq", "/ybm"] as const;
 
 // 검색에서 빼는 페이지: 로그인·개인 정보·관리 화면 (robots.txt)
-export const PRIVATE_PATHS = ["/admin", "/api", "/class", "/check", "/my", "/mission", "/notices", "/special", "/ybm/"];
+export const PRIVATE_PATHS = ["/admin", "/api", "/class", "/check", "/my", "/mission", "/notices", "/special", "/ybm/", "/login"];
 
 // 카카오톡·검색 미리보기 이미지 (app/opengraph-image.tsx가 만들어요)
 export const OG_IMAGE = { url: "/opengraph-image", width: 1200, height: 630, alt: "부산 서면 토익 벨라토익 vella_toeic" };

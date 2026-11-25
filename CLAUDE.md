@@ -138,7 +138,9 @@
 - 수업일 한곳: 수업일은 반마다, 공휴일은 기수 전체에 저장돼서, 공휴일을 나중에 다른 반 화면에서 추가하면 먼저 저장한 반의 수업일에 그날이 남을 수 있어요. 그래서 수업일이 필요한 곳은 lib/classCalendar.ts scheduleDays(기수, 반)/classDaysOf(신청)(저장값 없으면 기본값 − 그 기수 공휴일)를 써요 — 데일리 테스트 DAY 번호·숙제 별 확인·수업 기수 범위·이번 달 할 일·라이브 다음 수업·스티커판까지. schoolDaysFor를 직접 쓰면 공휴일을 꼭 빼기. 테스트 tests/schedule-sync.test.ts.
 - 화면 다듬기: 토스처럼 깔끔하게(흰 카드·옅은 입력칸·큰 숫자·화살표 목록) + 새 디자인 움직임(화면 열릴 때 투명도, 카드가 차례로 .stagger — 움직임은 끝나면 남지 않게 backwards, '동작 줄이기' 설정이면 꺼요). 화면 전체를 덮는 창(메뉴 서랍 등)은 머리의 흐림 효과·움직이는 카드 안에 두지 말고 body로(포털).
 - 미리보기 예시 데이터: DB 연결이 없는 미리보기 모드에서 환경변수 VELLA_DEMO=1이면 lib/demoSeed.ts가 예시 학생을 만들어요(박지은·이서윤 비밀번호 1234, 관리자 미리보기 비밀번호 vella). 실제 DB가 연결되면 아무것도 안 해요.
-- 구글·카카오 가입 + 자동등업: Vella가 자동등업 코드를 따로 가져오면 진행(보류). 설정 안내는 그때 정리.
+- 구글 로그인 (2026-11-25, SQL 39 members · member_links): 머리 [로그인](로그인 전) / [강의실](로그인 후) / [학생|강사](관리자), ☰ 서랍에 로그인·로그아웃. 로그인 화면(/login, 강의실·테스트·미션·QR 출석 로그인도 같은 app/class/LoginCard)은 맨 위 [Google로 로그인], 아래 접힌 '이름 + 비밀번호로 들어가기'(지금 학생용으로 유지). 구글 OAuth는 라이브러리 없이 lib/google.ts(PKCE + state 쿠키 vella_oauth 10분): /api/auth/signin/google?next= → 구글 → /api/auth/callback/google. 환경변수는 GOOGLE_CLIENT_ID/AUTH_GOOGLE_ID… · GOOGLE_CLIENT_SECRET/AUTH_GOOGLE_SECRET… 중 있는 것(관리 [기본 설정] '구글 로그인 점검'에 켜짐·찾은 이름·등록할 리디렉션 주소). 구글 콘솔 '승인된 리디렉션 URI' = https://vellatoeic.vercel.app/api/auth/callback/google (미리보기 주소도 쓰려면 따로 추가).
+- 구글 회원 ↔ 수강 신청 연결(자유 가입 아님 원칙 그대로): 구글 로그인 = 회원(members, vella_member 쿠키)일 뿐, 강의실 권한은 연결된 신청(member_links)에 lib/access.ts 규칙(납부·기수·반·과목)을 그대로 적용. 처음 한 번 /login/link에서 신청서 이름 + 강의실 비밀번호로 연결(그 이름·비밀번호의 모든 신청), 구글로 로그인한 채 낸 신청서는 자동 연결(같은 이름·비밀번호의 예전 신청도). lib/auth.ts getStudentIds = 이름+비밀번호 쿠키 + 회원 연결 신청(강사 학생 화면 보기 중이면 그 학생 것만). 로그아웃은 둘 다 풀고 첫 화면으로. 테스트 tests/google-login.test.ts.
+- 카카오 로그인 · 자동등업: Vella가 자동등업 코드를 따로 가져오면 진행(보류). 카카오 설정 안내는 그때 정리.
 
 ## 기술 구성
 - 핵심 화면 보호(lib/safe.ts): 로그인·강의실·레이아웃 공지에서 부가 기능(30분 자동 취소 점검, 열람 기간, 종강·특강 팝업, 선물, 음원, 테스트, 수업 기수 판단 등)은 safe()로 감싸 실패하거나 4~5초를 넘기면 기본값으로 넘어가고 console.error로 함수 이름·오류만 남겨요(Next 내부 신호는 unstable_rethrow로 통과). 레이아웃 공지는 한 요청에 한 번만 계산(react cache). 30분 자동 취소 점검은 입금 대기만 읽고, 학생 화면에서는 1분에 한 번만 돌아요.

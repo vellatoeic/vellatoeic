@@ -7,7 +7,7 @@ import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
 import { isClassDay, nextClassDay } from "@/lib/attendanceDays";
 import { specialDay } from "@/lib/special";
 import { canWatch } from "@/lib/access";
-import StudentLogin from "../class/StudentLogin";
+import LoginCard from "../class/LoginCard";
 import { classAppsFor } from "@/lib/classCohort";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +34,7 @@ export default async function Check() {
     return <Box title="수강 정보가 없어요"><p className="text-slate-600">Vella쌤에게 문의해 주세요.</p></Box>;
   }
   if (apps.length === 0) {
-    return <StudentLogin next="/check" note="출석하려면 먼저 로그인해 주세요. (처음 한 번만)" />;
+    return <LoginCard next="/check" note="출석하려면 먼저 로그인해 주세요. (처음 한 번만)" />;
   }
 
   // 수업 기수(날짜 기준)의 신청으로 출석해요. 모집 기수와 상관없어요.

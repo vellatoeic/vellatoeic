@@ -2,7 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { forget, memo } from "./requestMemo";
 import { createHmac, scryptSync, timingSafeEqual, randomBytes } from "crypto";
-import { isPreview } from "./db";
+import { isPreview, memberAppIds } from "./db";
 
 const SECRET =
   process.env.SESSION_SECRET ||
@@ -52,10 +52,22 @@ export async function setStudent(ids: string[]) {
   (await cookies()).set("vella_student", seal(ids.join(",")), cookieOpts);
 }
 // 한 요청 안에서는 쿠키를 한 번만 풀어요
+// 학생 신청 id = 이름+비밀번호 로그인 쿠키 + 구글 회원에게 연결된 신청 (강사 '학생 화면 보기' 중이면 그 학생 것만)
 export function getStudentIds(): Promise<string[]> {
   return memo("student:ids", async () => {
-    const v = unseal((await cookies()).get("vella_student")?.value);
-    return v ? v.split(",").filter(Boolean) : [];
+    const jar = await cookies();
+    const v = unseal(jar.get("vella_student")?.value);
+    const ids = v ? v.split(",").filter(Boolean) : [];
+    if (unseal(jar.get("vella_view")?.value)) return ids;
+    const memberId = unseal(jar.get("vella_member")?.value);
+    if (!memberId) return ids;
+    let linked: string[] = [];
+    try {
+      linked = await memberAppIds(memberId);
+    } catch {
+      linked = []; // 연결 표를 못 읽어도 기존 로그인은 그대로
+    }
+    return [...new Set([...ids, ...linked])];
   });
 }
 export async function clearStudent() {
@@ -63,6 +75,27 @@ export async function clearStudent() {
   forget("apps:active");
   (await cookies()).delete("vella_student");
   (await cookies()).delete("vella_view");
+  (await cookies()).delete("vella_member");
+}
+
+// ── 구글 로그인 회원 (vella_member = 회원 id 서명) ──
+export async function setMember(memberId: string) {
+  forget("student:");
+  forget("apps:active");
+  (await cookies()).set("vella_member", seal(memberId), cookieOpts);
+}
+export async function getMemberId(): Promise<string | null> {
+  return unseal((await cookies()).get("vella_member")?.value);
+}
+// 구글 로그인 시작~돌아올 때까지 잠깐 쓰는 위조 방지 값 (10분)
+export async function setOAuthState(json: string) {
+  (await cookies()).set("vella_oauth", seal(json), { ...cookieOpts, maxAge: 600 });
+}
+export async function takeOAuthState(): Promise<string | null> {
+  const jar = await cookies();
+  const v = unseal(jar.get("vella_oauth")?.value);
+  jar.delete("vella_oauth");
+  return v;
 }
 
 // ── 관리자 ─────────────────────────────────────

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { studentLogout } from "@/app/actions";
 
 // 머리 오른쪽 메뉴 서랍. 첫 화면 구역 + 수강생 메뉴 + YBM 수강 신청.
 // 서랍은 body 바로 아래에 그려요(포털): 머리의 흐림 효과(backdrop-filter) 안에 두면
@@ -27,7 +28,7 @@ const STUDENT: [string, string, string][] = [
 ];
 const YBM_URL = "https://www.ybmedu.com/seomyon/vellatoeic";
 
-export default function SiteMenu() {
+export default function SiteMenu({ loggedIn = false }: { loggedIn?: boolean }) {
   const [open, setOpen] = useState(false);
   const path = usePathname();
   useEffect(() => setOpen(false), [path]); // 다른 화면으로 가면 닫혀요
@@ -65,6 +66,12 @@ export default function SiteMenu() {
             </div>
             <nav className="dr-body">
               <p className="dr-label">수강생</p>
+              {!loggedIn && (
+                <Link href="/login" className="dr-item dr-login" onClick={() => setOpen(false)}>
+                  <img src="/img/icons/lock.png" alt="" />
+                  로그인
+                </Link>
+              )}
               {STUDENT.map(item)}
               <p className="dr-label">벨라토익</p>
               {SITE.map(item)}
@@ -73,6 +80,11 @@ export default function SiteMenu() {
                 YBM에서 수강 신청 ↗
               </a>
             </nav>
+            {loggedIn && (
+              <form action={studentLogout} className="dr-foot">
+                <button className="btn-ghost w-full">로그아웃</button>
+              </form>
+            )}
           </aside>
         </div>,
         document.body,
