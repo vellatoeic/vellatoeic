@@ -112,7 +112,7 @@ export default async function AboutPage() {
         <ol className="space-y-3">
           {[
             <>YBM 서면 학원에서 벨라토익 수업 <b>수강 등록</b>을 해요. <a href={YBM_SIGNUP_URL} target="_blank" rel="noreferrer" className="text-sky-deep underline">YBM 서면 수강 등록 ↗</a></>,
-            <>이 홈페이지에서 <b>현장</b> 또는 <b>불라방</b>을 골라 필독 사항을 읽고 <b>교재비 신청서</b>를 내요.</>,
+            <>이 홈페이지에서 <b>현장</b> 또는 <b>불라방</b>을 골라 필독 사항을 읽고 <b>교재 신청서</b>를 내요.</>,
             <>안내된 계좌로 교재비를 입금하면 확인 후 <b>납부 완료</b>로 바뀌어요.</>,
             <>신청한 뒤 <b>강의실</b>에 로그인해 라이브·출석·스티커판을 이용해요.</>,
           ].map((step, i) => (
@@ -123,8 +123,8 @@ export default async function AboutPage() {
           ))}
         </ol>
         <div className="grid grid-cols-2 gap-2">
-          <Link href="/guide/onsite" className="btn gap-1.5 !px-3 !text-base"><Icon name="school" size={24} />현장 교재비 신청</Link>
-          <Link href="/guide/online" className="btn gap-1.5 !px-3 !text-base"><Icon name="laptop" size={24} />불라방 교재비 신청</Link>
+          <Link href="/guide/onsite" className="btn gap-1.5 !px-3 !text-base"><Icon name="school" size={24} />현장 교재 신청</Link>
+          <Link href="/guide/online" className="btn gap-1.5 !px-3 !text-base"><Icon name="laptop" size={24} />불라방 교재 신청</Link>
         </div>
       </section>
 

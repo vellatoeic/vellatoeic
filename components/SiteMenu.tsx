@@ -18,8 +18,8 @@ const SITE: [string, string, string][] = [
   ["/about", "school", "벨라토익 소개 · 수강 신청 방법"],
 ];
 const STUDENT: [string, string, string][] = [
-  ["/guide/onsite", "school", "현장 수강생 · 교재비 신청"],
-  ["/guide/online", "laptop", "불라방 수강생 · 교재비 신청"],
+  ["/guide/onsite", "school", "현장 수강생 · 교재 신청"],
+  ["/guide/online", "laptop", "불라방 수강생 · 교재 신청"],
   ["/class", "star", "강의실"],
   ["/mission", "clipboard", "첫 수업 미션"],
   ["/special", "mic", "특강"],

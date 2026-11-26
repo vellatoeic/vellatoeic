@@ -106,10 +106,6 @@ export const FINDER = {
   solveTip: "해석없이 빠른 문제 풀이가 가능하며 어느 정도 품사 구분이 가능하면 등록가능",
 };
 
-export const PHOTOS = [
-  { src: "/img/classroom.jpg", lines: ["실전 감각 UP! 전반 무료 모의고사", "전파트 문풀 스킬 대방출! / 매달 두 번 맞춤형 적중 특강"] },
-  { src: "/img/group.jpg", lines: ["한국식 영어 공부 NO! 시험에 나오는 것만 빠르게!", "영알못을 위한 파트별 강의 제공 / 매수업 숙제 검사 1:1 피드백"] },
-];
 
 export const PERKS: [string, string][] = [
   ["live", "전국 어디서나! 실시간 라이브 수강 가능"],

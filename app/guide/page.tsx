@@ -2,7 +2,7 @@ import Icon from "@/components/Icon";
 import Link from "next/link";
 import { pageMeta } from "@/lib/seo";
 
-export const metadata = pageMeta("수강 신청 필독 사항 | 부산 서면 토익 벨라토익", "부산 서면 토익 벨라토익 수강 신청 전 필독 사항. 현장 또는 온라인 라이브(불라방)를 골라 교재비를 신청해요.", "/guide");
+export const metadata = pageMeta("수강 신청 필독 사항 | 부산 서면 토익 벨라토익", "부산 서면 토익 벨라토익 수강 신청 전 필독 사항. 현장 또는 온라인 라이브(불라방)를 골라 교재를 신청해요.", "/guide");
 
 export default function Guide() {
   return (

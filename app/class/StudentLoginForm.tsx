@@ -22,7 +22,7 @@ export default function StudentLoginForm({ next, note, providers, pin, title = "
       <div className="card mx-auto max-w-sm space-y-4 text-center">
         <Icon name="lock" size={56} className="mx-auto block" />
         <h1 className="font-jua text-3xl text-sky-ink">{title}</h1>
-        <p className="text-sm text-slate-500">{note ?? (pin ? "교재비 신청할 때 정한 이름과 비밀번호로 들어와요." : "카카오 또는 구글 계정으로 한 번에 들어와요.")}</p>
+        <p className="text-sm text-slate-500">{note ?? (pin ? "교재 신청할 때 정한 이름과 비밀번호로 들어와요." : "카카오 또는 구글 계정으로 한 번에 들어와요.")}</p>
         {error && ERRORS[error] && <p className="rounded-2xl bg-red-50 px-4 py-2.5 text-sm font-bold text-red-600">{ERRORS[error]}</p>}
         {social && <SocialButtons providers={providers} next={next ?? "/go"} />}
         {social && pin && <p className="flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" />또는 이름 + 비밀번호<span className="h-px flex-1 bg-slate-200" /></p>}
@@ -35,7 +35,7 @@ export default function StudentLoginForm({ next, note, providers, pin, title = "
             <button className={social ? "btn-ghost w-full" : "btn w-full"} disabled={pending}>{pending ? "확인 중…" : "들어가기"}</button>
           </form>
         )}
-        {social && !pin && <p className="text-xs text-slate-500">처음 한 번만 교재비 신청 때 정한 이름·비밀번호로 내 신청을 찾아 연결해요.</p>}
+        {social && !pin && <p className="text-xs text-slate-500">처음 한 번만 교재 신청 때 정한 이름·비밀번호로 내 신청을 찾아 연결해요.</p>}
         <p className="text-xs text-slate-400">
           아직 신청 전이라면{" "}
           <Link href="/guide" className="text-sky-deep underline">필독 사항 확인</Link>

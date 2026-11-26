@@ -36,8 +36,8 @@ const NOTICE: Record<Kind, string[]> = {
 export async function generateMetadata({ params }: { params: Promise<{ kind: string }> }) {
   const { kind } = await params;
   return kind === "online"
-    ? pageMeta("불라방(라이브) 교재비 신청 | 부산 서면 토익 벨라토익", "부산 서면 토익 벨라토익 불라방(유튜브 라이브) 수강생 필독 사항과 교재비 신청. 교재는 1층 데스크 또는 택배로 받아요.", "/guide/online")
-    : pageMeta("현장 수강 교재비 신청 | 부산 서면 토익 벨라토익", `부산 서면 토익 벨라토익 현장(${CLASSROOM}) 수강생 필독 사항과 교재비 신청. 교재는 첫 수업 날 강의실에서 받아요.`, "/guide/onsite");
+    ? pageMeta("불라방(라이브) 교재 신청 | 부산 서면 토익 벨라토익", "부산 서면 토익 벨라토익 불라방(유튜브 라이브) 수강생 필독 사항과 교재 신청. 교재는 1층 데스크 또는 택배로 받아요.", "/guide/online")
+    : pageMeta("현장 수강 교재 신청 | 부산 서면 토익 벨라토익", `부산 서면 토익 벨라토익 현장(${CLASSROOM}) 수강생 필독 사항과 교재 신청. 교재는 첫 수업 날 강의실에서 받아요.`, "/guide/onsite");
 }
 
 export default async function KindGuide({ params }: { params: Promise<{ kind: string }> }) {

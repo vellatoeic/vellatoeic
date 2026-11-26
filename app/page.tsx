@@ -17,15 +17,15 @@ import { homeCourseMonth } from "@/lib/homeCoursesServer";
 import { studentDashboard } from "@/lib/dashboard";
 import StudentDashboard from "./StudentDashboard";
 import {
-  BADGES, BIG_QUOTE, BRAND, BUZZ, CAREER, CLASSES_INTRO, CLOSING, COURSE_EVENTS, COURSE_NOTE,
-  PERKS, PHOTOS, POINTS, PROOFS, REVIEWS, TICKER, TRACKS_INTRO, type ClassIntro,
+  BIG_QUOTE, BRAND, CAREER, CLASSES_INTRO, COURSE_EVENTS, COURSE_NOTE,
+  PERKS, POINTS, PROOFS, REVIEWS, TRACKS_INTRO, type ClassIntro,
 } from "@/lib/homeContent";
 
 // 특강 모집 여부·강좌 개강일을 매번 확인해요.
 export const dynamic = "force-dynamic";
 
-// 첫 화면 (2026-11 새 디자인): 히어로 → 수강생 바로가기(예전 첫 화면 메뉴 그대로) → 소개 → 16회 → 반 찾기
-// → 성적·후기 → 혜택 → 강좌 시간표(수업일 설정의 개강일) → 마무리 → 자주 묻는 질문(관리 [FAQ])
+// 첫 화면 (2026-11-26 정리): 시작 화면(1 반 찾기 → 2 수강 신청하기(YBM) → 3 교재 신청 + 수강생 바로가기, 사진 없음)
+// → 수강생 바로가기 → 반 찾기 → 강좌 시간표(수업일 설정의 개강일) → 성적·후기 → 벨라쌤 소개 → 16회 → 혜택 → 자주 묻는 질문(관리 [FAQ])
 
 const icon = (name: string, cls = "") => <img className={`ic3d ${cls}`} src={`/img/icons/${name}.png`} alt="" loading="lazy" decoding="async" />;
 const CHECK = (
@@ -99,129 +99,81 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
       <NoticePopupHost />
       <Reveal />
 
-      {/* ── 첫 화면 ── */}
-      <section className="hero">
-        <div className="hero-glow" aria-hidden="true" />
-        <div className="hero-glow g2" aria-hidden="true" />
-        <div className="wrap hero-in">
-          <div>
-            <p className="hero-ybm"><span className="ybm-chip">YBM</span>{BRAND.center}</p>
-            <h1>
-              <span className="en"><span>VELLA</span> <span>TOEIC</span></span>
-              <span className="ko"><span>{BRAND.tagline}</span></span>
-              <span className="sr-only">부산 서면 토익 벨라토익(vella_toeic)</span>
-            </h1>
-            <p className="hero-sub"><b>{BRAND.slogan}</b><span className="sep" aria-hidden="true" />{BRAND.project}</p>
-            <ul className="laurels" aria-label="벨라토익 강의 특징">
-              {BADGES.map((b) => <li key={b}><img src="/img/icons/laurel.png" alt="" /><span>{b}</span></li>)}
-            </ul>
-            <div className="hero-cta">
-              <a className="h-btn gold" href="#finder">나에게 맞는 반 찾기</a>
-              <a className="h-btn line" href="#students">수강생 바로가기 · 교재비 신청</a>
-            </div>
+      {/* ── 첫 화면 (2026-11-26 Vella: 사진 없이 깔끔하게, 처음 온 학생은 1·2·3 순서대로 / 수강생은 바로가기) ── */}
+      <section className="start">
+        <div className="wrap start-grid">
+          <div className="start-head">
+          <p className="hero-ybm"><span className="ybm-chip">YBM</span>{BRAND.center}</p>
+          <h1>
+            {BRAND.tagline},<br /><em>벨라토익</em>
+            <span className="sr-only"> 부산 서면 토익 벨라토익(vella_toeic)</span>
+          </h1>
+          <p className="start-sub">{BRAND.slogan} · 한 달 16회 최단 프로젝트</p>
           </div>
-          <figure className="hero-photo">
-            <div className="arch"><img src="/img/teacher.jpg" alt="벨라쌤" width={1360} height={927} fetchPriority="high" /></div>
-            <figcaption><span className="sign" aria-hidden="true">Vella</span><span className="cap">{BRAND.profileLine}</span></figcaption>
-          </figure>
-        </div>
-        <div className="ticker" aria-hidden="true">
-          <div className="ticker-in">
-            {[0, 1].flatMap((n) => TICKER.flatMap((t, i) => [<span key={`${n}-${i}`}>{t}</span>, <i key={`${n}-${i}-s`}>✦</i>]))}
+
+          <div className="start-steps">
+          <p className="steps-label">처음이라면 순서대로</p>
+          <ol className="steps">
+            <li>
+              <a className="step" href="#finder">
+                <span className="step-no">1</span>
+                {icon("target", "md")}
+                <span className="step-t"><b>나에게 맞는 반 찾기</b><small>세 문제로 내 반을 추천해요</small></span>
+                <span className="chev" aria-hidden="true">›</span>
+              </a>
+            </li>
+            <li>
+              <a className="step" href={BRAND.courseUrl} {...out}>
+                <span className="step-no">2</span>
+                {icon("school", "md")}
+                <span className="step-t"><b>수강 신청하기</b><small>YBM 서면 홈페이지에서 수강 등록</small></span>
+                <span className="chev" aria-hidden="true">↗</span>
+              </a>
+            </li>
+            <li>
+              <div className="step">
+                <span className="step-no">3</span>
+                {icon("book", "md")}
+                <span className="step-t">
+                  <b>교재 신청</b><small>수강 등록을 마쳤다면 수업 방식을 골라요</small>
+                  <span className="step-pills">
+                    <Link href="/guide/onsite">현장 수강</Link>
+                    <Link href="/guide/online" className="alt">불라방(라이브)</Link>
+                  </span>
+                </span>
+              </div>
+            </li>
+          </ol>
           </div>
+
+          <a className="me-link" href="#students">
+            <span><small>이미 수강 중이에요</small><b>수강생 바로가기</b></span>
+            <span className="me-go" aria-hidden="true">강의실 · 미션 · 특강 ›</span>
+          </a>
         </div>
       </section>
 
-      {/* ── 수강생 바로가기 (예전 첫 화면 메뉴 그대로) ── */}
+      {/* ── 수강생 바로가기 ── */}
       <section className="sec quick" id="students">
-        <div className="wrap quick-grid">
-          <div>
-            <div className="quick-greet">
-              <p className="eyebrow">FOR STUDENTS</p>
-              <h2>수강 신청을 마치셨나요?</h2>
-              <Link href="/class">이미 신청했다면 강의실로 →</Link>
-            </div>
-            <div className="quick-big">
-              <Link href="/guide/onsite" className="qb">{icon("school", "lg")}<b>현장 수강생</b><small>수강 신청 · 교재비</small></Link>
-              <Link href="/guide/online" className="qb">{icon("laptop", "lg")}<b>불라방 수강생</b><small>수강 신청 · 교재비</small></Link>
-            </div>
+        <div className="wrap narrow">
+          <div className="quick-greet">
+            <p className="eyebrow">FOR STUDENTS</p>
+            <h2>수강생 바로가기</h2>
           </div>
+          <Link href="/class" className="quick-main">
+            {icon("star", "md")}
+            <span className="grow"><b>강의실</b><small>라이브 입장 · 출석 · 스티커판 · 지난 강의 · LC 음원</small></span>
+            <span className="chev" aria-hidden="true">›</span>
+          </Link>
           <div className="quick-list">
-            <QuickItem href="/class" ic="star" title="강의실" sub="출석 · 스티커판 · 강의 영상 · LC 음원" />
+            <QuickItem href="/guide" ic="book" title="교재 신청" sub="현장 · 불라방 교재 신청 · 신청 확인" />
             <QuickItem href="/mission" ic="clipboard" title="첫 수업 미션" sub="첫 수업 시간에 다 같이 해요" />
             {open.length > 0 ? (
               <QuickItem href="/special" ic="mic" title="특강 신청" sub={open.map((e) => specialDay(e.event_date)).join(" · ")} alert={deadlineBadge(open[0])} />
             ) : thisMonth.length > 0 && (
               <QuickItem href="/special" ic="mic" title="특강 다시 보기" sub="신청한 학생은 이번 달 말까지 다시 볼 수 있어요" />
             )}
-            <QuickItem href="/faq" ic="book" title="자주 묻는 질문" sub="교재비 · 강의실 · 라이브 · 출석 · 숙제" />
-            <QuickItem href="/about" ic="school" title="벨라토익 소개" sub="반 구성 · 시간표 · 수강 신청 방법" />
-          </div>
-        </div>
-      </section>
-
-      {/* ── 벨라쌤 소개 ── */}
-      <section className="sec" id="teacher">
-        <div className="wrap">
-          <SecHead eyebrow="ABOUT VELLA" title={<>영어전공자에게 배우는<br /><em>리얼 토익</em></>} sub="최단 프로젝트 리얼토익, 필요한 것만 제.대.로 공부하자!" />
-          <div className="teacher-grid">
-            <div className="h-card glass rv tilt">
-              <h3 className="card-t">{icon("laurel", "sm")}경력</h3>
-              <ul className="career">
-                {CAREER.map(([k, t]) => <li key={t}><span className={`k${k === "현" ? " now" : ""}`}>{k}</span>{t}</li>)}
-              </ul>
-              <div className="socials">
-                <a className="chip-link" href="https://www.instagram.com/vella_toeic/" {...out}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" /></svg>vella_toeic
-                </a>
-                <a className="chip-link" href={BRAND.youtubeUrl} {...out}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="4" /><path d="m10 9 5 3-5 3z" fill="currentColor" /></svg>벨라토익
-                </a>
-                <a className="chip-link" href={kakaoUrl} {...out}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 4C7 4 3 7.1 3 11c0 2.5 1.7 4.7 4.2 6l-1 3.6 4.1-2.7c.6.1 1.1.1 1.7.1 5 0 9-3.1 9-7S17 4 12 4z" /></svg>카톡 {BRAND.kakaoId}
-                </a>
-              </div>
-            </div>
-            <div className="h-card glass rv tilt">
-              <h3 className="card-t">{icon("book", "sm")}벨라토익 수업은</h3>
-              <ul className="ticks">{POINTS.map((p) => <li key={p}>{CHECK}<span>{p}</span></li>)}</ul>
-            </div>
-            <div className="h-card photo-card rv">
-              <img src="/img/stage.jpg" alt="무대에서 강의하는 벨라쌤" loading="lazy" width={364} height={337} />
-              <div className="photo-txt">
-                <p className="eyebrow">입소문으로 듣는 VELLA TOEIC</p>
-                {BUZZ.map((b) => <p key={b}>{b}</p>)}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 16회 프로젝트 ── */}
-      <section className="sec band" id="project">
-        <div className="wrap">
-          <SecHead eyebrow="ONE MONTH PROJECT" title={<>한 달, <em>16회</em>로 끝내는<br />토익 졸업 최단 프로젝트</>} sub="주 4회 · 16회 완성 (회당 120분)" />
-          <div className="sixteen rv" aria-label="16회 완성">
-            {Array.from({ length: 16 }, (_, i) => <span key={i} className="dot16" style={{ "--i": i } as React.CSSProperties}><b>{i + 1}</b></span>)}
-          </div>
-          <div className="tracks">
-            {TRACKS_INTRO.map((t) => (
-              <article key={t.title} className="h-card track rv tilt">
-                {icon(t.icon, "lg")}
-                <h3>{t.title}</h3>
-                <p className="lead">{t.lead}</p>
-                <ul className="ticks">{t.items.map((x) => <li key={x}>{CHECK}<span>{x}</span></li>)}</ul>
-                <p className="fine">*전체 커리큘럼 중 맞춤형 과정 선택!</p>
-              </article>
-            ))}
-          </div>
-          <div className="photo-row">
-            {PHOTOS.map((p) => (
-              <figure key={p.src} className="ph rv">
-                <img src={p.src} alt="벨라토익 수업 사진" loading="lazy" />
-                <figcaption>{p.lines.map((l) => <span key={l}>{l}</span>)}</figcaption>
-              </figure>
-            ))}
+            <QuickItem href="/faq" ic="feedback" title="자주 묻는 질문" sub="교재 · 강의실 · 라이브 · 출석 · 숙제" />
           </div>
         </div>
       </section>
@@ -233,6 +185,27 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
           <div className="finder-grid">
             <div className="rv"><ClassFinder kakaoUrl={kakaoUrl} /></div>
             <div className="class-list">{CLASSES_INTRO.map((c) => <ClassCard key={c.id} c={c} />)}</div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 강좌 시간표 (수업일 설정의 개강일로 자동) ── */}
+      <section className="sec" id="courses">
+        <div className="wrap">
+          <SecHead
+            eyebrow={courseMonth ? `${courseMonth.month}월 CLASSES` : "CLASSES"}
+            title={courseTitle}
+            sub={`${BRAND.centerShort} · 모든 반이 현장과 불라방(실시간 라이브) 둘 다 열려요`}
+          />
+          <Courses cards={COURSE_CARDS} starts={starts} />
+          <div className="h-card note-card rv">
+            <p>{COURSE_NOTE}</p>
+            <ul>{COURSE_EVENTS.map((e) => <li key={e}>{e}</li>)}</ul>
+            <div className="h-row">
+              <a className="h-btn gold" href={BRAND.courseUrl} {...out}>YBM에서 수강료 · 수강 신청 ↗</a>
+              <a className="h-btn line" href={`tel:${BRAND.phone.replace(/-/g, "")}`}>문의 {BRAND.phone}</a>
+            </div>
+            <p className="fine">수강료 · 할인은 반과 이벤트마다 달라 YBM 공식 페이지에서 안내해요.</p>
           </div>
         </div>
       </section>
@@ -274,47 +247,63 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
         </div>
       </section>
 
+      {/* ── 벨라쌤 소개 ── */}
+      <section className="sec" id="teacher">
+        <div className="wrap">
+          <SecHead eyebrow="ABOUT VELLA" title={<>영어전공자에게 배우는<br /><em>리얼 토익</em></>} sub="최단 프로젝트 리얼토익, 필요한 것만 제.대.로 공부하자!" />
+          <div className="teacher-grid">
+            <div className="h-card glass rv tilt">
+              <h3 className="card-t">{icon("laurel", "sm")}경력</h3>
+              <ul className="career">
+                {CAREER.map(([k, t]) => <li key={t}><span className={`k${k === "현" ? " now" : ""}`}>{k}</span>{t}</li>)}
+              </ul>
+              <div className="socials">
+                <a className="chip-link" href="https://www.instagram.com/vella_toeic/" {...out}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" /></svg>vella_toeic
+                </a>
+                <a className="chip-link" href={BRAND.youtubeUrl} {...out}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="4" /><path d="m10 9 5 3-5 3z" fill="currentColor" /></svg>벨라토익
+                </a>
+                <a className="chip-link" href={kakaoUrl} {...out}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 4C7 4 3 7.1 3 11c0 2.5 1.7 4.7 4.2 6l-1 3.6 4.1-2.7c.6.1 1.1.1 1.7.1 5 0 9-3.1 9-7S17 4 12 4z" /></svg>카톡 {BRAND.kakaoId}
+                </a>
+              </div>
+            </div>
+            <div className="h-card glass rv tilt">
+              <h3 className="card-t">{icon("book", "sm")}벨라토익 수업은</h3>
+              <ul className="ticks">{POINTS.map((p) => <li key={p}>{CHECK}<span>{p}</span></li>)}</ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 16회 프로젝트 ── */}
+      <section className="sec band" id="project">
+        <div className="wrap">
+          <SecHead eyebrow="ONE MONTH PROJECT" title={<>한 달, <em>16회</em>로 끝내는<br />토익 졸업 최단 프로젝트</>} sub="주 4회 · 16회 완성 (회당 120분)" />
+          <div className="sixteen rv" aria-label="16회 완성">
+            {Array.from({ length: 16 }, (_, i) => <span key={i} className="dot16" style={{ "--i": i } as React.CSSProperties}><b>{i + 1}</b></span>)}
+          </div>
+          <div className="tracks">
+            {TRACKS_INTRO.map((t) => (
+              <article key={t.title} className="h-card track rv tilt">
+                {icon(t.icon, "lg")}
+                <h3>{t.title}</h3>
+                <p className="lead">{t.lead}</p>
+                <ul className="ticks">{t.items.map((x) => <li key={x}>{CHECK}<span>{x}</span></li>)}</ul>
+                <p className="fine">*전체 커리큘럼 중 맞춤형 과정 선택!</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── 혜택 ── */}
       <section className="sec band">
         <div className="wrap">
           <SecHead eyebrow="BENEFITS" title={<>벨라토익 클래스<br /><em>끝없는 혜택!</em></>} />
           <div className="perks">
             {PERKS.map(([ic, t]) => <div key={t} className="perk rv tilt">{icon(ic)}<p>{t}</p></div>)}
-          </div>
-        </div>
-      </section>
-
-      {/* ── 강좌 시간표 (수업일 설정의 개강일로 자동) ── */}
-      <section className="sec" id="courses">
-        <div className="wrap">
-          <SecHead
-            eyebrow={courseMonth ? `${courseMonth.month}월 CLASSES` : "CLASSES"}
-            title={courseTitle}
-            sub={`${BRAND.centerShort} · 모든 반이 현장과 불라방(실시간 라이브) 둘 다 열려요`}
-          />
-          <Courses cards={COURSE_CARDS} starts={starts} />
-          <div className="h-card note-card rv">
-            <p>{COURSE_NOTE}</p>
-            <ul>{COURSE_EVENTS.map((e) => <li key={e}>{e}</li>)}</ul>
-            <div className="h-row">
-              <a className="h-btn gold" href={BRAND.courseUrl} {...out}>YBM에서 수강료 · 수강 신청 ↗</a>
-              <a className="h-btn line" href={`tel:${BRAND.phone.replace(/-/g, "")}`}>문의 {BRAND.phone}</a>
-            </div>
-            <p className="fine">수강료 · 할인은 반과 이벤트마다 달라 YBM 공식 페이지에서 안내해요.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 마무리 ── */}
-      <section className="sec closing">
-        <div className="wrap narrow rv">
-          <p className="hand">토익 공부, 어떻게 시작해야할 지 몰라 미루고 계신가요?</p>
-          <h2><span className="q">&ldquo;</span>제대로 된 토익 시작<br />한방에 졸업 가능합니다<span className="q">&rdquo;</span></h2>
-          <p className="closing-txt">{CLOSING.map((l, i) => <span key={i}>{l}<br /></span>)}</p>
-          <p className="closing-sign">YBM 서면 <span>×</span> 벨라토익<br /><b>직접 경험해보세요!</b></p>
-          <div className="h-row center">
-            <a className="h-btn gold" href={kakaoUrl} {...out}>카톡 1:1 상담</a>
-            <a className="h-btn line" href={BRAND.courseUrl} {...out}>{courseMonth ? `${courseMonth.month}월 ` : ""}강좌 신청 ↗</a>
           </div>
         </div>
       </section>

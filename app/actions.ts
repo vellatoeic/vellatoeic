@@ -82,7 +82,7 @@ function validScheduleClass(value: string): value is ScheduleClass {
   return Object.hasOwn(SCHEDULE_CLASSES, value);
 }
 
-// ── 교재비 신청 ─────────────────────────────────
+// ── 교재 신청 ─────────────────────────────────
 export async function submitApplication(_: FormState, fd: FormData): Promise<FormState> {
   const kind = clean(fd.get("kind")) as Kind;
   const course = clean(fd.get("course")) as CourseId;

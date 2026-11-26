@@ -4,7 +4,7 @@ import { keep } from "@/lib/keep";
 import { useActionState } from "react";
 import { linkWithPin, type FormState } from "@/app/actions";
 
-// 처음 한 번: 교재비 신청 때 정한 이름 + 비밀번호로 내 신청 찾기
+// 처음 한 번: 교재 신청 때 정한 이름 + 비밀번호로 내 신청 찾기
 export default function LinkForm({ next }: { next: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(linkWithPin, {});
   return (

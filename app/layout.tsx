@@ -53,11 +53,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <nav className="site-hdr-in">
             <Link href="/" className="wordmark" aria-label="벨라토익 첫 화면">VELLA <i>TOEIC</i></Link>
             <div className="site-hdr-nav" aria-label="첫 화면 바로가기">
-              <Link href="/#teacher">벨라쌤 소개</Link>
-              <Link href="/#project">최단 프로젝트</Link>
               <Link href="/#finder">반 찾기</Link>
-              <Link href="/#proof">성적 인증</Link>
+              <a href="https://www.ybmedu.com/seomyon/vellatoeic" target="_blank" rel="noopener noreferrer">수강 신청</a>
+              <Link href="/guide">교재 신청</Link>
               <Link href="/#courses">강좌</Link>
+              <Link href="/#proof">성적·후기</Link>
               <Link href="/faq">FAQ</Link>
             </div>
             <div className="ml-auto flex items-center gap-1.5">
