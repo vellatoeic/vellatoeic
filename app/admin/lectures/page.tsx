@@ -6,6 +6,10 @@ import { editLecture, removeLecture } from "@/app/actions";
 import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
 import UploadForm from "./UploadForm";
+import LectureBoard, { type BoardRowView } from "./LectureBoard";
+import { BOARD_ROWS, dateLabel, defaultTitle, liveRowId, rowStatus, sessionNo } from "@/lib/lectureBoard";
+import { scheduleDays } from "@/lib/classCalendar";
+import { safe } from "@/lib/safe";
 import CloseOnSubmitForm from "../CloseOnSubmitForm";
 import { classCohortNow } from "@/lib/classCohort";
 import { cohortUntil } from "@/lib/viewWindowServer";
@@ -14,12 +18,37 @@ import { todayKST } from "@/lib/config";
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
 
-export default async function Lectures({ searchParams }: { searchParams: Promise<{ old?: string }> }) {
+export default async function Lectures({ searchParams }: { searchParams: Promise<{ old?: string; d?: string }> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
-  const { old } = await searchParams;
+  const { old, d } = await searchParams;
   const now = await classCohortNow(); // 강의는 지금 수업 중인 기수가 기본
   const all = await listLectures();
   const today = todayKST();
+
+  // '오늘 수업 링크' 판: 고른 날짜(기본 오늘)의 수업 기수 · 시간표 6칸
+  const day = d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : today;
+  const dayCohort = day === today ? now : await classCohortNow(day);
+  const [startDays, solveDays] = await Promise.all([
+    safe("lectures.startDays", () => scheduleDays(dayCohort, "start-all"), [] as string[]),
+    safe("lectures.solveDays", () => scheduleDays(dayCohort, "solve-all"), [] as string[]),
+  ]);
+  const classDays = [...new Set([...startDays, ...solveDays])].sort();
+  const prevDay = classDays.filter((x) => x < day).at(-1) ?? null;
+  const nextDay = classDays.find((x) => x > day) ?? null;
+  const isClassDay = classDays.includes(day);
+  const hhmm = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(11, 16);
+  const live = day === today ? liveRowId(hhmm) : null;
+  const rows: BoardRowView[] = BOARD_ROWS.map((r) => {
+    const st = rowStatus(r, all, dayCohort, day);
+    const no = sessionNo(r.courses.includes("start") ? startDays : solveDays, day);
+    return {
+      id: r.id, slot: r.slot, time: `${r.from}~${r.to}`, label: r.label,
+      to: r.courses.map((c) => COURSES[c].label).join(" + "),
+      title: defaultTitle(r, day, no), done: st.done, youtubeId: st.youtubeId,
+      missing: st.missing.map((c) => COURSES[c].label), live: live === r.id,
+    };
+  });
+  const sessionText = sessionNo(startDays, day);
   const allCohorts = [...new Set([now, ...all.map((l) => l.cohort)])].sort().reverse();
   // 열람 마감(다음 달 개강 전날)이 지난 기수는 기본으로 숨겨요 (기록은 보관, '지난 기수 보기'로만)
   const pastSet = new Set((await Promise.all(allCohorts.map(async (c) => (c !== now && (await cohortUntil(c)) < today ? c : null)))).filter((c): c is string => !!c));
@@ -33,12 +62,27 @@ export default async function Lectures({ searchParams }: { searchParams: Promise
       <div className="card space-y-2 text-sm text-slate-600">
         <p className="font-jua text-lg text-sky-ink">유튜브 업로드 방법</p>
         <p>1. 유튜브에 강의를 올릴 때 공개 범위를 <b className="text-sky-deep">&apos;일부 공개&apos;</b>로 선택해요.</p>
-        <p>2. 영상 링크를 복사해서 아래에 붙여넣고 반·RC/LC·오전반/저녁반·제목을 고르면 끝!</p>
+        <p>2. 영상 링크를 복사해서 아래 시간표 칸에 붙여넣으면 끝! 반·RC/LC·오전반/저녁반·제목은 자동이에요.</p>
         <p>3. 해당 기수에서 그 반을 신청하고 납부가 확인된 학생에게만 보여요.</p>
         <p>4. 가장 최근에 올린 링크가 학생 강의실 &apos;라이브 바로가기&apos;에 바로 연결돼요. (오전반 학생은 오전반 링크, 저녁반 학생은 저녁반 링크)</p>
       </div>
 
-      <UploadForm defaultCohort={now} />
+      <nav className="flex flex-wrap items-center gap-2 text-sm">
+        {prevDay ? <a href={`/admin/lectures?d=${prevDay}`} className="btn-ghost !px-3 !py-1.5 inline-flex items-center gap-1"><Icon name="chevronLeft" size={14} />{dateLabel(prevDay)}</a> : <span />}
+        <form className="flex items-center gap-2">
+          <input type="date" name="d" defaultValue={day} className="input !w-44 !py-1.5" />
+          <button className="btn-ghost !px-3 !py-1.5">보기</button>
+        </form>
+        {day !== today && <a href="/admin/lectures" className="font-bold text-sky-deep underline">오늘로</a>}
+        {nextDay && <a href={`/admin/lectures?d=${nextDay}`} className="btn-ghost !px-3 !py-1.5 ml-auto inline-flex items-center gap-1">{dateLabel(nextDay)}<Icon name="chevronRight" size={14} /></a>}
+      </nav>
+      {!isClassDay && <p className="rounded-2xl bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-700">{dateLabel(day)}은 [수업일 설정]에 없는 날이에요. 보강·특별 수업이면 그대로 올려도 돼요.</p>}
+      <LectureBoard cohort={dayCohort} date={day} dateText={`${cohortLabel(dayCohort)} ${sessionText ? `${sessionText}회 · ` : ""}${dateLabel(day)}`} rows={rows} />
+
+      <details className="card !p-4">
+        <summary className="cursor-pointer font-jua text-lg text-sky-ink">직접 골라 올리기 (방학 시간표·특별 수업)</summary>
+        <div className="mt-3"><UploadForm defaultCohort={now} /></div>
+      </details>
 
       {pastSet.size > 0 && (
         <p className="flex flex-wrap items-center gap-2 rounded-2xl bg-slate-50 px-4 py-2.5 text-sm text-slate-500">

@@ -39,6 +39,8 @@ import { altFixResult, altTrackError, findPrevAlt, planBooks } from "@/lib/altCo
 import { currentAltIssues } from "@/lib/altIssuesServer";
 import { adjustedBooks } from "@/lib/manualLink";
 import { safe } from "@/lib/safe";
+import { BOARD_ROWS, dateLabel, defaultTitle, sessionNo, targetsOf } from "@/lib/lectureBoard";
+import { scheduleDays } from "@/lib/classCalendar";
 import { receiptVerdict } from "@/lib/receipt/verdict";
 import { OCR_CAP_KEY, OCR_SWITCH_KEY } from "@/lib/receipt/usage";
 import {
@@ -527,6 +529,35 @@ export async function uploadLecture(_: FormState, fd: FormData): Promise<FormSta
   revalidatePath("/class");
   revalidatePath("/admin/lectures");
   return { ok: count > 1 ? `'${title}' 강의를 ${count}곳에 올렸어요.` : `'${title}' 강의를 올렸어요.` };
+}
+
+// [강의 관리] '오늘 수업 링크' 판: 시간표 칸마다 링크만 붙이면 반·RC/LC·오전/저녁이 자동 (LC 공통은 두 반에). 채운 칸만 한 번에 올려요.
+export async function uploadBoardLectures(_: FormState, fd: FormData): Promise<FormState> {
+  if (!(await isAdmin())) return { error: "관리자 로그인이 필요해요." };
+  const cohort = clean(fd.get("cohort"));
+  const date = clean(fd.get("date"));
+  if (!/^\d{4}-\d{2}$/.test(cohort)) return { error: "기수를 확인해 주세요." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "수업 날짜를 골라 주세요." };
+  const filled = BOARD_ROWS.map((row) => ({ row, url: clean(fd.get(`link_${row.id}`)), title: clean(fd.get(`title_${row.id}`)) })).filter((x) => x.url);
+  if (filled.length === 0) return { error: "링크를 하나 이상 붙여 넣어 주세요." };
+  const bad = filled.filter((x) => !youtubeId(x.url));
+  if (bad.length > 0) return { error: `유튜브 링크를 확인해 주세요: ${bad.map((x) => `${x.row.slot === "am" ? "오전" : "저녁"} ${x.row.label}`).join(", ")}` };
+  const [startDays, solveDays] = await Promise.all([
+    safe("board.startDays", () => scheduleDays(cohort, "start-all"), [] as string[]),
+    safe("board.solveDays", () => scheduleDays(cohort, "solve-all"), [] as string[]),
+  ]);
+  let count = 0;
+  for (const { row, url, title } of filled) {
+    const no = sessionNo(row.courses.includes("start") ? startDays : solveDays, date);
+    const t = title || defaultTitle(row, date, no);
+    for (const target of targetsOf(row)) {
+      await addLecture({ cohort, ...target, title: t, youtube_id: youtubeId(url)! });
+      count++;
+    }
+  }
+  revalidatePath("/class");
+  revalidatePath("/admin/lectures");
+  return { ok: `${dateLabel(date)} 수업 ${filled.length}칸을 올렸어요 (학생 반 ${count}곳에 연결).` };
 }
 
 // 올린 강의의 제목·링크·기수·반·RC/LC 고치기 (잘못된 값이면 그대로 둬요)
