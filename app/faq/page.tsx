@@ -1,6 +1,7 @@
 import { listFaq } from "@/lib/db";
 import { pageMeta } from "@/lib/seo";
 import FaqList from "@/components/FaqList";
+import FaqSearch from "@/components/FaqSearch";
 
 export const dynamic = "force-dynamic";
 export const metadata = pageMeta("자주 묻는 질문 | 부산 서면 토익 벨라토익", "부산 서면 토익 벨라토익 자주 묻는 질문. 교재비 납부, 교재 수령, 강의실·라이브, 출석·숙제, 특강 안내를 모았어요.", "/faq");
@@ -29,7 +30,9 @@ export default async function FaqPage() {
         <p className="text-xs font-bold tracking-[0.12em] text-sky-deep">FAQ</p>
         <h1 className="font-jua mt-1 text-4xl text-sky-ink">자주 묻는 질문</h1>
       </div>
-      <FaqList items={items} />
+      <FaqSearch items={items}>
+        <FaqList items={items} />
+      </FaqSearch>
     </div>
   );
 }
