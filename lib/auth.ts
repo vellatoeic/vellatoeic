@@ -122,6 +122,24 @@ export async function clearPendingLink() {
   (await cookies()).delete("vella_link");
 }
 
+// ── 로그아웃: 학생·관리자·연결 대기 기록을 모두 지워요 ──
+// 카카오는 브라우저에 로그인을 기억해서, 그냥 두면 다음에 버튼을 누르자마자 같은 계정으로 들어가요.
+// 그래서 로그아웃한 뒤 첫 카카오 로그인은 카카오 로그인 화면을 다시 보여줘요(vella_relogin, 1시간, /api/auth에만).
+const RELOGIN = { ...cookieOpts, path: "/api/auth", maxAge: 60 * 60 };
+export async function logoutAll() {
+  await clearStudent();
+  const jar = await cookies();
+  jar.delete("vella_admin");
+  jar.delete("vella_link");
+  jar.set("vella_relogin", "1", RELOGIN);
+}
+export async function takeRelogin() {
+  const jar = await cookies();
+  const v = jar.get("vella_relogin")?.value === "1";
+  if (v) jar.set("vella_relogin", "", { ...RELOGIN, maxAge: 0 });
+  return v;
+}
+
 // ── 관리자 ─────────────────────────────────────
 function adminPassword() {
   return process.env.ADMIN_PASSWORD || (isPreview ? "vella" : "");

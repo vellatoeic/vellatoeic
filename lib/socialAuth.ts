@@ -10,7 +10,8 @@ export const callbackUrl = (origin: string, p: Provider) => `${origin}/api/auth/
 export const randomToken = (bytes = 24) => randomBytes(bytes).toString("base64url");
 const challenge = (verifier: string) => createHash("sha256").update(verifier).digest("base64url");
 
-export function authorizeUrl(p: Provider, origin: string, state: string, verifier: string): string {
+// relogin: 로그아웃한 뒤 첫 로그인이면 카카오도 로그인 화면을 다시 보여줘요(다른 계정을 고를 수 있게). 카카오톡 안 브라우저는 지원 안 해서 빼요.
+export function authorizeUrl(p: Provider, origin: string, state: string, verifier: string, relogin = false): string {
   const redirect_uri = callbackUrl(origin, p);
   if (p === "google") {
     const q = new URLSearchParams({
@@ -26,6 +27,7 @@ export function authorizeUrl(p: Provider, origin: string, state: string, verifie
     return `https://accounts.google.com/o/oauth2/v2/auth?${q}`;
   }
   const q = new URLSearchParams({ client_id: process.env.KAKAO_REST_API_KEY ?? "", redirect_uri, response_type: "code", state });
+  if (relogin) q.set("prompt", "login");
   return `https://kauth.kakao.com/oauth/authorize?${q}`;
 }
 

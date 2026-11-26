@@ -45,7 +45,7 @@ import { receiptVerdict } from "@/lib/receipt/verdict";
 import { OCR_CAP_KEY, OCR_SWITCH_KEY } from "@/lib/receipt/usage";
 import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
-  setAccount, getAccountId, getPendingLink, clearPendingLink,
+  setAccount, getAccountId, getPendingLink, clearPendingLink, logoutAll,
   isViewOnly, setViewing, clearViewing,
 } from "@/lib/auth";
 import { isProvider, isSignupNext, loginModeOf, parseAdminLogins, planLink, safeNext } from "@/lib/socialLogin";
@@ -277,7 +277,7 @@ export async function cancelLink() {
 }
 
 export async function studentLogout() {
-  await clearStudent(); // 이름+비밀번호 로그인 · 구글 로그인 모두 풀려요
+  await logoutAll(); // 이름+비밀번호 · 카카오·구글 · 관리자 로그인이 모두 풀려요
   redirect("/");
 }
 
@@ -316,7 +316,7 @@ export async function markAppsSeen() {
 }
 
 export async function logout() {
-  await clearAdmin();
+  await logoutAll(); // 관리자도 학생 쪽 로그인까지 모두 풀어요
   redirect("/admin");
 }
 
@@ -1039,7 +1039,7 @@ export async function specialLogin(_: FormState, fd: FormData): Promise<FormStat
 }
 
 export async function specialLogout() {
-  await clearStudent();
+  await logoutAll();
   redirect("/special");
 }
 

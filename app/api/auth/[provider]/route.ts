@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import type { NextRequest } from "next/server";
-import { setOAuthState } from "@/lib/auth";
+import { setOAuthState, takeRelogin } from "@/lib/auth";
 import { authorizeUrl, randomToken } from "@/lib/socialAuth";
 import { isAdminOAuth, isProvider, readyProviders, safeNext } from "@/lib/socialLogin";
 import { loginSetup } from "@/lib/socialServer";
@@ -18,5 +18,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ provider: s
   if (!isProvider(provider) || !providers.includes(provider)) redirect(next);
   const state = randomToken(), verifier = randomToken(32);
   await setOAuthState({ p: provider, s: state, v: verifier, n: next, l: q.get("link") === "1", ...(isAdminOAuth(admin) ? { a: admin } : {}) });
-  redirect(authorizeUrl(provider, req.nextUrl.origin, state, verifier));
+  const relogin = (await takeRelogin()) && !/KAKAOTALK/i.test(req.headers.get("user-agent") ?? "");
+  redirect(authorizeUrl(provider, req.nextUrl.origin, state, verifier, relogin));
 }
