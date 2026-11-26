@@ -30,7 +30,7 @@ export const COURSE_CARDS: CourseCard[] = [
   { group: "all", kind: "종합반", level: "실전속성", goal: "개념+실전 한 번에", days: "월~목", count: "월16회", months: 1, times: [range(fastAm), range(fastPm)], klass: "intensive-all" },
   { group: "all", kind: "종합반", level: "750+", goal: "750 목표", days: "월~목", count: "월16회", months: 1, times: [range(solveAm), range(solvePm)], klass: "solve-all" },
   { group: "all", kind: "종합반", level: "650+", goal: "650 목표", days: "월~목", count: "월16회", months: 1, times: [range(startAm), range(startPm)], klass: "start-all" },
-  { group: "lc", kind: "LC 단과", level: "650+ · 750+", goal: "LC 공통 수업", days: "월~목", count: "월16회", months: 1, times: [range(lcAm), range(lcPm)], klass: "start-all" },
+  { group: "lc", kind: "LC 단과", level: "650+ · 750+", goal: "LC만 집중", days: "월~목", count: "월16회", months: 1, times: [range(lcAm), range(lcPm)], klass: "start-all" },
   { group: "rc", kind: "RC 단과", level: "750+", goal: "750 목표", days: "월~목", count: "월16회", months: 1, times: SOLVE_RC, klass: "solve-all" },
   { group: "rc", kind: "RC 단과", level: "650+", goal: "650 목표", days: "월~목", count: "월16회", months: 1, times: START_RC, klass: "start-all" },
   { group: "alt", kind: "격일반", level: "750+", goal: "750 목표", days: "월수", count: "월8회", months: 2, times: [range(solveAm), range(solvePm)], klass: "solve-mw" },

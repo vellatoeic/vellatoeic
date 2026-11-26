@@ -19,7 +19,7 @@ const CLASSES = [
   { icon: "target", name: "문풀반", goal: "토익 750 목표", body: "개념을 아는 분을 위한 실전반이에요. 점수가 오르는 풀이 감각을 집중해서 끌어올려요." },
   { icon: "stopwatch", name: "속성반", goal: "한 달 집중", body: "한 달 동안 시작반과 문풀반을 함께 듣는 주 4일 집중 과정이에요. 짧은 기간에 개념과 실전을 한 번에 끝내고 싶은 분께 맞아요." },
   { icon: "calendar", name: "격일반", goal: "2달 완성", body: "월·수 또는 화·목, 주 2일씩 두 달 이어 들으면 한 과정이 완성돼요. 일정이 바쁜 직장인·대학생에게 좋아요." },
-  { icon: "headphones", name: "단과", goal: "RC 또는 LC만", body: "RC만, 혹은 LC만 집중해서 듣고 싶을 때 골라요. LC는 시작반·문풀반 공통 수업이에요." },
+  { icon: "headphones", name: "단과", goal: "RC 또는 LC만", body: "RC만, 혹은 LC만 집중해서 듣고 싶을 때 골라요." },
 ];
 
 const CARE = [

@@ -4,7 +4,7 @@ import Icon from "@/components/Icon";
 import { startTransition, useActionState, useRef, useState, type FormEvent } from "react";
 import { previewApplication, submitApplication, type FormState } from "@/app/actions";
 import type { ReceiptResult } from "@/app/receiptActions";
-import type { ReceiptClass } from "@/lib/receipt/classes";
+import { classTextWithLevel, type ReceiptClass } from "@/lib/receipt/classes";
 import ReceiptStep from "./ReceiptStep";
 import { BRING_BOOKS_TEXT, lateDeliveryWarning, LATE_DELIVERY_TEXT } from "@/lib/altContinue";
 import { scheduleClassFor } from "@/lib/schedule";
@@ -43,7 +43,7 @@ const choice = (on: boolean) =>
 type MonthOption = { cohort: string; label: string; range: string; round: 1 | 2; windows: Record<string, { first: string | null; last: string | null }> };
 
 // account: 구글·카카오만 방식에서 로그인한 계정 이름 (있으면 비밀번호 칸이 없어요)
-export default function ApplyForm({ kind, months, today, account = null, receiptMenu = null }: { kind: Kind; months: MonthOption[]; today: string; account?: string | null; receiptMenu?: string | null }) {
+export default function ApplyForm({ kind, months, today, account = null, receiptMenu = null, notices = [] }: { kind: Kind; months: MonthOption[]; today: string; account?: string | null; receiptMenu?: string | null; notices?: string[] }) {
   const pinFields = !account;
   const [state, action, pending] = useActionState<FormState, FormData>(submitApplication, {});
   // 수강 월: 하나뿐이면 자동, 둘이면 기본 선택 없이 꼭 고르기
@@ -186,6 +186,33 @@ export default function ApplyForm({ kind, months, today, account = null, receipt
 
       {ready ? (
         <>
+      {locked && course && slot && month ? (
+        <div className="space-y-3">
+          <div className="rounded-3xl bg-gradient-to-br from-[#4fb3e8] via-sky-deep to-[#1f78ad] p-5 text-white shadow-[0_10px_26px_rgba(43,143,199,0.3)]">
+            <p className="text-sm opacity-85">수강증으로 확인한 내 반</p>
+            <p className="mt-1 font-jua text-2xl leading-snug">{classTextWithLevel({ cohort: month, course, track, slot })}</p>
+            <p className="text-sm opacity-90">{KINDS[kind].label} · {slotLabel({ course, track }, slot)}</p>
+            <div className="mt-4 flex items-end justify-between gap-3 rounded-2xl bg-white/15 p-4">
+              <span className="min-w-0">
+                <b className="block font-jua text-lg">교재 {books.length}권{askContinuing && continuing === true ? " · 이어듣기" : ""}</b>
+                <small className="block text-xs opacity-90">{books.map((b) => BOOKS[b]).join(" · ")}{pickup === "delivery" ? ` + 택배비 ${won(SHIPPING_FEE)}` : ""}</small>
+              </span>
+              <span className="shrink-0 text-right"><small className="block text-xs opacity-80">교재비</small><b className="font-jua text-3xl">{won(amount)}</b></span>
+            </div>
+          </div>
+          {months.length > 1 && receiptClasses.length > 1 && (
+            <div className="grid grid-cols-2 gap-3">
+              {months.filter((m) => receiptClasses.some((c) => c.cohort === m.cohort)).map((m) => (
+                <button type="button" key={m.cohort} onClick={() => chooseMonth(m.cohort)} aria-pressed={month === m.cohort} className={`${choice(month === m.cohort)} text-center`}>
+                  <span className="block font-jua text-lg text-sky-ink">{m.label}</span>
+                  <span className="text-xs text-slate-500">{m.range}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
       <div className="border-t-2 border-dashed border-sky-main pt-5">
         <p className="flex items-center gap-2 font-jua text-xl text-sky-ink"><span className="grid h-7 w-7 place-items-center rounded-full bg-sky-deep text-sm text-white">2</span>{locked ? "수강증대로 정해진 반을 확인해요" : "학원에 등록한 반을 골라요"}</p>
         <p className="mt-1 text-sm text-slate-500">{locked ? "수강 월·반·과정·시간은 수강증대로 채워져서 바꿀 수 없어요. 이름과 교재 받는 방법만 적어 주세요." : "수강증에서 반을 다 읽지 못했어요. 학원에 등록한 반과 똑같이 골라 주세요. 선생님이 수강증과 비교해서 확인해요."}</p>
@@ -247,22 +274,6 @@ export default function ApplyForm({ kind, months, today, account = null, receipt
         </div>
       )}
 
-      {askContinuing && (
-        <div>
-          <p className="label">지난달에도 시작반 격일반을 들었어요? <span className="font-normal text-slate-400">(지난달 기록으로 자동 확인돼요)</span></p>
-          <div className="grid grid-cols-2 gap-3">
-            <button type="button" onClick={() => setContinuing(true)} className={`${choice(continuing === true)} text-center`}>
-              <span className="font-jua text-lg text-sky-ink">예</span>
-              <span className="mt-1 block text-sm text-slate-600">LC 교재만 받아요</span>
-            </button>
-            <button type="button" onClick={() => setContinuing(false)} className={`${choice(continuing === false)} text-center`}>
-              <span className="font-jua text-lg text-sky-ink">아니요</span>
-              <span className="mt-1 block text-sm text-slate-600">처음 듣는 과정이에요</span>
-            </button>
-          </div>
-        </div>
-      )}
-
       {course && (
         <div>
           <p className="label">3. 수강 시간</p>
@@ -276,6 +287,25 @@ export default function ApplyForm({ kind, months, today, account = null, receipt
                 </button>
               );
             })}
+          </div>
+        </div>
+      )}
+
+        </>
+      )}
+
+      {askContinuing && (
+        <div>
+          <p className="label">지난달에도 시작반 격일반을 들었어요? <span className="font-normal text-slate-400">(지난달 기록으로 자동 확인돼요)</span></p>
+          <div className="grid grid-cols-2 gap-3">
+            <button type="button" onClick={() => setContinuing(true)} className={`${choice(continuing === true)} text-center`}>
+              <span className="font-jua text-lg text-sky-ink">예</span>
+              <span className="mt-1 block text-sm text-slate-600">LC 교재만 받아요</span>
+            </button>
+            <button type="button" onClick={() => setContinuing(false)} className={`${choice(continuing === false)} text-center`}>
+              <span className="font-jua text-lg text-sky-ink">아니요</span>
+              <span className="mt-1 block text-sm text-slate-600">처음 듣는 과정이에요</span>
+            </button>
           </div>
         </div>
       )}
@@ -355,20 +385,26 @@ export default function ApplyForm({ kind, months, today, account = null, receipt
         )}
       </div>
 
-      <div className="flex items-start gap-3 rounded-2xl bg-sky-soft p-4">
-        <input id="ybm_registered" type="checkbox" name="ybm_registered" className="mt-1 h-5 w-5 accent-sky-deep" />
-        <span className="text-[15px] text-slate-700">
-          <label htmlFor="ybm_registered">YBM 학원 수강 등록을 마쳤어요.</label>
-          <a href="https://www.ybmedu.com/seomyon/vellatoeic" target="_blank" rel="noreferrer" className="mt-0.5 block text-xs text-sky-deep underline underline-offset-2">아직이라면 먼저 등록하기 ↗</a>
-        </span>
-      </div>
-
-      <label className="flex items-start gap-3 rounded-2xl bg-sky-soft p-4">
+      <input type="hidden" name="ybm_registered" value="1" />
+      {notices.length > 0 && (
+        <details className="group rounded-2xl bg-sky-soft p-4">
+          <summary className="flex cursor-pointer list-none items-center justify-between font-bold text-sky-ink">
+            필독 사항 {notices.length}가지
+            <span className="text-sm font-normal text-sky-deep group-open:hidden">눌러서 읽기</span>
+          </summary>
+          <ul className="mt-3 space-y-2">
+            {notices.map((n) => (
+              <li key={n} className="flex gap-2 text-[15px] leading-relaxed text-slate-700"><Icon name="check" size={16} className="mt-1 shrink-0 text-sky-deep" />{n}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+      <label className="flex items-start gap-3 rounded-2xl border-2 border-sky-main/60 bg-white p-4">
         <input type="checkbox" name="agree" className="mt-1 h-5 w-5 accent-sky-deep" />
-        <span className="text-[15px] text-slate-700">위 필독 사항을 모두 읽었어요.</span>
+        <span className="text-[15px] text-slate-700">필독 사항을 읽었어요.</span>
       </label>
 
-      <div className="rounded-2xl border-2 border-dashed border-sky-main p-5 text-center">
+      {!locked && <div className="rounded-2xl border-2 border-dashed border-sky-main p-5 text-center">
         {course && (
           <p className="mb-2 rounded-full bg-sky-soft px-3 py-1 text-sm font-bold text-sky-ink">
             {KINDS[kind].label} · {COURSES[course].label} {TRACKS[track]}
@@ -388,14 +424,14 @@ export default function ApplyForm({ kind, months, today, account = null, receipt
         ) : (
           <p className="text-slate-500">반과 과정을 고르면 교재와 금액이 자동으로 나와요.</p>
         )}
-      </div>
+      </div>}
 
       {(checkError || state.error) && <p className="rounded-xl bg-red-50 p-3 text-center font-bold text-red-600">{checkError || state.error}</p>}
 
       <button className="btn w-full" disabled={pending || blocked || checking}>
-        {pending ? "제출 중…" : checking ? "확인 중…" : "입력 내용 확인하기"}
+        {pending ? "제출 중…" : checking ? "확인 중…" : amount > 0 && course ? `교재비 ${won(amount)} 입금 안내 받기` : "입력 내용 확인하기"}
       </button>
-      <p className="text-center text-sm text-slate-600">제출 후 나오는 계좌로 <b className="text-red-600">입금까지 해야</b> 신청이 완료돼요.<br />신청서는 한 번만 제출해 주세요.</p>
+      <p className="text-center text-sm text-slate-600">제출하면 바로 입금 계좌가 나와요. <b className="text-red-600">30분 안에 입금</b>하면 끝!<br />입금이 확인되면 강의실이 열려요.</p>
 
         </>
       ) : (

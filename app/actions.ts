@@ -103,9 +103,11 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   const pin = clean(fd.get("pin"));
   const slot = clean(fd.get("slot"));
   // 구글·카카오만 방식: 비밀번호 칸이 없고, 로그인한 학생 번호(account_id)로 신청이 묶여요
-  const social = (await loginSetup()).mode === "social";
-  const accountId = social ? await getAccountId() : null;
-  if (social && !accountId) return { error: "먼저 구글 또는 카카오로 로그인해 주세요." };
+  // 카카오·구글로 로그인한 학생은('둘 다' 방식 포함) 비밀번호 없이 학생 번호(account_id)로 신청해요
+  const loginMode = (await loginSetup()).mode;
+  const accountId = loginMode !== "pin" ? await getAccountId() : null;
+  if (loginMode === "social" && !accountId) return { error: "먼저 카카오 또는 구글로 로그인해 주세요." };
+  const social = !!accountId;
 
   if (!["onsite", "online"].includes(kind)) return { error: "수강 형태를 선택해 주세요." };
   if (!Object.hasOwn(COURSES, course)) return { error: "수강 신청한 반을 선택해 주세요." };
@@ -204,7 +206,7 @@ export async function previewApplication(fd: FormData): Promise<{ error?: string
   const pickup = (kind === "onsite" ? "classroom" : clean(fd.get("pickup"))) as Pickup;
   const cohort = clean(fd.get("cohort"));
   if (!Object.hasOwn(COURSES, course) || !COURSES[course].tracks.includes(track) || !/^\d{4}-\d{2}$/.test(cohort)) return { error: "반·과정·수강 월을 다시 골라 주세요." };
-  const accountId = (await loginSetup()).mode === "social" ? await getAccountId() : null;
+  const accountId = (await loginSetup()).mode !== "pin" ? await getAccountId() : null;
   const plan = await applicationPlan({ cohort, course, track, pickup, name: normName(clean(fd.get("name"))), pin: clean(fd.get("pin")), wantContinuing: !!fd.get("continuing"), accountId });
   if (plan.error) return { error: plan.error };
   return { books: plan.books.map((b) => BOOKS[b]), amount: plan.amount, continuing: plan.continuing, notice: plan.notice, secondMonth: plan.secondMonth };

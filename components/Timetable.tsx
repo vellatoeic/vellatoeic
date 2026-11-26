@@ -35,7 +35,7 @@ export default function Timetable({ initial = "am" }: { initial?: TimeSlot }) {
           );
         })}
       </ul>
-      <p className="text-xs text-slate-500">주 4일(종합반)은 월~목, 격일반은 월·수 또는 화·목이에요. LC는 시작반·문풀반 공통 수업이에요.</p>
+      <p className="text-xs text-slate-500">주 4일(종합반)은 월~목, 격일반은 월·수 또는 화·목이에요.</p>
     </section>
   );
 }

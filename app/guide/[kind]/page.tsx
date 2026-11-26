@@ -40,8 +40,9 @@ export async function generateMetadata({ params }: { params: Promise<{ kind: str
     : pageMeta("현장 수강 교재 신청 | 부산 서면 토익 벨라토익", `부산 서면 토익 벨라토익 현장(${CLASSROOM}) 수강생 필독 사항과 교재 신청. 교재는 첫 수업 날 강의실에서 받아요.`, "/guide/onsite");
 }
 
-export default async function KindGuide({ params }: { params: Promise<{ kind: string }> }) {
+export default async function KindGuide({ params, searchParams }: { params: Promise<{ kind: string }>; searchParams: Promise<{ pin?: string }> }) {
   const { kind } = await params;
+  const { pin: pinParam } = await searchParams;
   if (kind !== "onsite" && kind !== "online") notFound();
   // 신청서에서 고를 수 있는 수강 월 (이번 달: 2주차 마지막 수업일까지 / 다음 달: 15일부터)
   // 반별 첫·마지막 수업일 (개강 직전 택배 안내용)
@@ -54,57 +55,54 @@ export default async function KindGuide({ params }: { params: Promise<{ kind: st
     return Object.fromEntries(entries);
   };
   const months = await Promise.all((await signupMonths()).map(async (m) => ({ ...m, round: await roundFor(m.cohort), windows: await windowsOf(m.cohort) })));
-  // 구글·카카오만 방식: 로그인한 학생 번호로 신청해요 (로그인 전이면 신청서 대신 로그인 버튼)
+  // 로그인 먼저(2026-11-26 Vella): 카카오·구글 로그인이 켜져 있으면 로그인 → 수강증 → 교재비 → 입금.
+  // 로그인한 학생 번호로 신청해서 비밀번호 칸이 없어요. '둘 다' 방식만 아래 작은 링크로 이름+비밀번호 신청도 돼요.
   const login = await loginSetup();
-  const accountId = login.mode === "social" ? await getAccountId() : null;
+  const accountId = login.mode !== "pin" ? await getAccountId() : null;
+  const gate = login.mode !== "pin" && !accountId && !(login.mode === "both" && pinParam === "1");
   const link = accountId ? (await listLoginLinks([accountId])).sort((a, b) => (b.last_login_at ?? "").localeCompare(a.last_login_at ?? ""))[0] : null;
   const accountLabel = accountId ? (link ? `${PROVIDER_LABEL[link.provider]}${link.email || link.nickname ? ` (${link.email ?? link.nickname})` : ""}` : "로그인한") : null;
 
+  const STEPS = [
+    { n: 1, title: "YBM 수강증 올리기", sub: "캡처 한 장이면 반이 자동으로" },
+    { n: 2, title: "교재비 확인", sub: "내 반 교재와 금액이 바로 나와요" },
+    { n: 3, title: "입금하면 끝", sub: "확인되면 강의실이 열려요" },
+  ];
+
   return (
-    <div className="stagger space-y-6 pt-8">
+    <div className="stagger space-y-5 pt-8">
       <div className="text-center">
-        <span className="rounded-full bg-sky-main px-4 py-1.5 text-sm font-bold text-sky-ink">
-          {KINDS[kind].label}
-        </span>
-        <h1 className="font-jua mt-4 text-4xl text-sky-ink">필독 사항 확인</h1>
+        <span className="rounded-full bg-sky-main px-4 py-1.5 text-sm font-bold text-sky-ink">{KINDS[kind].label}</span>
+        <h1 className="font-jua mt-4 text-4xl text-sky-ink">교재 신청</h1>
+        <p className="mt-2 text-[15px] text-slate-600">학원 수강 등록을 마쳤다면 이렇게 끝나요</p>
       </div>
 
-      <section className="card space-y-4">
-        <p className="font-jua text-2xl text-sky-ink">반가워요:)</p>
-        <p className="leading-relaxed text-slate-700">
-          모두 수강 준비 되었나요~?
-          <br />
-          수업 전 교재를 받기 위한 <b className="text-sky-deep">교재 신청 안내</b>입니다.
-          <br />
-          학원 수강 등록을 마쳤다면, 아래 신청서 맨 위에 <b className="text-sky-deep">YBM 수강증</b>을 올려 주세요. 반·과정·시간이 자동으로 정해져요.
-        </p>
-        <a href="#apply" className="flex items-center justify-between gap-3 rounded-2xl bg-sky-deep px-4 py-3 text-white">
-          <span><small className="block text-xs opacity-80">준비물</small><b className="font-jua text-lg">YBM 수강증 캡처 한 장</b></span>
-          <span className="text-sm font-bold">신청서로 ↓</span>
-        </a>
-        <ul className="space-y-2 rounded-2xl bg-sky-soft p-5">
-          {NOTICE[kind].map((n) => (
-            <li key={n} className="flex gap-2 text-[15px] leading-relaxed text-slate-700">
-              <span className="mt-0.5 font-bold text-sky-deep">✓</span>
-              {n}
-            </li>
-          ))}
-        </ul>
-      </section>
+      <ol className="grid grid-cols-3 gap-2">
+        {STEPS.map((st) => (
+          <li key={st.n} className="rounded-2xl bg-white p-3 text-center shadow-[0_4px_14px_rgba(18,64,92,0.06)]">
+            <span className="mx-auto grid h-7 w-7 place-items-center rounded-full bg-sky-deep text-sm font-bold text-white">{st.n}</span>
+            <b className="mt-1.5 block text-[14px] leading-tight text-sky-ink">{st.title}</b>
+            <small className="mt-1 block text-[11px] leading-snug text-slate-500">{st.sub}</small>
+          </li>
+        ))}
+      </ol>
 
-      <Timetable />
-
-      {kind === "online" && <HowToWatch beforeApply login={login.mode} />}
-
-      {login.mode === "social" && !accountId ? (
-        <section className="card space-y-3 text-center">
-          <p className="font-jua text-2xl text-sky-ink">신청서 쓰기 전에 로그인해 주세요</p>
-          <p className="text-sm text-slate-600">카카오 또는 구글 계정으로 신청하면, 강의실·특강도 같은 버튼으로 들어와요.</p>
+      {gate ? (
+        <section className="card space-y-4 text-center">
+          <p className="font-jua text-2xl text-sky-ink">먼저 로그인해 주세요</p>
+          <p className="text-sm text-slate-600">카카오 또는 구글로 로그인하면 비밀번호 없이 신청하고, 강의실·특강도 같은 버튼으로 들어와요.</p>
           <SocialButtons providers={login.providers} next={`/guide/${kind}`} />
+          {login.mode === "both" && <a href={`/guide/${kind}?pin=1#apply`} className="block text-xs text-slate-400 underline underline-offset-2">카카오·구글 없이 이름 + 비밀번호로 신청하기</a>}
         </section>
       ) : (
-        <ApplyForm kind={kind} months={months} today={todayKST()} account={accountLabel} receiptMenu={await getSetting("receipt_menu")} />
+        <ApplyForm kind={kind} months={months} today={todayKST()} account={accountLabel} receiptMenu={await getSetting("receipt_menu")} notices={NOTICE[kind]} />
       )}
+
+      <details className="group card !p-0">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 font-jua text-lg text-sky-ink">수업 시간표 보기<span className="text-sm font-normal text-sky-deep group-open:hidden">펼치기</span></summary>
+        <div className="px-2 pb-2"><Timetable /></div>
+      </details>
+      {kind === "online" && <HowToWatch beforeApply login={login.mode} />}
     </div>
   );
 }
