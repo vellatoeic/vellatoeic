@@ -409,3 +409,15 @@
   .vh .doors { margin-top: 0; gap: 14px; }
   .vh .start-grid { grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); column-gap: 48px; }
 }
+
+/* 수강생 바로가기 — 컴퓨터에서는 큰 강의실 + 나란한 칸 (2026-11-26 반응형) */
+.vh .quick-wrap { max-width: 760px; }
+@media (min-width: 1024px) {
+  .vh .quick-wrap { max-width: 1120px; }
+  .vh .quick-greet { text-align: center; }
+  .vh .quick-main { padding: 22px 26px; }
+  .vh .quick-main b { font-size: 1.4rem; }
+  .vh .quick-wrap .quick-list { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 12px; }
+  .vh .quick-wrap .ql { flex-direction: column; align-items: flex-start; gap: 10px; padding: 18px; min-height: 150px; }
+  .vh .quick-wrap .ql .chev { display: none; }
+}

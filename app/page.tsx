@@ -139,7 +139,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
 
       {/* ── 수강생 바로가기 ── */}
       <section className="sec quick" id="students">
-        <div className="wrap narrow">
+        <div className="wrap quick-wrap">
           <div className="quick-greet">
             <p className="eyebrow">FOR STUDENTS</p>
             <h2>수강생 바로가기</h2>

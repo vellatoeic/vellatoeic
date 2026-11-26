@@ -18,8 +18,21 @@ export default function StudentLoginForm({ next, note, providers, pin, title = "
   const [state, action, pending] = useActionState<FormState, FormData>(studentLogin, {});
   const social = providers.length > 0;
   return (
-    <div className="pt-10">
-      <div className="card mx-auto max-w-sm space-y-4 text-center">
+    <div className="pt-10 lg:pt-16">
+      {/* 컴퓨터(1024px 이상): 왼쪽 안내 칸 + 오른쪽 로그인 칸으로 넓게. 휴대폰은 카드 하나 그대로 */}
+      <div className="card mx-auto max-w-sm lg:grid lg:max-w-4xl lg:grid-cols-2 lg:overflow-hidden lg:!p-0">
+        <div className="hidden flex-col justify-between bg-gradient-to-br from-[#4fb3e8] via-sky-deep to-[#1f78ad] p-10 text-white lg:flex">
+          <div>
+            <p className="text-sm font-bold opacity-80">VELLA TOEIC</p>
+            <p className="mt-3 font-jua text-4xl leading-tight">토익의 시작,<br />벨라토익</p>
+            <p className="mt-4 text-[15px] leading-relaxed opacity-90">강의실 · 라이브 · 출석 · 데일리 테스트 · LC 음원 · 특강을 한 곳에서 해요.</p>
+          </div>
+          <ul className="mt-8 space-y-2 text-sm opacity-90">
+            <li className="flex items-center gap-2"><Icon name="check" size={16} />교재 신청할 때 만든 계정으로 들어와요</li>
+            <li className="flex items-center gap-2"><Icon name="check" size={16} />입금이 확인되면 강의실이 열려요</li>
+          </ul>
+        </div>
+        <div className="space-y-4 text-center lg:p-10">
         <Icon name="lock" size={56} className="mx-auto block" />
         <h1 className="font-jua text-3xl text-sky-ink">{title}</h1>
         <p className="text-sm text-slate-500">{note ?? (pin ? "교재 신청할 때 정한 이름과 비밀번호로 들어와요." : "카카오 또는 구글 계정으로 한 번에 들어와요.")}</p>
@@ -38,9 +51,10 @@ export default function StudentLoginForm({ next, note, providers, pin, title = "
         {social && !pin && <p className="text-xs text-slate-500">처음 한 번만 교재 신청 때 정한 이름·비밀번호로 내 신청을 찾아 연결해요.</p>}
         <p className="text-xs text-slate-400">
           아직 신청 전이라면{" "}
-          <Link href="/guide" className="text-sky-deep underline">필독 사항 확인</Link>
-          부터 해주세요.
+          <Link href="/guide" className="text-sky-deep underline">교재 신청</Link>
+          부터 해 주세요.
         </p>
+        </div>
       </div>
     </div>
   );
