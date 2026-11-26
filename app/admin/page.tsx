@@ -27,13 +27,25 @@ import ReceiptReviewBox from "./ReceiptReviewBox";
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false } };
 
-type Filters = { k: string; p: string; b: string; t: string; q: string; c: string; ra: string; mv: string; linked: string };
+type Filters = { k: string; p: string; b: string; t: string; q: string; c: string; ra: string; mv: string; linked: string; r: string };
 
 const KIND_FILTERS = [["all", "전체"], ["onsite", "현장"], ["online", "불라방"]] as const;
 const PAY_FILTERS = [["all", "전체"], ["pending", "미납"], ["paid", "납부 완료"], ["refunded", "환불"], ["cancelled", "취소"]] as const;
 const isPaid = (a: Application) => a.status === "paid" || a.status === "shipped";
 const SLOT_ORDER: (TimeSlot | null)[] = ["am", "pm", null];
 const BOOK_FILTERS = [["all", "전체"], ["todo", "수령·발송 대기"], ["done", "수령·발송 완료"]] as const;
+// 수강증 자동 확인 (SQL 40): 확인 필요 = 선생님이 봐야 하는 신청, 확인됨 = 자동 확인·선생님 확인, 없음 = 수강증 없이 받은 예전 신청
+const RECEIPT_FILTERS = [["all", "전체"], ["review", "확인 필요"], ["ok", "확인됨"], ["none", "수강증 없음"]] as const;
+const receiptIs = (a: Application, v: string) =>
+  v === "review" ? a.receipt_status === "review" : v === "ok" ? a.receipt_status === "auto" || a.receipt_status === "approved" : v === "none" ? !a.receipt_status : true;
+// 필터 칩 옆 인원수 (기수 안, 취소는 '취소' 칩에서만)
+function chipCount(key: "k" | "p" | "b" | "r", v: string, all: Application[], withCancelled: Application[]) {
+  if (v === "all") return all.length;
+  if (key === "k") return all.filter((a) => a.kind === v).length;
+  if (key === "p") return v === "cancelled" ? withCancelled.filter((a) => a.status === "cancelled").length : all.filter((a) => (v === "paid" ? isPaid(a) : a.status === v)).length;
+  if (key === "b") return all.filter((a) => (v === "todo" ? bookTodo(a) : a.kind === "online" && a.status === "shipped")).length;
+  return all.filter((a) => receiptIs(a, v)).length;
+}
 
 const bookTodo = (a: Application) => a.kind === "online" && a.status === "paid";
 
@@ -204,7 +216,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   await autoCleanupAudios().catch(() => 0); // 기간이 끝나고 7일 지난 LC 음원 자동 정리
 
   const now = await currentCohort();
-  const { k = "all", p = "all", b = "all", t = "all", q = "", c = now, ra = "", mv = "", linked = "" } = await searchParams;
+  const { k = "all", p = "all", b = "all", t = "all", q = "", c = now, ra = "", mv = "", linked = "", r = "all" } = await searchParams;
   // 30분 자동 취소(timeout)는 관리 화면 어디에도 안 보여요. 관리자 취소(admin)는 '취소' 필터에서만.
   const everything = (await listApplications()).filter(visibleToAdmin);
   const [account, cafeHomeworkUrl, cafeUrl, blogUrl, studyBoardUrl, chatUrl, chatCode, rawCohort, kakaoChannel] = await Promise.all([
@@ -250,6 +262,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
     if (p === "refunded" && a.status !== "refunded") return false;
     if (b === "todo" && !bookTodo(a)) return false;
     if (b === "done" && !(a.kind === "online" && a.status === "shipped")) return false;
+    if (r !== "all" && !receiptIs(a, r)) return false;
     if (q && !`${a.name} ${a.depositor} ${a.phone ?? ""}`.includes(q)) return false;
     return true;
   });
@@ -261,7 +274,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   const listRounds = new Map(await Promise.all([...new Set(list.map((a) => a.cohort))].map(async (co) => [co, await roundFor(co)] as const)));
   const link = (patch: Partial<Filters>) => {
     const params = new URLSearchParams();
-    for (const [key, value] of Object.entries({ c, k, p, b, t, q, ...patch })) {
+    for (const [key, value] of Object.entries({ c, k, p, b, t, q, r, ...patch })) {
       if (value && (value !== "all" || key === "c")) params.set(key, value);
     }
     return `/admin?${params}`;
@@ -560,10 +573,15 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
           { name: "수강 형태", key: "k" as const, value: k, items: KIND_FILTERS },
           { name: "납부", key: "p" as const, value: p, items: PAY_FILTERS },
           { name: "불라방 교재", key: "b" as const, value: b, items: BOOK_FILTERS },
+          { name: "수강증", key: "r" as const, value: r, items: RECEIPT_FILTERS },
         ].map((row) => (
           <div key={row.key} className="flex flex-wrap items-center gap-2">
             <span className="w-20 shrink-0 font-bold text-slate-500">{row.name}</span>
-            {row.items.map(([v, label]) => <a key={v} href={link({ [row.key]: v })} className={chip(row.value === v)}>{label}</a>)}
+            {row.items.map(([v, label]) => {
+              const n = chipCount(row.key, v, all, withCancelled);
+              const alert = row.key === "r" && v === "review" && n > 0;
+              return <a key={v} href={link({ [row.key]: v })} className={`${chip(row.value === v)}${alert && row.value !== v ? " !bg-amber-50 !text-amber-700" : ""}`}>{label} <span className="tabular-nums opacity-70">{n}</span></a>;
+            })}
           </div>
         ))}
         <form className="flex items-center gap-2 pt-1">
@@ -573,6 +591,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
           {p !== "all" && <input type="hidden" name="p" value={p} />}
           {b !== "all" && <input type="hidden" name="b" value={b} />}
           {t !== "all" && <input type="hidden" name="t" value={t} />}
+          {r !== "all" && <input type="hidden" name="r" value={r} />}
           <input name="q" defaultValue={q} placeholder="이름·입금자·번호" className="input !w-48 !py-2 text-sm" />
           {q && <a href={link({ q: "" })} className="text-slate-400 underline">지우기</a>}
         </form>
