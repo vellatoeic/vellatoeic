@@ -115,21 +115,21 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
           <div className="doors">
             <div className="door">
               <p className="door-k">처음이에요</p>
-              <p className="door-t">벨라토익이 처음인 학생</p>
-              <p className="door-s">나에게 맞는 반을 찾고, YBM 서면에서 수강 등록해요.</p>
+              <p className="door-t">벨라토익이<br className="sm:hidden" /> 처음인 학생</p>
+              <p className="door-s">반을 찾고, YBM 서면에서 수강 등록해요.</p>
               <div className="door-btns">
-                <a href="#finder" className="db main">{icon("target", "xs")}나에게 맞는 반 찾기</a>
-                <a href={BRAND.courseUrl} {...out} className="db">{icon("school", "xs")}수강 신청하기 ↗</a>
+                <a href="#finder" className="db main">{icon("target", "xs")}반 찾기</a>
+                <a href={BRAND.courseUrl} {...out} className="db">{icon("school", "xs")}수강 신청 ↗</a>
               </div>
             </div>
             <div className="door on">
               <p className="door-k">등록했어요</p>
-              <p className="door-t">학원 수강 등록을 마친 학생</p>
-              <p className="door-s">YBM 수강증으로 교재를 신청하고, 강의실에 들어가요.</p>
+              <p className="door-t">학원 등록을<br className="sm:hidden" /> 마친 학생</p>
+              <p className="door-s">수강증으로 교재 신청하고 강의실에 들어가요.</p>
               <div className="door-btns">
-                <Link href="/guide/onsite" className="db main">{icon("book", "xs")}교재 신청 · 현장</Link>
-                <Link href="/guide/online" className="db main">{icon("laptop", "xs")}교재 신청 · 불라방</Link>
-                <Link href="/class" className="db">{icon("star", "xs")}강의실 들어가기</Link>
+                <Link href="/guide/onsite" className="db main">{icon("book", "xs")}현장 교재 신청</Link>
+                <Link href="/guide/online" className="db main">{icon("laptop", "xs")}불라방 교재 신청</Link>
+                <Link href="/class" className="db">{icon("star", "xs")}강의실</Link>
               </div>
             </div>
           </div>
