@@ -62,7 +62,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </div>
             <div className="ml-auto flex items-center gap-1.5">
               <Bell count={notice.unread} visitorKeys={notice.visitorKeys} />
-              {admin ? <ModeSwitch /> : loggedIn ? <Link href="/class" className="hdr-class">강의실</Link> : <Link href="/login" className="hdr-login">로그인</Link>}
+              {admin ? <ModeSwitch viewing={!!viewing} /> : loggedIn ? <Link href="/class" className="hdr-class">강의실</Link> : <Link href="/login" className="hdr-login">로그인</Link>}
               {/* 관리자만 로그인해도 메뉴에 [로그아웃]이 보여야 해요 (로그아웃은 관리자까지 모두 풀어요) */}
               <SiteMenu loggedIn={loggedIn || admin} />
             </div>
@@ -71,6 +71,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <form action={stopViewing} className="view-strip">
               <input type="hidden" name="app_id" value={viewing.appId} />
               <span><b>{viewing.name}</b> 학생 화면 미리보기 중 · 보기만 돼요</span>
+              <Link href="/admin/view-as?pick=1" className="underline underline-offset-2">다른 학생</Link>
               <button type="submit">끝내기</button>
             </form>
           )}

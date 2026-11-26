@@ -289,7 +289,7 @@ export async function viewAsStudent(fd: FormData) {
   const [app] = await getApplications([id]);
   if (!app) return;
   await setViewing(app.id, app.name);
-  redirect("/");
+  redirect("/go"); // 이번 달 수강생이면 학생 첫 화면(대시보드), 아니면 강의실 (lib/zones.ts)
 }
 // 보기 전용 끝내기 → 그 학생 통합 화면으로 돌아가요
 export async function stopViewing(fd: FormData) {
