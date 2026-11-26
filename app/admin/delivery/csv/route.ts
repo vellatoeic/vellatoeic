@@ -5,6 +5,7 @@ import { BOOKS, STATUS_LABEL, klassLabel } from "@/lib/config";
 import { csvResponse, phoneLabel } from "@/lib/csv";
 import { classCohortNow } from "@/lib/classCohort";
 import { isActive } from "@/lib/access";
+import { addressCells, splitAddress } from "@/lib/address";
 
 export const dynamic = "force-dynamic";
 
@@ -23,11 +24,11 @@ export async function GET(req: Request) {
   const YBM_STATUS = { pending: "미납", paid: "발송 대기", shipped: "발송 완료" };
   // 학원·인강을 합쳐 최신 신청이 맨 위
   const rows = [
-    ...(from === "ybm" ? [] : apps.map((a) => ({ at: a.created_at, cells: [day(a.created_at), a.name, klassLabel(a), phoneLabel(a.phone), a.address, a.books.map((b) => BOOKS[b]).join(", "), STATUS_LABEL[a.status]] }))),
-    ...(from === "academy" ? [] : ybm.map((o) => ({ at: o.created_at, cells: [day(o.created_at), o.name, "YBM 인강", phoneLabel(o.phone), o.address, "개념 zip", YBM_STATUS[o.status as "pending" | "paid" | "shipped"]] }))),
+    ...(from === "ybm" ? [] : apps.map((a) => ({ at: a.created_at, cells: [day(a.created_at), a.name, klassLabel(a), phoneLabel(a.phone), ...addressCells(splitAddress(a.address, a.address_detail)), a.books.map((b) => BOOKS[b]).join(", "), STATUS_LABEL[a.status]] }))),
+    ...(from === "academy" ? [] : ybm.map((o) => ({ at: o.created_at, cells: [day(o.created_at), o.name, "YBM 인강", phoneLabel(o.phone), ...addressCells(splitAddress(o.address, o.address_detail)), "개념 zip", YBM_STATUS[o.status as "pending" | "paid" | "shipped"]] }))),
   ].sort((x, y) => y.at.localeCompare(x.at));
   return csvResponse(`택배명단_${cohort}${from === "ybm" ? "_YBM" : from === "academy" ? "_학원" : ""}.csv`, [
-    ["신청일", "이름", "수강반", "연락처", "주소", "교재", "상태"],
+    ["신청일", "이름", "수강반", "연락처", "우편번호", "기본주소", "상세주소", "교재", "상태"],
     ...rows.map((r) => r.cells),
   ]);
 }

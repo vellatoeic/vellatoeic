@@ -21,6 +21,7 @@ export type Application = {
   phone: string | null;
   depositor: string;
   address: string | null;
+  address_detail?: string | null; // 택배 상세주소 (SQL 41부터, 예전 신청은 비어 있어요 → lib/address.ts가 address에서 나눠요)
   amount: number;
   status: Status;
   pin_hash: string | null;
@@ -38,7 +39,7 @@ export type Application = {
 export type NewApplication = Omit<Application, "id" | "status" | "created_at">;
 
 // 신청 조회에 쓰는 칸 (비밀번호 해시 pin_hash는 로그인 확인 때만 읽어요)
-const APP_COLS = "id,cohort,kind,course,track,continuing,slot,pickup_date,pickup_time,books,pickup,name,phone,depositor,address,amount,status,created_at,paid_at,cancelled_at,cancel_reason,pending_from,books_adjusted,audio_extended_until,account_id,receipt_status";
+const APP_COLS = "id,cohort,kind,course,track,continuing,slot,pickup_date,pickup_time,books,pickup,name,phone,depositor,address,amount,status,created_at,paid_at,cancelled_at,cancel_reason,pending_from,books_adjusted,audio_extended_until,account_id,receipt_status,address_detail";
 
 // ── 수강증 자동 확인 (SQL 40) ──
 // auto = 수강증대로 자동 확인 · review = 선생님 확인 필요 · approved = 선생님이 확인함
@@ -95,6 +96,7 @@ export type YbmOrder = {
   name: string;
   phone: string;
   address: string;
+  address_detail?: string | null; // 상세주소 (SQL 41)
   depositor: string;
   amount: number;
   status: "pending" | "paid" | "shipped" | "cancelled";
@@ -466,7 +468,7 @@ export async function deleteLecture(id: string) {
 // ── YBM 인강 교재 주문 ─────────────────────────
 const YBM_BUCKET = "ybm-proofs";
 
-export async function createYbmOrder(o: Pick<YbmOrder, "name" | "phone" | "address" | "depositor" | "amount">, proof: { data: Buffer; type: string }): Promise<string> {
+export async function createYbmOrder(o: Pick<YbmOrder, "name" | "phone" | "address" | "address_detail" | "depositor" | "amount">, proof: { data: Buffer; type: string }): Promise<string> {
   const id = crypto.randomUUID();
   const path = `${id}.${proof.type === "image/png" ? "png" : proof.type === "image/webp" ? "webp" : "jpg"}`;
   if (sb) {

@@ -95,6 +95,7 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   const phone = clean(fd.get("phone")).replace(/[^0-9]/g, "");
   const depositor = clean(fd.get("depositor")) || name;
   const address = clean(fd.get("address"));
+  const addressDetail = clean(fd.get("address_detail")).slice(0, 100); // 상세주소는 따로도 저장 (택배 칸별 복사, SQL 41)
   // 불라방 1층 데스크 수령 희망 날짜·시간 (미리 준비할 수 있게)
   const deskPickup = kind === "online" && pickup === "classroom";
   const pickupDate = clean(fd.get("pickup_date"));
@@ -163,6 +164,7 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
     phone: kind === "online" ? phone : null,
     depositor,
     address: pickup === "delivery" ? address : null,
+    address_detail: pickup === "delivery" && addressDetail ? addressDetail : null,
     pickup_date: deskPickup ? pickupDate : null,
     pickup_time: deskPickup ? pickupTime : null,
     amount: calcAmount(books, pickup),
@@ -657,6 +659,7 @@ export async function createYbmOrderAction(_: FormState, fd: FormData): Promise<
   const name = normName(clean(fd.get("name")));
   const phone = clean(fd.get("phone")).replace(/[^0-9]/g, "");
   const address = clean(fd.get("address"));
+  const addressDetail = clean(fd.get("address_detail")).slice(0, 100);
   const depositor = normName(clean(fd.get("depositor"))) || name;
   const proof = fd.get("proof");
   if (!/^[가-힣a-zA-Z ]{2,20}$/.test(name)) return { error: "이름을 한글 또는 영문으로 정확히 입력해 주세요." };
@@ -670,7 +673,7 @@ export async function createYbmOrderAction(_: FormState, fd: FormData): Promise<
   await safe("expireUnpaid", () => expireUnpaid(Date.now()), null);
   const existing = (await listYbmOrders()).find((o) => o.status !== "shipped" && o.status !== "cancelled" && o.name === name && o.phone === phone);
   if (existing) redirect(`/ybm/${existing.id}?again=1`);
-  const id = await createYbmOrder({ name, phone, address, depositor, amount: YBM_ORDER_AMOUNT }, { data: Buffer.from(await proof.arrayBuffer()), type: proof.type });
+  const id = await createYbmOrder({ name, phone, address, address_detail: addressDetail || null, depositor, amount: YBM_ORDER_AMOUNT }, { data: Buffer.from(await proof.arrayBuffer()), type: proof.type });
   await linkWaitingDeposit({ kind: "ybm", id, depositor, amount: YBM_ORDER_AMOUNT }); // 주문보다 먼저 온 입금 연결
   revalidatePath("/admin/delivery");
   redirect(`/ybm/${id}`);

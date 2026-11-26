@@ -44,6 +44,7 @@
 | `39_social_login.sql` | 완료 · 2026-11-25 · npm run sql | 구글·카카오 로그인 준비: 신청서에 학생 번호 칸(account_id, 모두 비어 있음)·로그인 연결 표(login_links, 0건) 추가. 기존 데이터 그대로(신청 149건) |
 | `39_google_login.sql` | 완료 · 2026-11-25 · npm run sql | (쓰지 않음 — 39_social_login 방식으로 결정) 구글 로그인 회원(members)과 수강 신청 연결(member_links) 표 추가 (2026-11-25, 기존 표·데이터는 그대로) |
 | `40_receipt_checks.sql` | 완료 · 2026-11-26 · npm run sql | 수강증 자동 확인: 읽은 기록 표(receipt_checks) · 신청서의 수강증 상태 칸(applications.receipt_status) · 비공개 사진 보관함(receipts) 추가 |
+| `41_address_detail.sql` | 완료 · 2026-11-26 · npm run sql | 택배 상세주소 따로 저장: 신청서(applications)·YBM 인강 주문(ybm_orders)에 상세주소 칸(address_detail)만 추가해요. 여러 번 실행해도 안전해요. |
 
 > 2026-11-13 새 Supabase 프로젝트(서울)로 이사: `scripts/migrate-db.mjs --run`으로 옛 DB의 public 구조·데이터·권한·RLS·보관함 설정을 그대로 복사했어요. 위 기록(1~32)은 새 DB에도 그대로 들어 있어요.
 > `33_speed_cleanup.sql`: 옛 DB 확인 결과 ①인덱스 4개만 들어 있고 ②10월 이전 정리는 실행되지 않은 상태로 이사됐어요(완료로 기록하지 않음). 정리는 `35_october_cleanup.sql`로 따로 해요.
