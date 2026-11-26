@@ -1,3 +1,4 @@
+import { DESK } from "./config";
 // ── 격일반 이어듣기·두 달째 요일 (DB 없이 계산, 서버 판단이 기준) ──
 // 지난달 기수 + 같은 이름 + 같은 비밀번호 + 같은 반(시작반/문풀반) 격일반 + 납부 완료 신청이 있으면 '두 달째'.
 // - 시작반 격일반 두 달째: 이어듣기 자동(LC 교재만). 기록이 없으면 처음 듣는 과정(교재 3권).
@@ -45,7 +46,7 @@ export function lateDeliveryWarning(today: string, first: string | null, last: s
   const from = new Date(Date.parse(`${first}T00:00:00Z`) - 3 * 86400000).toISOString().slice(0, 10);
   return today >= from && today <= last;
 }
-export const LATE_DELIVERY_TEXT = "지금 신청하면 첫 수업 전에 교재가 도착하기 어려워요 (평일 2~3일). 1층 데스크 수령을 추천해요.";
+export const LATE_DELIVERY_TEXT = `지금 신청하면 첫 수업 전에 교재가 도착하기 어려워요 (평일 2~3일). ${DESK} 수령을 추천해요.`;
 
 // ── 이미 들어온 신청 점검 (관리자 '⚠️ 격일반 확인 필요') ──
 // 관리자 쪽에서는 비밀번호를 비교할 수 없어서(학생마다 따로 암호화) '같은 이름'으로 지난달 기록을 찾아요.

@@ -1,3 +1,4 @@
+import { DESK } from "@/lib/config";
 import Icon from "@/components/Icon";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -107,7 +108,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
         </div>
         <div className="flex flex-wrap gap-1.5">
           <span className={`${chip} ${a.status === "pending" ? "bg-amber-100 text-amber-700" : a.status === "refunded" ? "bg-slate-200 text-slate-600" : "bg-emerald-100 text-emerald-700"}`}>{STATUS[a.status]}</span>
-          {a.kind === "online" && <span className={`${chip} bg-sky-soft text-sky-ink`}>교재 {a.pickup === "delivery" ? "택배" : "1층 데스크"} · {bookStatusLabel(a)}</span>}
+          {a.kind === "online" && <span className={`${chip} bg-sky-soft text-sky-ink`}>교재 {a.pickup === "delivery" ? "택배" : `현장 수령(${DESK})`} · {bookStatusLabel(a)}</span>}
           {a.continuing && <span className={`${chip} bg-slate-100 text-slate-600`}>이어듣기</span>}
           <span className={`${chip} ${missionCount(mission) === 4 ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>미션 {missionCount(mission)}/4</span>
         </div>

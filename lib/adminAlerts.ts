@@ -22,7 +22,7 @@ export async function recentApplications(limit = 300): Promise<RecentItem[]> {
       id: o.id, at: o.created_at, type: "인강" as const, name: o.name,
       detail: `개념 zip · ${YBM[o.status]}`,
       warn: o.status === "pending" ? "입금 대기" : o.status === "cancelled" ? "취소" : undefined,
-      href: "/admin/delivery?from=ybm",
+      href: "/admin/delivery?pick=ship&from=ybm",
     })),
   ];
   return items.sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);
@@ -42,11 +42,13 @@ export async function adminAlerts() {
   const delivery =
     apps.filter((a) => (a.cohort === cohort || a.cohort === classNow) && a.kind === "online" && a.pickup === "delivery" && a.status === "paid").length +
     ybm.filter((o) => o.status === "paid").length;
+  // 불라방 현장 수령(데스크) 준비: 납부 완료 · 아직 안 받아 간 학생 (받아 가면 학생 [교재 받았어요] 또는 [불라방] 탭 [수령 완료])
+  const desk = apps.filter((a) => (a.cohort === cohort || a.cohort === classNow) && a.kind === "online" && a.pickup === "classroom" && a.status === "paid").length;
   // 선생님 확인이 필요한 수강증 (취소·환불된 신청 제외)
   const byId = new Map(apps.map((a) => [a.id, a]));
   const receipts = (await listReceiptChecks("review").catch(() => [])).filter((c) => {
     const a = c.application_id ? byId.get(c.application_id) : undefined;
     return !!a && a.status !== "cancelled" && a.status !== "refunded";
   }).length;
-  return { since, fresh, recent, waiting, checks, delivery, refunds: refunds.length, receipts };
+  return { since, fresh, recent, waiting, checks, delivery, desk, refunds: refunds.length, receipts };
 }

@@ -96,7 +96,7 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   const depositor = clean(fd.get("depositor")) || name;
   const address = clean(fd.get("address"));
   const addressDetail = clean(fd.get("address_detail")).slice(0, 100); // 상세주소는 따로도 저장 (택배 칸별 복사, SQL 41)
-  // 불라방 1층 데스크 수령 희망 날짜·시간 (미리 준비할 수 있게)
+  // 불라방 현장(데스크) 수령 희망 날짜·시간 (미리 준비할 수 있게)
   const deskPickup = kind === "online" && pickup === "classroom";
   const pickupDate = clean(fd.get("pickup_date"));
   const pickupTime = clean(fd.get("pickup_time"));
@@ -1138,7 +1138,7 @@ export async function resolveBookDepositEvent(fd: FormData) {
   revalidatePath("/admin");
 }
 
-// 학생이 1층 데스크에서 교재를 받고 직접 '받았어요'를 눌러요. (본인 신청 · 불라방 데스크 수령 · 납부 완료만)
+// 학생이 데스크(config DESK)에서 교재를 받고 직접 '받았어요'를 눌러요. (본인 신청 · 불라방 데스크 수령 · 납부 완료만)
 export async function confirmBookReceived(fd: FormData) {
   if (await isViewOnly()) return;
   const id = clean(fd.get("id"));

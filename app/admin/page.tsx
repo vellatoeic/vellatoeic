@@ -69,7 +69,7 @@ function Row({ a, group, mission, fresh, sum, back, bookOptions }: { a: Applicat
           <div className="flex flex-wrap items-center gap-1.5">
             <Link href={`/admin/students/${a.id}`} className="font-bold text-sky-ink underline decoration-sky-main underline-offset-2">{a.name}</Link>
             {a.depositor !== a.name && <span className="text-sm text-slate-500">(입금자 {a.depositor})</span>}
-            <Badge tone={a.kind === "onsite" ? "slate" : "sky"}>{KINDS[a.kind].short}{a.kind === "online" ? ` · ${a.pickup === "delivery" ? "택배" : "1층 데스크"}` : ""}</Badge>
+            <Badge tone={a.kind === "onsite" ? "slate" : "sky"}>{KINDS[a.kind].short}{a.kind === "online" ? ` · ${a.pickup === "delivery" ? "택배" : "현장 수령"}` : ""}</Badge>
             <Badge tone={a.status === "pending" ? "amber" : a.status === "refunded" || a.status === "cancelled" ? "slate" : "green"}>{a.status === "pending" ? "미납" : a.status === "refunded" ? "환불" : a.status === "cancelled" ? "취소" : "납부 완료"}</Badge>
             {a.kind === "online" && <Badge tone={a.status === "shipped" ? "green" : a.status === "paid" ? "amber" : "slate"}>교재 {book}</Badge>}
             {a.continuing && <Badge tone="slate">이어듣기</Badge>}

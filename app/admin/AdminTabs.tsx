@@ -12,7 +12,7 @@ export default async function AdminTabs({ active }: { active: "apps" | "roster" 
   await safe("purgeTimedOut", () => purgeTimedOut(), undefined);
   // 수강증: 제출 안 한 기록은 하루 뒤, 확인이 끝난 사진·원문은 7일 뒤 자동으로 지워요 (무료 보관함 1GB 보호)
   await safe("purgeReceipts", () => purgeReceipts(), { dropped: 0, stripped: 0 });
-  const { fresh, waiting, checks, delivery, refunds, receipts } = await adminAlerts();
+  const { fresh, waiting, checks, delivery, desk, refunds, receipts } = await adminAlerts();
   const tab = (on: boolean) =>
     `relative rounded-full px-4 py-2 font-bold ${on ? "bg-sky-deep text-white" : "bg-white text-sky-ink"}`;
   const dot = (n: number) => n > 0 && (
@@ -27,7 +27,7 @@ export default async function AdminTabs({ active }: { active: "apps" | "roster" 
           <h1 className="font-jua mr-2 text-3xl text-sky-ink">관리</h1>
           <Link href="/admin" className={tab(active === "apps")}>신청 관리{dot(appsTodo)}</Link>
           <Link href="/admin/roster" className={tab(active === "roster")}>현장 명단</Link>
-          <Link href="/admin/delivery" className={tab(active === "delivery")}>택배 발송{dot(delivery)}</Link>
+          <Link href="/admin/delivery" className={tab(active === "delivery")}>불라방{dot(delivery + desk)}</Link>
           <Link href="/admin/tests" className={tab(active === "tests")}>오늘의 테스트</Link>
           <Link href="/admin/stamps" className={tab(active === "stamps")}>출석·숙제</Link>
           <Link href="/admin/schedule" className={tab(active === "schedule")}>수업일 설정</Link>
@@ -48,7 +48,7 @@ export default async function AdminTabs({ active }: { active: "apps" | "roster" 
         </div>
       </div>
 
-      {appsTodo + delivery > 0 && (
+      {appsTodo + delivery + desk > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-3xl border-2 border-red-200 bg-white p-3 shadow-sm">
           <span className="inline-flex items-center gap-1 font-jua px-1 text-lg text-red-500"><Icon name="bell" size={22} />할 일</span>
           {fresh.length > 0 && (
@@ -63,7 +63,8 @@ export default async function AdminTabs({ active }: { active: "apps" | "roster" 
           {waiting > 0 && <Link href="/admin" className={`${chip} bg-amber-50 text-amber-700`}><Icon name="coins" size={16} className="mr-1" />입금 대기 {waiting}명</Link>}
           {checks > 0 && <Link href="/admin" className={`${chip} bg-red-50 text-red-600`}><Icon name="alert" size={16} className="mr-1" />입금 문자 확인 {checks}건</Link>}
           {receipts > 0 && <Link href="/admin#receipts" className={`${chip} bg-amber-50 text-amber-700`}><Icon name="clipboard" size={16} className="mr-1" />수강증 확인 {receipts}명</Link>}
-          {delivery > 0 && <Link href="/admin/delivery" className={`${chip} bg-sky-deep text-white`}><Icon name="parcel" size={16} className="mr-1" />택배 발송 대기 {delivery}건</Link>}
+          {delivery > 0 && <Link href="/admin/delivery?pick=ship" className={`${chip} bg-sky-deep text-white`}><Icon name="parcel" size={16} className="mr-1" />택배 발송 대기 {delivery}건</Link>}
+          {desk > 0 && <Link href="/admin/delivery?pick=desk" className={`${chip} bg-sky-soft text-sky-ink ring-1 ring-sky-main`}><Icon name="school" size={16} className="mr-1" />현장 수령 준비 {desk}명</Link>}
         </div>
       )}
     </div>

@@ -77,6 +77,7 @@ export function booksFor(course: CourseId, track: Track, round: 1 | 2, continuin
 }
 
 export const CLASSROOM = "801호"; // 현장 수업 강의실 (바꾸면 학생·관리 화면 전체에 반영돼요)
+export const DESK = "8층 데스크"; // 불라방 현장 수령 장소 (바꾸면 학생·관리 화면 전체에 반영돼요, 2026-11-26 1층 → 8층)
 // 특강 현장 신청 보증금 (참여하면 100% 환급)
 export const SPECIAL_DEPOSIT = 10000;
 export const DEPOSIT_MINUTES = 30; // 신청 후 이 시간(분) 안에 입금이 없으면 자동 취소
@@ -95,7 +96,7 @@ export const KINDS: Record<Kind, { label: string; short: string }> = {
 
 // 불라방 수령 방법
 export const PICKUPS: Record<Pickup, { label: string; desc: string }> = {
-  classroom: { label: "1층 데스크 수령", desc: "직접 방문해서 수령" },
+  classroom: { label: `${DESK} 수령`, desc: "직접 방문해서 수령" },
   delivery: { label: "택배 수령", desc: `택배비 ${SHIPPING_FEE.toLocaleString("ko-KR")}원` },
 };
 

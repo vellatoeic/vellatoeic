@@ -1,3 +1,4 @@
+import { DESK } from "@/lib/config";
 import Icon from "@/components/Icon";
 import Link from "next/link";
 import { BLOG_URL, CLASSROOM, INSTAGRAM_URL } from "@/lib/config";
@@ -80,7 +81,7 @@ export default async function AboutPage() {
           </div>
           <div className="rounded-2xl bg-sky-soft p-4">
             <h3 className="font-jua text-xl text-sky-ink">불라방 (토익 인강 라이브)</h3>
-            <p className="mt-1 text-[15px] leading-relaxed text-slate-700">같은 수업을 유튜브 라이브로 실시간으로 들어요. 놓친 수업은 종강일까지 다시 볼 수 있고, 교재는 1층 데스크 수령이나 택배로 받아요.</p>
+            <p className="mt-1 text-[15px] leading-relaxed text-slate-700">같은 수업을 유튜브 라이브로 실시간으로 들어요. 놓친 수업은 종강일까지 다시 볼 수 있고, 교재는 {DESK} 수령이나 택배로 받아요.</p>
           </div>
         </div>
         <p className="text-sm text-slate-500">현장 학생도 사정이 생기면 라이브로 들을 수 있고, 오전반·저녁반 교차 수강도 돼요.</p>

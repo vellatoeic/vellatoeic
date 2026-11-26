@@ -1,3 +1,4 @@
+import { DESK } from "@/lib/config";
 import Icon from "@/components/Icon";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -128,7 +129,7 @@ export default async function MyPage({ params, searchParams }: { params: Promise
                 ? <>납부가 확인됐어요.<br />첫 수업 날 {CLASSROOM}에서 교재를 일괄 지급해요.<br />수강 시간에 맞춰 등원해 주세요!</>
                 : a.status === "shipped"
                   ? "교재 수령이 확인됐어요. 수업 준비 완료!"
-                  : <>납부가 확인됐어요.<br />{a.pickup_date ? <><b>{specialDay(a.pickup_date)} {a.pickup_time}</b>에 </> : ""}1층 데스크에서 교재를 받아 가세요!</>}
+                  : <>납부가 확인됐어요.<br />{a.pickup_date ? <><b>{specialDay(a.pickup_date)} {a.pickup_time}</b>에 </> : ""}{DESK}에서 교재를 받아 가세요!</>}
           </p>
           {lateDelivery && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-800"><Icon name="parcel" size={18} className="mr-1" />{LATE_DELIVERY_TEXT}</p>}
         </section>
@@ -157,7 +158,7 @@ export default async function MyPage({ params, searchParams }: { params: Promise
           <dt className="text-slate-500">교재</dt><dd>{a.books.map((b) => BOOKS[b]).join(", ")}</dd>
           <dt className="text-slate-500">수령 방법</dt><dd>{pickupLabel(a.kind, a.pickup)}</dd>
           {a.address && (<><dt className="text-slate-500">주소</dt><dd>{a.address}</dd></>)}
-          {a.pickup_date && (<><dt className="text-slate-500">수령 희망</dt><dd>{specialDay(a.pickup_date)} {a.pickup_time} · 1층 데스크</dd></>)}
+          {a.pickup_date && (<><dt className="text-slate-500">수령 희망</dt><dd>{specialDay(a.pickup_date)} {a.pickup_time} · {DESK}</dd></>)}
           <dt className="text-slate-500">교재비</dt><dd className="font-bold">{won(a.amount)}</dd>
         </dl>
       </section>

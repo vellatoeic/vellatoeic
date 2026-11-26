@@ -11,7 +11,8 @@ import { shiftMonth } from "./signupMonths";
 
 // ── 화면 확인용 예시 데이터 (DB 연결이 없는 미리보기 모드 + 환경변수 VELLA_DEMO=1 일 때만) ──
 // 실제 DB가 연결되면(isPreview=false) 절대 아무것도 하지 않아요.
-// 예시 학생: 박지은 (비밀번호 1234, 이번 달 문풀반 종합 저녁 · 불라방) / 이서윤 (1234, 다음 달 시작반 격일 화목 오전 · 현장)
+// 예시 학생: 박지은 (비밀번호 1234, 이번 달 문풀반 종합 저녁 · 불라방 택배) / 이서윤 (1234, 다음 달 시작반 격일 화목 오전 · 현장)
+// 최민재·정하린 (다음 달 불라방 현장 수령: 준비 · 미납)
 // 관리자 미리보기 비밀번호: vella
 const g = globalThis as unknown as { __vellaDemo?: Promise<void> };
 
@@ -66,4 +67,15 @@ async function seed() {
     books: ["concept", "start_rc", "lc2"], pickup: "classroom", name: "이서윤", phone: null, depositor: "이서윤", address: null, amount: 30000, pin_hash: hashPin("1234"),
   });
   await updateApplication(b, { status: "paid" });
+
+  // 불라방 현장 수령(데스크) 예시: 최민재(납부 완료 · 준비) / 정하린(미납)
+  const c = await createApplication({
+    cohort: next, kind: "online", course: "solve", track: "all", continuing: false, slot: "pm", pickup_date: `${next}-01`, pickup_time: "18:30",
+    books: ["solve_rc2", "lc2"], pickup: "classroom", name: "최민재", phone: "01023456789", depositor: "최민재", address: null, amount: 20000, pin_hash: hashPin("1234"),
+  });
+  await updateApplication(c, { status: "paid" });
+  await createApplication({
+    cohort: next, kind: "online", course: "start", track: "all", continuing: false, slot: "am", pickup_date: `${next}-02`, pickup_time: "10:00",
+    books: ["concept", "start_rc", "lc2"], pickup: "classroom", name: "정하린", phone: "01034567890", depositor: "정하린", address: null, amount: 30000, pin_hash: hashPin("1234"),
+  });
 }

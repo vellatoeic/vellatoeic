@@ -6,7 +6,6 @@ import LoginForm from "../LoginForm";
 import AdminTabs from "../AdminTabs";
 import PrintButton from "./PrintButton";
 import Link from "next/link";
-import { specialDay } from "@/lib/special";
 import { isActive } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
@@ -57,8 +56,6 @@ export default async function Roster() {
   const cohort = await currentCohort();
   const apps = (await listCohortApplications(cohort)).filter(isActive);
   const onsite = apps.filter((a) => a.kind === "onsite");
-  const desk = apps.filter((a) => a.kind === "online" && a.pickup === "classroom");
-  const delivery = apps.filter((a) => a.kind === "online" && a.pickup === "delivery");
 
   return (
     <div className="space-y-6 pt-8">
@@ -115,46 +112,11 @@ export default async function Roster() {
       })}
       {onsite.length === 0 && <p className="card text-center text-slate-500">이번 기수 현장 신청자가 아직 없어요.</p>}
 
-      <div data-slot-part="other" className="space-y-6">
-      <h2 className="font-jua pt-4 text-3xl text-sky-ink">불라방 교재 수령 명단</h2>
-      <section className="card break-inside-avoid">
-        <h3 className="font-jua text-xl text-sky-ink">
-          1층 데스크 수령 <span className="text-base text-slate-400">· {desk.length}명</span>
-        </h3>
-        <p className="mt-1 text-sm text-slate-500">학생이 고른 수령 희망 날짜·시간 순서예요. 미리 준비해 두세요.<br />교재를 받은 학생은 직접 [교재 받았어요]를 눌러서 &apos;수령 완료&apos;로 바뀌어요.</p>
-        {desk.length === 0 ? <p className="mt-2 text-sm text-slate-500">아직 없어요.</p> : (
-          <table className="mt-3 w-full text-left text-[15px]">
-            <thead>
-              <tr className="border-b border-sky-main text-sm text-slate-500">
-                <th className="w-8 py-2">✓</th>
-                <th className="py-2">수령 희망</th>
-                <th className="py-2">이름</th>
-                <th className="py-2">교재</th>
-                <th className="py-2 text-right">상태</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...desk]
-                .sort((a, b) => `${a.pickup_date ?? "9999"} ${a.pickup_time ?? ""}`.localeCompare(`${b.pickup_date ?? "9999"} ${b.pickup_time ?? ""}`) || a.name.localeCompare(b.name, "ko"))
-                .map((a) => (
-                  <tr key={a.id} className={`border-b border-sky-soft ${a.status === "pending" ? "bg-amber-50" : a.status === "shipped" ? "text-slate-400" : ""}`}>
-                    <td className="py-2"><span className="inline-block h-4 w-4 rounded border-2 border-sky-main" /></td>
-                    <td className="whitespace-nowrap py-2 font-bold text-sky-ink">{a.pickup_date ? `${specialDay(a.pickup_date)} ${a.pickup_time ?? ""}` : <span className="font-normal text-slate-400">미정</span>}</td>
-                    <td className="py-2">{a.name}{a.depositor !== a.name && <span className="ml-1 text-xs text-slate-400">({a.depositor})</span>}{a.continuing && a.course === "start" && <span className="ml-1.5 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-bold text-yellow-800">지난달 교재 지참</span>}</td>
-                    <td className="py-2 text-sm text-slate-600">{a.books.map((b) => BOOKS[b]).join(", ")}</td>
-                    <td className={`whitespace-nowrap py-2 text-right font-bold ${a.status === "pending" ? "text-amber-600" : "text-sky-deep"}`}>
-                      {a.status === "pending" ? "미납" : a.status === "shipped" ? "수령 완료" : "준비"}
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        )}
-      </section>
-      <p className="card text-sm text-slate-600 print:hidden">
-        택배 수령 {delivery.length}명의 이름·연락처·주소는 <Link href="/admin/delivery" className="font-bold text-sky-deep underline">[택배 발송]</Link> 탭에서 볼 수 있어요.
+      {/* 불라방 학생(현장 수령 · 택배)은 [불라방] 탭으로 옮겼어요 (2026-11-26) */}
+      <p className="card text-sm text-slate-600 print:hidden" data-slot-part="other">
+        불라방 학생(현장 수령 · 택배)의 교재는{" "}
+        <Link href="/admin/delivery" className="font-bold text-sky-deep underline">[불라방]</Link> 탭에서 봐요.
       </p>
-      </div>
     </div>
   );
 }

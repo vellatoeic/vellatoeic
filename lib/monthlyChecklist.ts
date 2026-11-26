@@ -68,7 +68,7 @@ export async function monthlyChecklist(today = todayKST()): Promise<{ cohort: st
   const pending = mine.filter((a) => a.status === "pending").length;
   const unshipped = mine.filter((a) => a.kind === "online" && a.pickup === "delivery" && a.status === "paid").length;
   items.push(gate(addDays(first, -3), pending === 0, { key: "pending", title: `개강 전 입금 대기 ${pending}명`, href: `/admin?c=${cohort}&p=pending` }));
-  items.push(gate(addDays(first, -3), unshipped === 0, { key: "delivery", title: `개강 전 불라방 택배 미발송 ${unshipped}명`, href: "/admin/delivery" }));
+  items.push(gate(addDays(first, -3), unshipped === 0, { key: "delivery", title: `개강 전 불라방 택배 미발송 ${unshipped}명`, href: "/admin/delivery?pick=ship" }));
   // 격일반 확인 필요 (요일·이어듣기)
   const alt = await currentAltIssues(today);
   items.push({ key: "alt", title: `격일반 확인 필요 ${alt.length}건`, state: alt.length ? "todo" : "done", detail: alt.length ? "요일·이어듣기를 지난달 기록과 맞춰 주세요" : "모두 맞아요", href: "/admin#alt" });

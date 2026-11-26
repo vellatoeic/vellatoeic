@@ -13,8 +13,8 @@ export type Application = {
   track: Track;
   continuing: boolean; // 격일반을 지난달에 이어 듣는 수강생 (LC만 새로 받음)
   slot: TimeSlot | null; // 수강 시간 (오전반/저녁반). 시간 추가 전 신청은 비어 있어요.
-  pickup_date: string | null; // 불라방 1층 데스크 수령 희망 날짜
-  pickup_time: string | null; // 불라방 1층 데스크 수령 희망 시간 (예: 14:00)
+  pickup_date: string | null; // 불라방 현장(데스크) 수령 희망 날짜
+  pickup_time: string | null; // 불라방 현장(데스크) 수령 희망 시간 (예: 14:00)
   books: BookId[];
   pickup: Pickup;
   name: string;

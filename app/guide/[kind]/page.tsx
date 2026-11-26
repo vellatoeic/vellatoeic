@@ -1,3 +1,4 @@
+import { DESK } from "@/lib/config";
 import { notFound } from "next/navigation";
 import { CLASSROOM, KINDS, todayKST, type Kind } from "@/lib/config";
 import { getSetting, listLoginLinks, roundFor } from "@/lib/db";
@@ -26,7 +27,7 @@ const NOTICE: Record<Kind, string[]> = {
   ],
   online: [
     "불라방 수강생은 등록 즉시 아래 신청서를 작성하고 교재비를 납부해 주세요.",
-    "교재는 1층 데스크 수령 또는 택배 수령 중 선택할 수 있어요.",
+    `교재는 ${DESK} 수령 또는 택배 수령 중 선택할 수 있어요.`,
     "택배 수령은 납부 확인 후 순서대로 발송해요.",
     "입금자명이 신청자 이름과 다르면 아래 '입금자명' 칸에 꼭 적어 주세요.",
   ],
@@ -36,7 +37,7 @@ const NOTICE: Record<Kind, string[]> = {
 export async function generateMetadata({ params }: { params: Promise<{ kind: string }> }) {
   const { kind } = await params;
   return kind === "online"
-    ? pageMeta("불라방(라이브) 교재 신청 | 부산 서면 토익 벨라토익", "부산 서면 토익 벨라토익 불라방(유튜브 라이브) 수강생 필독 사항과 교재 신청. 교재는 1층 데스크 또는 택배로 받아요.", "/guide/online")
+    ? pageMeta("불라방(라이브) 교재 신청 | 부산 서면 토익 벨라토익", "부산 서면 토익 벨라토익 불라방(유튜브 라이브) 수강생 필독 사항과 교재 신청. 교재는 데스크 수령 또는 택배로 받아요.", "/guide/online")
     : pageMeta("현장 수강 교재 신청 | 부산 서면 토익 벨라토익", `부산 서면 토익 벨라토익 현장(${CLASSROOM}) 수강생 필독 사항과 교재 신청. 교재는 첫 수업 날 강의실에서 받아요.`, "/guide/onsite");
 }
 
