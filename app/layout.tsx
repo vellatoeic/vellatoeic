@@ -63,7 +63,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div className="ml-auto flex items-center gap-1.5">
               <Bell count={notice.unread} visitorKeys={notice.visitorKeys} />
               {admin ? <ModeSwitch /> : loggedIn ? <Link href="/class" className="hdr-class">강의실</Link> : <Link href="/login" className="hdr-login">로그인</Link>}
-              <SiteMenu loggedIn={loggedIn} />
+              {/* 관리자만 로그인해도 메뉴에 [로그아웃]이 보여야 해요 (로그아웃은 관리자까지 모두 풀어요) */}
+              <SiteMenu loggedIn={loggedIn || admin} />
             </div>
           </nav>
           {viewing && (
