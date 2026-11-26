@@ -80,7 +80,7 @@ export default function OrderForm({ amountLabel }: { amountLabel: string }) {
   }
 
   return (
-    <form onSubmit={review} className="space-y-3">
+    <form onSubmit={review} className="space-y-3 lg:grid lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-start lg:gap-4 lg:space-y-0 lg:[&>section:first-of-type]:row-span-6">
       <section className="card space-y-3">
         <p className="flex items-center gap-2 font-jua text-lg text-sky-ink"><span className="grid h-7 w-7 place-items-center rounded-full bg-sky-deep text-sm text-white">1</span>신청 교재</p>
         <div className="rounded-2xl bg-sky-soft p-3 text-[15px]">

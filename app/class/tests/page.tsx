@@ -32,7 +32,7 @@ export default async function TestsPage() {
     .map((r) => ({ label: String(r.test_no), pct: Math.round((r.score / r.questions) * 100), r }));
 
   return (
-    <div className="stagger space-y-5 pt-8">
+    <div className="stagger wide space-y-5 pt-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-6 lg:gap-y-3 lg:space-y-0 lg:[&>a]:col-span-2 lg:[&>h1]:col-span-2">
       <Link href="/class" className="text-sm text-sky-deep underline">← 강의실로</Link>
       <h1 className="font-jua text-3xl text-sky-ink">데일리 테스트</h1>
 

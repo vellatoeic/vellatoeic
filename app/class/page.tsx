@@ -195,7 +195,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
   })();
 
   return (
-    <div className="stagger space-y-6 pt-8">
+    <div className="stagger wide space-y-6 pt-8">
       <div className="flex items-end justify-between">
         <div>
           <p className="text-slate-500">{name}님의</p>
@@ -239,6 +239,9 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
         </div>
       ))}
 
+      {/* 컴퓨터(1024px 이상): 왼쪽 탭·라이브·특강·오늘의 테스트 / 오른쪽 미션·안내·연결·단톡방 (휴대폰은 위아래 같은 순서) */}
+      <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
+      <div className="space-y-6">
       {paid.length > 0 && (
         <div>
           <div className="grid grid-cols-2 gap-1 rounded-2xl bg-white p-1 shadow-[0_2px_0_#d5ecf9]">
@@ -318,6 +321,8 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
         <BookReceived key={a.id} id={a.id} when={a.pickup_date ? `${specialDay(a.pickup_date)} ${a.pickup_time ?? ""}` : undefined} />
       ))}
 
+      </div>
+      <div className="space-y-6">
       {latestMission < 4 && (
         <Link href="/mission" className="flex items-center gap-3 rounded-[20px] border-2 border-[#ffd23f] bg-white p-4 shadow-[0_3px_0_#cfe6f5]">
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#e8f8ef]"><Icon name="clipboard" size={32} /></span>
@@ -353,6 +358,9 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
         </a>
       )}
 
+      </div>
+      </div>
+
       {paid.map((a) => {
         // 강의 목록은 고른 시간대(☀️/🌙) 강의만 보여요. 구분 없는 예전 강의는 둘 다에 보여요.
         // 열람 기간이 지난 신청은 강의 목록을 보여주지 않아요 (스티커판 등 기록은 보기만)
@@ -367,6 +375,9 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
                 {COURSES[a.course].label} {TRACKS[a.track]}
               </h2>
             </div>
+            {/* 컴퓨터: 왼쪽 스티커판(휴대폰 크기 그대로, 이미지 저장용) / 오른쪽 LC 음원·지난 강의. 휴대폰은 음원 → 스티커판 → 강의 순서 그대로 */}
+            <div className="lg:mt-2 lg:grid lg:grid-cols-[minmax(0,25rem)_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:items-start lg:gap-x-8">
+            <div className="lg:col-start-2 lg:row-start-1">
             {(() => {
               const box = audioBoxes.get(a.id);
               if (!box?.period || today > box.period.end) return null;
@@ -388,6 +399,8 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
                 </div>
               );
             })()}
+            </div>
+            <div className="lg:col-start-1 lg:row-start-1 lg:row-span-2">
             <div id="sticker" className="scroll-mt-20" />
             {(() => {
               const klass = scheduleClassFor(a.course, a.track);
@@ -407,6 +420,8 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
                 welcome={missionCount(missionFor(a.id, missions)) === 4}
               />;
             })()}
+            </div>
+            <div className="lg:col-start-2 lg:row-start-2">
             {phase === "extended" && w && (
               <div className="mt-6 rounded-2xl bg-emerald-50 p-3 text-center text-sm">
                 <p className="font-bold text-emerald-700"><Icon name="book" size={20} className="mr-1" />{Number(a.cohort.slice(5, 7))}월 강의는 {dayLabelKo(w.until)}까지 볼 수 있어요{!hasNextOf(a) && ` · ${Number(shiftMonth(a.cohort, 1).slice(5, 7))}월 수업도 함께해요!`}</p>
@@ -439,6 +454,8 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
                 </div>
               );
             })}
+            </div>
+            </div>
           </section>
         );
       })}

@@ -37,7 +37,7 @@ export default function FaqSearch({ items, children }: { items: FaqItem[]; child
       )}
       {searching ? (
         found.length > 0 ? (
-          <div className="space-y-2" aria-live="polite">
+          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:items-start lg:gap-2 lg:space-y-0 lg:[&>p]:col-span-2" aria-live="polite">
             <p className="text-sm text-slate-500">&lsquo;{q.trim()}&rsquo; 검색 결과 {found.length}개</p>
             {found.map((f) => (
               <details key={f.id} open={found.length <= 3} className="group rounded-2xl border border-sky-deep/10 bg-white shadow-[0_4px_14px_rgba(18,64,92,0.06)]">

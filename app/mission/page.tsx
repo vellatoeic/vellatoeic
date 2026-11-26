@@ -48,7 +48,7 @@ export default async function MissionPage() {
   const introDone = !!mission?.intro_at;
 
   return (
-    <div className="mx-auto max-w-md space-y-2.5 pt-8">
+    <div className="mx-auto max-w-md space-y-2.5 pt-8 lg:grid lg:max-w-4xl lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0 lg:[&>h1]:col-span-2 lg:[&>p]:col-span-2 lg:[&>section:first-of-type]:col-span-2">
       <h1 className="flex items-center justify-center gap-2 font-jua text-[26px] text-sky-ink"><Icon name="clipboard" size={36} />첫 수업 미션</h1>
       <p className="text-center text-sm text-[#6b93ad]">{firstName}님, 4개만 하면 웰컴 배지를 받아요!<br />{start ? `첫 수업(${specialDay(start)}) 시간에 다 같이 해요 :)` : "첫 수업 시간에 다 같이 해요 :)"}</p>
 

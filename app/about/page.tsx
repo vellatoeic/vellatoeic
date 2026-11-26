@@ -41,7 +41,7 @@ export default async function AboutPage() {
   ];
 
   return (
-    <article className="stagger space-y-6 pt-8">
+    <article className="stagger wide space-y-6 pt-8">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml() }} />
 
       <header className="text-center">

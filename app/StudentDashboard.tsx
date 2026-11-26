@@ -56,7 +56,7 @@ export default function StudentDashboard({ d }: { d: Dashboard }) {
       : <>{d.cohortMonth}월 수업이 끝났어요</>;
 
   return (
-    <div className="sd">
+    <div className="sd wide">
       <NoticePopupHost />
       {d.audio && d.audio.count > 0 && <AudioPopup cohort={a.cohort} end={d.audio.end} />}
 
@@ -78,6 +78,9 @@ export default function StudentDashboard({ d }: { d: Dashboard }) {
         </Link>
       )}
 
+      {/* 컴퓨터(1024px 이상)에서는 왼쪽: 라이브·진행·오늘 할 일 / 오른쪽: 카드·단톡방·메뉴 (휴대폰은 위아래 그대로) */}
+      <div className="sd-cols">
+      <div className="sd-main">
       {/* 라이브: 수업 10분 전~종료까지 빨갛게 (강의실과 같은 규칙) */}
       {d.live.open ? (
         d.live.link ? (
@@ -141,6 +144,8 @@ export default function StudentDashboard({ d }: { d: Dashboard }) {
         )}
       </section>
 
+      </div>
+      <div className="sd-side">
       {/* 카드 묶음 */}
       <div className="sd-grid">
         {d.tests && (
@@ -198,6 +203,8 @@ export default function StudentDashboard({ d }: { d: Dashboard }) {
       </section>
 
       <AddToHome />
+      </div>
+      </div>
       <StudentTabBar tests={!!d.tests} />
     </div>
   );

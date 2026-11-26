@@ -160,3 +160,6 @@ body:has(.tabbar) .site-foot { padding-bottom: 104px; }
     display: none !important;
   }
 }
+
+/* 컴퓨터에서 넓게 쓰는 학생 화면 (2026-11-26 반응형): 바깥 기본 폭(max-w-3xl)을 벗어나 최대 72rem. 휴대폰·태블릿은 그대로 */
+@media (min-width: 1024px) { .wide { margin-inline: calc(50% - min(36rem, 50vw - 1rem)); } }

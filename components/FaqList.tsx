@@ -8,7 +8,7 @@ export default function FaqList({ items }: { items: FaqItem[] }) {
   const categories = [...new Set(published.map((f) => f.category))]; // 맨 앞 항목 순서대로
   if (categories.length === 0) return <p className="card text-center text-slate-500">아직 등록된 질문이 없어요.</p>;
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">
       {categories.map((c) => (
         <details key={c} className="group/cat rounded-[20px] border border-sky-deep/15 bg-white/70 p-2">
           <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5">

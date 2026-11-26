@@ -61,7 +61,7 @@ export default async function SpecialPage({ searchParams }: { searchParams: Prom
   });
 
   return (
-    <div className="stagger space-y-6 pt-8">
+    <div className="stagger wide space-y-6 pt-8">
       {expired && <p className="card !bg-slate-100 flex items-center justify-center gap-2 font-bold text-slate-600"><Icon name="book" size={24} />열람 기간이 끝났어요</p>}
       <div className="text-center">
         <span className="rounded-full bg-sky-main px-4 py-1.5 text-sm font-bold text-sky-ink">{weekdayLabel}</span>
@@ -69,6 +69,9 @@ export default async function SpecialPage({ searchParams }: { searchParams: Prom
         <p className="mt-2 text-slate-600">현장 또는 불라방으로 신청할 수 있어요.</p>
       </div>
 
+      {/* 컴퓨터(1024px 이상): 왼쪽 특강 신청 / 오른쪽 내 특강 신청 (휴대폰은 위아래 같은 순서) */}
+      <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
+      <div className="space-y-6">
       {upcoming.length === 0
         ? <p className="card text-center text-slate-500">지금 신청할 수 있는 특강이 없어요.</p>
         : socialOnly && !loggedIn
@@ -81,6 +84,8 @@ export default async function SpecialPage({ searchParams }: { searchParams: Prom
           )
           : <SpecialForm needPin={!socialOnly} events={upcoming.map((event) => ({ id: event.id, title: event.title, when: specialWhen(event), closed: !open.includes(event), badge: deadlineBadge(event) }))} />}
 
+      </div>
+      <div className="space-y-6">
       {myRows.length > 0 ? (
         <section className="space-y-3">
           <h2 className="font-jua text-2xl text-sky-ink">내 특강 신청</h2>
@@ -177,6 +182,8 @@ export default async function SpecialPage({ searchParams }: { searchParams: Prom
       ) : login.mode !== "pin" && loggedIn ? null : (
         <SpecialLogin providers={login.providers} pin={login.pin} />
       )}
+      </div>
+      </div>
     </div>
   );
 }

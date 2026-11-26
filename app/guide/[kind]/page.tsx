@@ -70,22 +70,27 @@ export default async function KindGuide({ params, searchParams }: { params: Prom
   ];
 
   return (
-    <div className="stagger space-y-5 pt-8">
+    <div className="stagger wide space-y-5 pt-8">
       <div className="text-center">
         <span className="rounded-full bg-sky-main px-4 py-1.5 text-sm font-bold text-sky-ink">{KINDS[kind].label}</span>
         <h1 className="font-jua mt-4 text-4xl text-sky-ink">교재 신청</h1>
         <p className="mt-2 text-[15px] text-slate-600">학원 수강 등록을 마쳤다면 이렇게 끝나요</p>
       </div>
 
-      <ol className="grid grid-cols-3 gap-2">
+      {/* 컴퓨터(1024px 이상): 왼쪽 신청서 / 오른쪽 1·2·3 · 시간표 · 불라방 안내 (휴대폰은 위아래 같은 순서) */}
+      <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[auto_1fr] lg:items-start lg:gap-6 lg:space-y-0">
+      <ol className="grid grid-cols-3 gap-2 lg:col-start-2 lg:row-start-1 lg:grid-cols-1">
         {STEPS.map((st) => (
-          <li key={st.n} className="rounded-2xl bg-white p-3 text-center shadow-[0_4px_14px_rgba(18,64,92,0.06)]">
-            <span className="mx-auto grid h-7 w-7 place-items-center rounded-full bg-sky-deep text-sm font-bold text-white">{st.n}</span>
-            <b className="mt-1.5 block text-[14px] leading-tight text-sky-ink">{st.title}</b>
-            <small className="mt-1 block text-[11px] leading-snug text-slate-500">{st.sub}</small>
+          <li key={st.n} className="rounded-2xl bg-white p-3 text-center shadow-[0_4px_14px_rgba(18,64,92,0.06)] lg:flex lg:items-center lg:gap-3 lg:p-4 lg:text-left">
+            <span className="mx-auto grid h-7 w-7 shrink-0 place-items-center rounded-full bg-sky-deep text-sm font-bold text-white lg:mx-0">{st.n}</span>
+            <span className="block">
+              <b className="mt-1.5 block text-[14px] leading-tight text-sky-ink lg:mt-0 lg:text-base">{st.title}</b>
+              <small className="mt-1 block text-[11px] leading-snug text-slate-500 lg:text-xs">{st.sub}</small>
+            </span>
           </li>
         ))}
       </ol>
+      <div className="lg:col-start-1 lg:row-start-1 lg:row-span-2">
 
       {gate ? (
         <section className="card space-y-4 text-center">
@@ -97,12 +102,16 @@ export default async function KindGuide({ params, searchParams }: { params: Prom
       ) : (
         <ApplyForm kind={kind} months={months} today={todayKST()} account={accountLabel} receiptMenu={await getSetting("receipt_menu")} notices={NOTICE[kind]} />
       )}
+      </div>
 
+      <div className="space-y-5 lg:col-start-2 lg:row-start-2">
       <details className="group card !p-0">
         <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 font-jua text-lg text-sky-ink">수업 시간표 보기<span className="text-sm font-normal text-sky-deep group-open:hidden">펼치기</span></summary>
         <div className="px-2 pb-2"><Timetable /></div>
       </details>
       {kind === "online" && <HowToWatch beforeApply login={login.mode} />}
+      </div>
+      </div>
     </div>
   );
 }

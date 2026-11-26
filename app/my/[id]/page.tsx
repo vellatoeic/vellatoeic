@@ -58,7 +58,7 @@ export default async function MyPage({ params, searchParams }: { params: Promise
   const done = a.status === "pending" ? 1 : a.status === "paid" && online ? 2 : 3;
 
   return (
-    <div className="stagger space-y-6 pt-8">
+    <div className="stagger wide space-y-6 pt-8">
       <div className="text-center">
         <p className="mb-2 inline-block rounded-full bg-sky-deep px-5 py-1.5 font-jua text-2xl text-white">{Number(a.cohort.slice(5, 7))}월 수업</p>
         <h1 className="font-jua text-4xl text-sky-ink">
@@ -67,6 +67,9 @@ export default async function MyPage({ params, searchParams }: { params: Promise
         <p className="mt-2 text-slate-600">{a.name}님, 이 페이지를 즐겨찾기 해두면 진행 상황을 확인할 수 있어요.</p>
       </div>
 
+      {/* 컴퓨터(1024px 이상): 왼쪽 진행 단계·입금 안내 / 오른쪽 수업 듣는 방법·신청 내용 (휴대폰은 위아래 같은 순서) */}
+      <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
+      <div className="space-y-6">
       {a.continuing && a.course === "start" && (
         <p className="rounded-3xl border-2 border-yellow-300 bg-yellow-100 p-5 text-center font-jua text-xl leading-relaxed text-yellow-900"><Icon name="book" size={26} className="mr-1" />{BRING_BOOKS_TEXT}</p>
       )}
@@ -140,6 +143,8 @@ export default async function MyPage({ params, searchParams }: { params: Promise
 
       {deskWaiting && isMine && <BookReceived id={a.id} when={a.pickup_date ? `${specialDay(a.pickup_date)} ${a.pickup_time ?? ""}` : undefined} />}
 
+      </div>
+      <div className="space-y-6">
       {a.kind === "online" && <HowToWatch days={classDaysLabel(a)} times={classTimes(a)} login={(await loginSetup()).mode} />}
 
       <section className="card">
@@ -158,6 +163,8 @@ export default async function MyPage({ params, searchParams }: { params: Promise
       </section>
 
       <AddToHome />
+      </div>
+      </div>
     </div>
   );
 }

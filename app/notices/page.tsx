@@ -21,7 +21,7 @@ export default async function NoticesPage() {
   const reads = new Set((await listNoticeReads({ appIds: apps.map((a) => a.id) })).map((r) => r.notice_id));
 
   return (
-    <div className="space-y-4 pt-8">
+    <div className="wide space-y-4 pt-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 lg:[&>h1]:col-span-2 lg:[&>p]:col-span-2">
       <h1 className="flex items-center gap-2 font-jua text-3xl text-sky-ink"><Icon name="bell" size={34} />공지</h1>
       {mine.length === 0 && <p className="card text-center text-slate-500">아직 공지가 없어요.</p>}
       {mine.map((n) => {

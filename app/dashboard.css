@@ -81,3 +81,11 @@ a.sd-card:active { transform: scale(0.98); }
 @media (prefers-reduced-motion: reduce) {
   .sd > *, .sd-ring-fg { animation: none; }
 }
+
+/* 컴퓨터: 두 칸 (2026-11-26 반응형) */
+.sd-cols, .sd-main, .sd-side { display: grid; gap: 12px; align-content: start; min-width: 0; }
+@media (min-width: 1024px) {
+  .sd-cols { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .sd-side .sd-grid { grid-template-columns: 1fr 1fr; }
+  .sd { padding-bottom: 48px; }
+}
