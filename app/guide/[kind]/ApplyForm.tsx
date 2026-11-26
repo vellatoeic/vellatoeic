@@ -43,7 +43,7 @@ const choice = (on: boolean) =>
 type MonthOption = { cohort: string; label: string; range: string; round: 1 | 2; windows: Record<string, { first: string | null; last: string | null }> };
 
 // account: 구글·카카오만 방식에서 로그인한 계정 이름 (있으면 비밀번호 칸이 없어요)
-export default function ApplyForm({ kind, months, today, account = null }: { kind: Kind; months: MonthOption[]; today: string; account?: string | null }) {
+export default function ApplyForm({ kind, months, today, account = null, receiptMenu = null }: { kind: Kind; months: MonthOption[]; today: string; account?: string | null; receiptMenu?: string | null }) {
   const pinFields = !account;
   const [state, action, pending] = useActionState<FormState, FormData>(submitApplication, {});
   // 수강 월: 하나뿐이면 자동, 둘이면 기본 선택 없이 꼭 고르기
@@ -71,6 +71,8 @@ export default function ApplyForm({ kind, months, today, account = null }: { kin
   const locked = receipt?.status === "match" && !override && receiptClasses.length > 0;
   const wrongPage = receipt?.status === "match" && receipt.kind === "online" && kind === "onsite" && !override;
   const needOverride = receipt?.status === "reject" && !override;
+  // 2단계(수강 월·반·과정·시간·이름·교재 받는 방법)는 수강증을 읽은 뒤에만 보여요 (학생이 반을 먼저 고르는 것처럼 보이지 않게)
+  const ready = !!receipt?.id && (receipt.status !== "reject" || override);
 
   const applyClass = (c: ReceiptClass) => {
     setMonth(c.cohort);
@@ -163,7 +165,7 @@ export default function ApplyForm({ kind, months, today, account = null }: { kin
   };
 
   return (
-    <form onSubmit={review} className="card space-y-6">
+    <form onSubmit={review} id="apply" className="card scroll-mt-24 space-y-6">
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="pickup" value={pickup} />
       <input type="hidden" name="track" value={track} />
@@ -174,7 +176,7 @@ export default function ApplyForm({ kind, months, today, account = null }: { kin
       {receipt?.id && <input type="hidden" name="receipt_id" value={receipt.id} />}
       {override && <input type="hidden" name="receipt_override" value="1" />}
 
-      <ReceiptStep kind={kind} result={receipt} onResult={onReceipt} />
+      <ReceiptStep kind={kind} result={receipt} onResult={onReceipt} menu={receiptMenu} />
       {(locked || wrongPage || needOverride) && (
         <button type="button" onClick={() => setOverride(true)} className="-mt-3 block text-left text-xs text-slate-500 underline underline-offset-2">
           {needOverride ? "수강증이 맞는데 계속 안 되나요? 반을 직접 고를게요" : "수강증과 다른 반이 나왔나요? 반을 직접 고를게요"}
@@ -182,6 +184,12 @@ export default function ApplyForm({ kind, months, today, account = null }: { kin
       )}
       {override && <p className="-mt-3 rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800">직접 고른 반은 선생님이 수강증과 비교해서 확인해요. 학원에 등록한 반과 같은지 꼭 확인해 주세요.</p>}
 
+      {ready ? (
+        <>
+      <div className="border-t-2 border-dashed border-sky-main pt-5">
+        <p className="flex items-center gap-2 font-jua text-xl text-sky-ink"><span className="grid h-7 w-7 place-items-center rounded-full bg-sky-deep text-sm text-white">2</span>{locked ? "수강증대로 정해진 반을 확인해요" : "학원에 등록한 반을 골라요"}</p>
+        <p className="mt-1 text-sm text-slate-500">{locked ? "수강 월·반·과정·시간은 수강증대로 채워져서 바꿀 수 없어요. 이름과 교재 받는 방법만 적어 주세요." : "수강증에서 반을 다 읽지 못했어요. 학원에 등록한 반과 똑같이 골라 주세요. 선생님이 수강증과 비교해서 확인해요."}</p>
+      </div>
       <div>
         <p className="label">수강 월</p>
         {months.length === 1 ? (
@@ -382,13 +390,20 @@ export default function ApplyForm({ kind, months, today, account = null }: { kin
         )}
       </div>
 
-      {!receipt?.id && <p className="text-center text-sm font-bold text-amber-700">맨 위에서 YBM 수강증을 먼저 올려 주세요.</p>}
       {(checkError || state.error) && <p className="rounded-xl bg-red-50 p-3 text-center font-bold text-red-600">{checkError || state.error}</p>}
 
       <button className="btn w-full" disabled={pending || blocked || checking}>
         {pending ? "제출 중…" : checking ? "확인 중…" : "입력 내용 확인하기"}
       </button>
       <p className="text-center text-sm text-slate-600">제출 후 나오는 계좌로 <b className="text-red-600">입금까지 해야</b> 신청이 완료돼요.<br />신청서는 한 번만 제출해 주세요.</p>
+
+        </>
+      ) : (
+        <div className="rounded-2xl border-2 border-dashed border-slate-200 p-5 text-center">
+          <p className="font-jua text-lg text-slate-400">2단계 · 반 확인하고 교재 받는 방법 고르기</p>
+          <p className="mt-1 text-sm text-slate-500">위에서 YBM 수강증을 올리면 <b>수강 월 · 반 · 과정 · 수강 시간</b>이 자동으로 채워지고, 이어서 이름과 교재 받는 방법을 적어요.</p>
+        </div>
+      )}
 
       {confirm && course && slot && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center" role="dialog" aria-modal="true">

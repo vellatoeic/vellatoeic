@@ -41,7 +41,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <p className="text-sm text-slate-600">이 {label} 계정으로 교재 신청해요. 이후 강의실 입장 가능해요.</p>
         <form action={startFresh}>
           <input type="hidden" name="next" value={next} />
-          <button className="btn w-full">수강 신청하러 가기</button>
+          <button className="btn w-full">수강 등록하러 가기</button>
+          <p className="mt-2 text-xs text-slate-500">학원에서 수강 신청을 마쳤다면 다시 신청하지 않아요. YBM 수강증 캡처만 올리면 반이 자동으로 등록돼요.</p>
         </form>
       </section>
 

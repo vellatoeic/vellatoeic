@@ -74,10 +74,14 @@ export default async function KindGuide({ params }: { params: Promise<{ kind: st
         <p className="leading-relaxed text-slate-700">
           모두 수강 준비 되었나요~?
           <br />
-          수업 전 교재 수령을 위한 <b className="text-sky-deep">교재비 납부 안내</b>입니다.
+          수업 전 교재를 받기 위한 <b className="text-sky-deep">교재 신청 안내</b>입니다.
           <br />
-          수강 신청한 반을 확인하시고 아래 꼼꼼히 답변해 주세요!
+          학원 수강 등록을 마쳤다면, 아래 신청서 맨 위에 <b className="text-sky-deep">YBM 수강증</b>을 올려 주세요. 반·과정·시간이 자동으로 정해져요.
         </p>
+        <a href="#apply" className="flex items-center justify-between gap-3 rounded-2xl bg-sky-deep px-4 py-3 text-white">
+          <span><small className="block text-xs opacity-80">준비물</small><b className="font-jua text-lg">YBM 수강증 캡처 한 장</b></span>
+          <span className="text-sm font-bold">신청서로 ↓</span>
+        </a>
         <ul className="space-y-2 rounded-2xl bg-sky-soft p-5">
           {NOTICE[kind].map((n) => (
             <li key={n} className="flex gap-2 text-[15px] leading-relaxed text-slate-700">
@@ -99,7 +103,7 @@ export default async function KindGuide({ params }: { params: Promise<{ kind: st
           <SocialButtons providers={login.providers} next={`/guide/${kind}`} />
         </section>
       ) : (
-        <ApplyForm kind={kind} months={months} today={todayKST()} account={accountLabel} />
+        <ApplyForm kind={kind} months={months} today={todayKST()} account={accountLabel} receiptMenu={await getSetting("receipt_menu")} />
       )}
     </div>
   );

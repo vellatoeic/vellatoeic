@@ -443,6 +443,8 @@ export async function saveSettings(fd: FormData) {
     const ch = clean(fd.get("kakao_channel_url"));
     if (!ch || /^https:\/\//.test(ch)) await setSetting("kakao_channel_url", ch);
   }
+  // 교재 신청서의 'YBM 수강증 불러오는 방법' ② 메뉴 위치 (예: YBM어학원 앱 → 마이페이지 → 수강증)
+  if (fd.has("receipt_menu")) await setSetting("receipt_menu", clean(fd.get("receipt_menu")).slice(0, 80));
   if (fd.has("chat_url")) {
     const chatUrl = clean(fd.get("chat_url"));
     if (!chatUrl || /^https:\/\//.test(chatUrl)) await setSetting("chat_url", chatUrl);

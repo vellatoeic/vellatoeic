@@ -219,7 +219,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   const { k = "all", p = "all", b = "all", t = "all", q = "", c = now, ra = "", mv = "", linked = "", r = "all" } = await searchParams;
   // 30분 자동 취소(timeout)는 관리 화면 어디에도 안 보여요. 관리자 취소(admin)는 '취소' 필터에서만.
   const everything = (await listApplications()).filter(visibleToAdmin);
-  const [account, cafeHomeworkUrl, cafeUrl, blogUrl, studyBoardUrl, chatUrl, chatCode, rawCohort, kakaoChannel] = await Promise.all([
+  const [account, cafeHomeworkUrl, cafeUrl, blogUrl, studyBoardUrl, chatUrl, chatCode, rawCohort, kakaoChannel, receiptMenu] = await Promise.all([
     getSetting("bank_account"),
     getSetting("cafe_homework_url"),
     getSetting("cafe_url"),
@@ -229,6 +229,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
     getSetting("chat_code"),
     getSetting("current_cohort"),
     getSetting("kakao_channel_url"),
+    getSetting("receipt_menu"),
   ]);
   const round = await roundFor(now);
   // 교재 회차 (이번 달·다음 달): 저장된 값과 자동 값(roundOf)
@@ -534,6 +535,10 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
           <label className="sm:col-span-4">
             <span className="label"><Icon name="gift" size={20} className="mr-1" />벨라토익 카톡 채널 주소 <span className="font-normal text-slate-400">(선물 결과 카드의 [카톡 채널 열기] 버튼, 비우면 버튼 숨김)</span></span>
             <input type="url" name="kakao_channel_url" defaultValue={kakaoChannel} className="input" placeholder="https://pf.kakao.com/..." />
+          </label>
+          <label className="sm:col-span-4">
+            <span className="label"><Icon name="clipboard" size={20} className="mr-1" />YBM 수강증 메뉴 위치 <span className="font-normal text-slate-400">(교재 신청서 &apos;수강증 불러오는 방법&apos; 2번에 그대로 나와요, 비우면 &apos;내 수강 정보에서&apos;)</span></span>
+            <input name="receipt_menu" defaultValue={receiptMenu ?? ""} className="input" placeholder="예: YBM어학원 앱 → 마이페이지 → 수강증" maxLength={80} />
           </label>
           <button className="btn !py-3">저장</button>
           <p className="text-xs text-slate-500 sm:col-span-3">

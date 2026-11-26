@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { readReceiptAction, type ReceiptResult } from "@/app/receiptActions";
 import { KINDS, type Kind } from "@/lib/config";
 import { classTextWithLevel } from "@/lib/receipt/classes";
+import ReceiptHowTo from "./ReceiptHowTo";
 
 // 휴대폰 캡처를 가로 1600px 이하 JPEG로 줄여요 (Vercel 업로드 한도 4.5MB 안, 글자는 또렷하게)
 async function shrink(file: File): Promise<Blob> {
@@ -23,7 +24,7 @@ async function shrink(file: File): Promise<Blob> {
   return file;
 }
 
-export default function ReceiptStep({ kind, result, onResult }: { kind: Kind; result: ReceiptResult | null; onResult: (r: ReceiptResult | null) => void }) {
+export default function ReceiptStep({ kind, result, onResult, menu }: { kind: Kind; result: ReceiptResult | null; onResult: (r: ReceiptResult | null) => void; menu?: string | null }) {
   const [reading, setReading] = useState(false);
   const [slow, setSlow] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
@@ -58,11 +59,11 @@ export default function ReceiptStep({ kind, result, onResult }: { kind: Kind; re
 
   return (
     <div className="space-y-3">
-      <p className="label">YBM 수강증 올리기 <span className="font-normal text-slate-400">(필수)</span></p>
+      <p className="flex items-center gap-2 font-jua text-xl text-sky-ink"><span className="grid h-7 w-7 place-items-center rounded-full bg-sky-deep text-sm text-white">1</span>YBM 수강증 올리기 <span className="font-body text-sm font-normal text-slate-400">(필수)</span></p>
       <p className="text-[15px] leading-relaxed text-slate-600">
         YBM 앱·홈페이지의 <b className="text-sky-ink">수강증 화면(파란 카드)</b>을 캡처해서 올려 주세요. 반·과정·시간·수강 월이 자동으로 채워져요.
-        <span className="mt-1 block text-xs text-slate-500">수강생·수강센터·강의실·수강시간 칸이 모두 보이게 캡처해 주세요.</span>
       </p>
+      <ReceiptHowTo menu={menu} open={!(result?.status === "match")} />
 
       <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
       <div className="flex items-center gap-3 rounded-2xl border-2 border-dashed border-sky-main p-4">
