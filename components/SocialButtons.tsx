@@ -20,7 +20,8 @@ const KakaoIcon = () => (
 // [카카오로 로그인] · [구글로 로그인]
 // 카톡·인스타·네이버 앱 안의 브라우저에서는 구글이 로그인을 막아요 → 카톡은 밖의 브라우저로, 안드로이드는 크롬으로 열고, 아이폰은 사파리로 여는 법을 안내해요.
 // link: 강의실에서 이미 로그인한 학생이 [연결하기]로 누를 때 (지금 신청을 그 계정에 바로 연결)
-export default function SocialButtons({ providers, next, link = false }: { providers: Provider[]; next: string; link?: boolean }) {
+// admin: 관리자 로그인(login) · 관리자 계정 등록(add) 버튼
+export default function SocialButtons({ providers, next, link = false, admin }: { providers: Provider[]; next: string; link?: boolean; admin?: "login" | "add" }) {
   const [ua, setUa] = useState("");
   const [origin, setOrigin] = useState("");
   const [copied, setCopied] = useState(false);
@@ -30,8 +31,8 @@ export default function SocialButtons({ providers, next, link = false }: { provi
   }, []);
   if (providers.length === 0) return null;
 
-  const path = (p: Provider) => `/api/auth/${p}?next=${encodeURIComponent(next)}${link ? "&link=1" : ""}`;
-  const verb = link ? " 계정 연결하기" : "로 로그인";
+  const path = (p: Provider) => admin ? `/api/auth/${p}?admin=${admin}` : `/api/auth/${p}?next=${encodeURIComponent(next)}${link ? "&link=1" : ""}`;
+  const verb = admin === "add" ? " 계정 추가" : link ? " 계정 연결하기" : "로 로그인";
   const inApp = origin ? inAppBrowser(ua) : null;
   const iosOtherApp = inApp === "other" && !isAndroid(ua);
   const googleHref =

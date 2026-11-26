@@ -95,7 +95,8 @@ function unsealTimed<T>(raw: string | undefined, maxMs: number): T | null {
 
 // 구글·카카오로 보내기 전 확인값 (state, PKCE): 10분, 로그인 주소(/api/auth)에만 보내요
 // l = 강의실 [연결하기] 버튼에서 왔어요 (이미 로그인한 신청을 그대로 연결)
-export type OAuthState = { p: string; s: string; v: string; n: string; l?: boolean };
+// a = 관리자 로그인(login) · 관리자 계정 등록(add)
+export type OAuthState = { p: string; s: string; v: string; n: string; l?: boolean; a?: "login" | "add" };
 const OAUTH_MS = 10 * 60 * 1000;
 export async function setOAuthState(st: OAuthState) {
   (await cookies()).set("vella_oauth", sealTimed(st), { ...cookieOpts, path: "/api/auth", maxAge: OAUTH_MS / 1000 });

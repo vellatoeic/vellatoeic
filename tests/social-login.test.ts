@@ -1,7 +1,7 @@
 // 구글·카카오 로그인 규칙 테스트 (DB 없이)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { effectiveMode, googleClaims, inAppBrowser, isSignupNext, loginModeOf, planLink, providerReady, readyProviders, safeNext, showPinLogin, showSocialLogin } from "@/lib/socialLogin";
+import { effectiveMode, googleClaims, inAppBrowser, isAdminLogin, isAdminOAuth, isSignupNext, loginModeOf, parseAdminLogins, planLink, providerReady, readyProviders, safeNext, showPinLogin, showSocialLogin, withAdminLogin } from "@/lib/socialLogin";
 import { findPrevAlt, planBooks, NOT_FOUND_NOTICE, NOT_FOUND_NOTICE_SOCIAL } from "@/lib/altContinue";
 import { loginApps } from "@/lib/access";
 import type { Application } from "@/lib/db";
@@ -91,4 +91,20 @@ test("격일반 두 달째: 구글·카카오만 방식은 같은 학생 번호�
   assert.equal(books.notice, NOT_FOUND_NOTICE_SOCIAL);
   const pinBooks = planBooks({ course: "start", track: "alt_tt", pickup: "classroom", round: 2, prev: null, wantContinuing: true });
   assert.equal(pinBooks.notice, NOT_FOUND_NOTICE);
+});
+
+test("관리자 카카오·구글 계정: 계정 고유번호로 등록하고, 이상한 값은 버리고, 같은 계정은 한 번만", () => {
+  assert.deepEqual(parseAdminLogins(""), []);
+  assert.deepEqual(parseAdminLogins("깨진 값"), []);
+  assert.deepEqual(parseAdminLogins(JSON.stringify([{ p: "naver", sub: "1" }, { p: "kakao", sub: "" }, { p: "google", sub: "g1", label: "a", at: "t" }])).map((x) => x.sub), ["g1"]);
+  const one = withAdminLogin([], { p: "kakao", sub: "k1", label: "벨라", at: "t1" });
+  const again = withAdminLogin(one, { p: "kakao", sub: "k1", label: "벨라쌤", at: "t2" });
+  assert.equal(again.length, 1);
+  assert.equal(again[0].label, "벨라쌤");
+  const both = withAdminLogin(again, { p: "google", sub: "g1", label: null, at: "t3" });
+  assert.equal(isAdminLogin(both, "google", "g1"), true);
+  assert.equal(isAdminLogin(both, "google", "k1"), false); // 카카오 번호를 구글로 쓰면 안 돼요
+  assert.equal(isAdminOAuth("login"), true);
+  assert.equal(isAdminOAuth("add"), true);
+  assert.equal(isAdminOAuth("admin"), false);
 });
