@@ -1,9 +1,9 @@
 import "server-only";
 import { randomUUID } from "crypto";
-import { appsByAccount, getApplications, getLoginLink, getSetting, linkAccount, saveLoginLink, touchLoginLink } from "./db";
-import { getStudentIds, setAccount, setPendingLink, setStudent } from "./auth";
+import { appsByAccount, getApplications, getLoginLink, getSetting, linkAccount, saveLoginLink, setSetting, touchLoginLink } from "./db";
+import { getStudentIds, isAdmin, setAccount, setAdmin, setPendingLink, setStudent } from "./auth";
 import { isActive, loginApps } from "./access";
-import { effectiveMode, isSignupNext, loginModeOf, planLink, readyProviders, showPinLogin, showSocialLogin, type Provider } from "./socialLogin";
+import { effectiveMode, isAdminLogin, isSignupNext, loginModeOf, parseAdminLogins, planLink, readyProviders, showPinLogin, showSocialLogin, withAdminLogin, type Provider } from "./socialLogin";
 import type { Profile } from "./socialAuth";
 
 // 지금 학생 로그인 화면에 보여줄 것: 켜진 구글·카카오 버튼 + 이름·비밀번호 칸을 보여줄지
@@ -17,6 +17,8 @@ export async function loginSetup() {
 // linkSession: 강의실 [연결하기]에서 왔으면 지금 로그인한 신청을 이 계정에 바로 연결해요 (이름·비밀번호를 다시 안 물어요).
 // 돌아갈 주소를 돌려줘요.
 export async function socialSignIn(p: Provider, prof: Profile, next: string, linkSession = false): Promise<string> {
+  // 관리자로 등록된 계정이면 학생 버튼으로 눌러도 관리 화면으로
+  if (isAdminLogin(await adminLogins(), p, prof.sub)) return adminSignIn(p, prof);
   const link = await getLoginLink(p, prof.sub);
   const pending = { p, sub: prof.sub, email: prof.email, nick: prof.nickname };
   const session = !link && linkSession ? (await getApplications(await getStudentIds())).filter(isActive) : [];
@@ -44,4 +46,23 @@ export async function socialSignIn(p: Provider, prof: Profile, next: string, lin
   // 연결은 됐는데 수강 신청이 없어요 → 예전 신청 찾기 또는 수강 신청 안내
   await setPendingLink({ ...pending, none: true });
   return `/login?next=${encodeURIComponent(next)}`;
+}
+
+// ── 관리자 구글·카카오 계정 (settings.admin_logins) ──
+export async function adminLogins() {
+  return parseAdminLogins(await getSetting("admin_logins"));
+}
+
+// 관리 화면 [구글 계정 추가]·[카카오 계정 추가]: 관리자 비밀번호로 들어온 상태에서만 등록돼요
+export async function addAdminLogin(p: Provider, prof: Profile): Promise<string> {
+  if (!(await isAdmin())) return "/admin";
+  await setSetting("admin_logins", JSON.stringify(withAdminLogin(await adminLogins(), { p, sub: prof.sub, label: prof.email ?? prof.nickname, at: new Date().toISOString() })));
+  return "/admin?al=added#login-mode";
+}
+
+// 관리자 로그인 화면의 카카오·구글 버튼: 등록된 계정이면 관리자 로그인
+export async function adminSignIn(p: Provider, prof: Profile): Promise<string> {
+  if (!isAdminLogin(await adminLogins(), p, prof.sub)) return "/admin?al=unknown";
+  await setAdmin();
+  return "/admin";
 }

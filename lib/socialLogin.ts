@@ -81,3 +81,25 @@ export function planLink(apps: Pick<Application, "id" | "created_at" | "account_
     attach: byAge.filter((a) => !a.account_id).map((a) => a.id), // 아직 번호가 없는 신청
   };
 }
+
+// ── 관리자 구글·카카오 계정 (settings.admin_logins) ──
+// 이메일이 아니라 계정 고유번호(provider + subject)로 등록해요: 코드·저장소에 이메일을 쓰지 않고, 이메일을 바꿔도 그대로예요.
+// 등록은 관리자 비밀번호로 들어온 상태에서 관리 화면 [구글 계정 추가]·[카카오 계정 추가]로만 해요.
+export type AdminLogin = { p: Provider; sub: string; label: string | null; at: string };
+export type AdminOAuth = "login" | "add"; // login = 관리자 로그인, add = 이 계정을 관리자로 등록
+export const isAdminOAuth = (v: string | null | undefined): v is AdminOAuth => v === "login" || v === "add";
+
+export function parseAdminLogins(raw: string | null | undefined): AdminLogin[] {
+  try {
+    const v = JSON.parse(raw || "[]") as unknown;
+    if (!Array.isArray(v)) return [];
+    return v.filter((x): x is AdminLogin => !!x && isProvider(String(x.p)) && typeof x.sub === "string" && x.sub.length > 0);
+  } catch {
+    return [];
+  }
+}
+// 같은 계정은 한 번만 (다시 등록하면 이름·시각만 새로)
+export function withAdminLogin(list: AdminLogin[], add: AdminLogin): AdminLogin[] {
+  return [...list.filter((x) => !(x.p === add.p && x.sub === add.sub)), add];
+}
+export const isAdminLogin = (list: AdminLogin[], p: Provider, sub: string) => list.some((x) => x.p === p && x.sub === sub);

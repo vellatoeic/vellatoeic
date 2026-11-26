@@ -40,7 +40,7 @@ import {
   hashPin, checkPin, setStudent, clearStudent, getStudentIds, checkAdminPassword, setAdmin, isAdmin, clearAdmin,
   setAccount, getAccountId, getPendingLink, clearPendingLink,
 } from "@/lib/auth";
-import { isProvider, isSignupNext, loginModeOf, planLink, safeNext } from "@/lib/socialLogin";
+import { isProvider, isSignupNext, loginModeOf, parseAdminLogins, planLink, safeNext } from "@/lib/socialLogin";
 import { loginSetup } from "@/lib/socialServer";
 import { allow } from "@/lib/rateLimit";
 import { randomUUID } from "crypto";
@@ -352,6 +352,16 @@ export async function unlinkLogin(fd: FormData) {
   const subject = clean(fd.get("subject"));
   if (isProvider(provider) && subject) await deleteLoginLink(provider, subject);
   revalidatePath(`/admin/students/${clean(fd.get("id"))}`);
+}
+
+// 관리자 구글·카카오 계정 빼기 (관리 화면 '관리자 로그인 계정')
+export async function removeAdminLogin(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const p = clean(fd.get("provider"));
+  const sub = clean(fd.get("subject"));
+  const list = parseAdminLogins(await getSetting("admin_logins"));
+  await setSetting("admin_logins", JSON.stringify(list.filter((x) => !(x.p === p && x.sub === sub))));
+  revalidatePath("/admin");
 }
 
 export async function saveSettings(fd: FormData) {
