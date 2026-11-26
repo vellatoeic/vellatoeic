@@ -14,8 +14,9 @@
 /* 테마 밖 변수 (Tailwind가 지우지 않게 일반 CSS 변수로) */
 :root {
   --color-sky-muted: #5d7f95; /* 흐린 글씨 (새 디자인) */
-  --font-serif: "Playfair Display", "Times New Roman", serif;
-  --font-script: "Great Vibes", cursive;
+  /* 2026-11-26 Vella: 기울어진 영문 장식 글씨(Playfair·Great Vibes)가 촌스러워서 제목·로고·서명도 Pretendard 굵은 글씨로 (토스처럼 깔끔하게) */
+  --font-serif: var(--font-jua);
+  --font-script: var(--font-jua);
 }
 
 html { background: var(--color-sky-soft); scroll-padding-top: 76px; }
@@ -55,8 +56,8 @@ b, strong, .font-bold, .btn, .btn-ghost, .label { font-family: var(--font-jua); 
 @media (prefers-reduced-motion: reduce) { .vt-pulse { animation: none; } }
 
 /* ── 머리 (로고 VELLA TOEIC · 🔔 · 강의실 · ☰) ── */
-.wordmark { font-family: var(--font-serif); font-weight: 600; font-size: 1.2rem; letter-spacing: 0.06em; color: var(--color-sky-ink); white-space: nowrap; display: inline-flex; align-items: center; }
-.wordmark i { font-weight: 700; color: var(--color-sky-deep); margin-left: 6px; }
+.wordmark { font-family: var(--font-serif); font-weight: 800; font-size: 1.15rem; letter-spacing: 0.01em; color: var(--color-sky-ink); white-space: nowrap; display: inline-flex; align-items: center; }
+.wordmark i { font-style: normal; font-weight: 800; color: var(--color-sky-deep); margin-left: 5px; }
 .site-hdr { position: sticky; top: 0; z-index: 20; background: rgba(234, 246, 253, 0.88); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid rgba(43, 143, 199, 0.14); }
 .site-hdr-in { max-width: 72rem; margin: 0 auto; height: 60px; padding: 0 8px 0 16px; display: flex; align-items: center; gap: 12px; }
 .site-hdr-nav { display: none; flex: 1; justify-content: center; gap: 2px; }

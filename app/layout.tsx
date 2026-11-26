@@ -1,9 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
-import "@fontsource/playfair-display/latin-600.css";
-import "@fontsource/playfair-display/latin-700-italic.css";
-import "@fontsource/great-vibes/latin-400.css";
 import "./globals.css";
 import SiteMenu from "@/components/SiteMenu";
 import IconDefs from "@/components/IconDefs";
