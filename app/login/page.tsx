@@ -35,25 +35,26 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </p>
       </div>
 
+      {/* 12월부터 새로 오는 학생이 대부분이라 '처음이에요'가 위, 이미 신청한 학생의 연결 칸은 아래 */}
       <section className="card space-y-3">
-        <h2 className="font-jua text-xl text-sky-ink">교재비 신청을 한 적이 있어요</h2>
+        <h2 className="font-jua text-xl text-sky-ink">벨라토익 수업이 처음이에요</h2>
+        <p className="text-sm text-slate-600">이 {label} 계정으로 교재비 신청서를 작성해요. 강의실·특강도 같은 버튼으로 들어와요.</p>
+        <form action={startFresh}>
+          <input type="hidden" name="next" value={next} />
+          <button className="btn w-full">수강 신청하러 가기</button>
+        </form>
+      </section>
+
+      <section className="card space-y-3">
+        <h2 className="font-jua text-xl text-sky-ink">전에 교재비 신청을 한 적이 있어요</h2>
         <p className="text-sm text-slate-600">
-          신청할 때 정한 <b>이름과 비밀번호 4자리</b>를 한 번만 입력하면 연결돼요. 다음부터는 {label} 버튼만 누르면 돼요.
+          지난달 수강생이거나 이미 신청서를 냈다면, 신청할 때 정한 <b>이름과 비밀번호 4자리</b>를 한 번만 입력하면 연결돼요. 다음부터는 {label} 버튼만 누르면 돼요.
         </p>
         <LinkForm next={next} />
         <p className="text-xs text-slate-500">
           비밀번호가 기억나지 않으면 Vella쌤에게 카톡으로 알려 주세요.
           {channel && <> <a href={channel} target="_blank" rel="noreferrer" className="text-sky-deep underline">카톡 채널 열기 ↗</a></>}
         </p>
-      </section>
-
-      <section className="card space-y-3">
-        <h2 className="font-jua text-xl text-sky-ink">벨라토익 수업이 처음이에요</h2>
-        <p className="text-sm text-slate-600">이 {label} 계정으로 교재비 신청서를 작성해요. 강의실·특강도 같은 버튼으로 들어와요.</p>
-        <form action={startFresh}>
-          <input type="hidden" name="next" value={next} />
-          <button className="btn-ghost w-full">수강 신청하러 가기</button>
-        </form>
       </section>
 
       <form action={cancelLink} className="text-center">
