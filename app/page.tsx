@@ -24,7 +24,7 @@ import {
 // 특강 모집 여부·강좌 개강일을 매번 확인해요.
 export const dynamic = "force-dynamic";
 
-// 첫 화면 (2026-11-26 정리): 시작 화면(1 반 찾기 → 2 수강 신청하기(YBM) → 3 교재 신청 + 수강생 바로가기, 사진 없음)
+// 첫 화면 (2026-11-26 정리): 시작 화면(두 갈래: 처음이에요 = 반 찾기·수강 신청(YBM) / 등록했어요 = 교재 신청 현장·불라방·강의실, 사진 없음)
 // → 수강생 바로가기 → 반 찾기 → 강좌 시간표(수업일 설정의 개강일) → 성적·후기 → 벨라쌤 소개 → 16회 → 혜택 → 자주 묻는 질문(관리 [FAQ])
 
 const icon = (name: string, cls = "") => <img className={`ic3d ${cls}`} src={`/img/icons/${name}.png`} alt="" loading="lazy" decoding="async" />;
@@ -99,7 +99,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
       <NoticePopupHost />
       <Reveal />
 
-      {/* ── 첫 화면 (2026-11-26 Vella: 사진 없이 깔끔하게, 처음 온 학생은 1·2·3 순서대로 / 수강생은 바로가기) ── */}
+      {/* ── 첫 화면 (2026-11-26 Vella: 사진 없이 깔끔하게, '처음이에요' / '등록했어요' 두 갈래) ── */}
       <section className="start">
         <div className="wrap start-grid">
           <div className="start-head">
@@ -112,44 +112,28 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
           </div>
 
           <div className="start-steps">
-          <p className="steps-label">처음이라면 순서대로</p>
-          <ol className="steps">
-            <li>
-              <a className="step" href="#finder">
-                <span className="step-no">1</span>
-                {icon("target", "md")}
-                <span className="step-t"><b>나에게 맞는 반 찾기</b><small>세 문제로 내 반을 추천해요</small></span>
-                <span className="chev" aria-hidden="true">›</span>
-              </a>
-            </li>
-            <li>
-              <a className="step" href={BRAND.courseUrl} {...out}>
-                <span className="step-no">2</span>
-                {icon("school", "md")}
-                <span className="step-t"><b>수강 신청하기</b><small>YBM 서면 홈페이지에서 수강 등록</small></span>
-                <span className="chev" aria-hidden="true">↗</span>
-              </a>
-            </li>
-            <li>
-              <div className="step">
-                <span className="step-no">3</span>
-                {icon("book", "md")}
-                <span className="step-t">
-                  <b>교재 신청</b><small>수강 등록을 마쳤다면 수업 방식을 골라요</small>
-                  <span className="step-pills">
-                    <Link href="/guide/onsite">현장 수강</Link>
-                    <Link href="/guide/online" className="alt">불라방(라이브)</Link>
-                  </span>
-                </span>
+          <div className="doors">
+            <div className="door">
+              <p className="door-k">처음이에요</p>
+              <p className="door-t">벨라토익이 처음인 학생</p>
+              <p className="door-s">나에게 맞는 반을 찾고, YBM 서면에서 수강 등록해요.</p>
+              <div className="door-btns">
+                <a href="#finder" className="db main">{icon("target", "xs")}나에게 맞는 반 찾기</a>
+                <a href={BRAND.courseUrl} {...out} className="db">{icon("school", "xs")}수강 신청하기 ↗</a>
               </div>
-            </li>
-          </ol>
+            </div>
+            <div className="door on">
+              <p className="door-k">등록했어요</p>
+              <p className="door-t">학원 수강 등록을 마친 학생</p>
+              <p className="door-s">YBM 수강증으로 교재를 신청하고, 강의실에 들어가요.</p>
+              <div className="door-btns">
+                <Link href="/guide/onsite" className="db main">{icon("book", "xs")}교재 신청 · 현장</Link>
+                <Link href="/guide/online" className="db main">{icon("laptop", "xs")}교재 신청 · 불라방</Link>
+                <Link href="/class" className="db">{icon("star", "xs")}강의실 들어가기</Link>
+              </div>
+            </div>
           </div>
-
-          <a className="me-link" href="#students">
-            <span><small>이미 수강 중이에요</small><b>수강생 바로가기</b></span>
-            <span className="me-go" aria-hidden="true">강의실 · 미션 · 특강 ›</span>
-          </a>
+          </div>
         </div>
       </section>
 

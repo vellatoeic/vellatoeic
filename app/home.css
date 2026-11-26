@@ -375,9 +375,28 @@
 .vh .start .me-link { grid-area: me; }
 @media (min-width: 900px) {
   .vh .start { padding: 64px 0 72px; }
-  .vh .start-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 500px); grid-template-areas: "head steps" "me steps"; column-gap: 64px; align-items: end; }
+  .vh .start-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 500px); grid-template-areas: "head steps" "me steps"; column-gap: 64px; align-items: center; }
   .vh .start-steps .steps-label { margin-top: 0; }
   .vh .start .me-link { align-self: start; margin-top: 28px; max-width: 420px; }
   .vh .start h1 { font-size: 4.4rem; }
 }
 @media (prefers-reduced-motion: reduce) { .vh .step, .vh .me-link, .vh .quick-main { transition: none; } }
+
+/* 두 갈래 (2026-11-26): 처음이에요 / 등록했어요 */
+.vh .doors { display: grid; gap: 12px; margin-top: 26px; }
+.vh .door { border-radius: 22px; padding: 20px; background: #fff; border: 1px solid rgba(43, 143, 199, 0.16); box-shadow: 0 8px 24px rgba(18, 64, 92, 0.07); }
+.vh .door.on { background: linear-gradient(150deg, #12405c, #1d5f86); border-color: transparent; color: #fff; box-shadow: 0 12px 28px rgba(18, 64, 92, 0.22); }
+.vh .door-k { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 0.75rem; font-weight: 800; background: #eaf6fd; color: var(--deep); }
+.vh .door.on .door-k { background: rgba(159, 216, 245, 0.2); color: #9fd8f5; }
+.vh .door-t { margin-top: 10px; font-size: 1.3rem; font-weight: 800; letter-spacing: -0.03em; }
+.vh .door-s { margin-top: 4px; font-size: 0.9rem; color: #6a8ca3; }
+.vh .door.on .door-s { color: rgba(255, 255, 255, 0.75); }
+.vh .door-btns { display: grid; gap: 8px; margin-top: 16px; }
+.vh .db { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; padding: 0 14px; border-radius: 14px; font-weight: 800; font-size: 0.98rem; color: var(--deep); background: #eaf6fd; transition: transform 0.12s; }
+.vh .db:active { transform: scale(0.98); }
+.vh .db.main { color: #fff; background: linear-gradient(135deg, #4fb3e8, var(--deep)); box-shadow: 0 4px 0 #1f6f9e; }
+.vh .door.on .db { color: #fff; background: rgba(255, 255, 255, 0.12); }
+.vh .door.on .db.main { color: #12405c; background: #fff; box-shadow: 0 4px 0 #9fd8f5; }
+.vh .db .ic3d.xs { width: 22px; height: 22px; }
+@media (min-width: 560px) { .vh .door.on .door-btns { grid-template-columns: 1fr 1fr; } .vh .door.on .db:last-child { grid-column: span 2; } }
+@media (min-width: 900px) { .vh .doors { margin-top: 0; } }
