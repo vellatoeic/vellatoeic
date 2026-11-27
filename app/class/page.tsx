@@ -45,6 +45,8 @@ import { dayLabelKo, viewPhase, viewableCohorts } from "@/lib/viewWindow";
 import { signupMonths } from "@/lib/signupMonthsServer";
 import { safe } from "@/lib/safe";
 import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
+import { chatGateFor, preCourseFor, type ChatGate } from "@/lib/preCourse";
+import PreCourseCard from "@/components/PreCourseCard";
 
 const nextMonthOf = (today: string) => shiftMonth(today.slice(0, 7), 1);
 
@@ -153,6 +155,11 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
     }
     return null;
   }, null);
+  // 개강 전 학생: 맨 위 '○월 수업 준비 중' 카드 · 단톡방은 개강 전날부터 (lib/preCourse.ts)
+  const [pre, chatGate] = await Promise.all([
+    safe("preCourse", () => preCourseFor(apps, today), null),
+    chatUrl ? safe("chatGate", () => chatGateFor(apps, today), { open: true } as ChatGate) : Promise.resolve(null),
+  ]);
   const ownSlot: TimeSlot = liveApp?.slot ?? paid[0]?.slot ?? "am";
   const tab: TimeSlot = t === "am" || t === "pm" ? t : ownSlot;
 
@@ -240,6 +247,8 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
           <p className="mt-2 text-sm text-slate-600">입금자명: <b>{a.depositor}</b> · {COURSES[a.course].label} {TRACKS[a.track]}</p>
         </div>
       ))}
+
+      {pre && <PreCourseCard pre={pre} chat={chatGate} />}
 
       {/* 컴퓨터(1024px 이상): 왼쪽 탭·라이브·특강·오늘의 테스트 / 오른쪽 미션·안내·연결·단톡방 (휴대폰은 위아래 같은 순서) */}
       <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
@@ -367,8 +376,14 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
       {showGift && cohort && <GiftDraw initial={myDraw} month={Number(cohort.slice(5, 7))} channelUrl={kakaoChannel} />}
 
-      {/* 단톡방: 이번 달 또는 다음 달 신청이 납부 완료된 학생에게만 (링크가 비어 있으면 숨김) */}
-      {chatUrl && paid.some((a) => a.cohort === today.slice(0, 7) || a.cohort === nextMonthOf(today)) && (
+      {/* 단톡방: 이번 달 또는 다음 달 신청이 납부 완료된 학생, 그 반 개강 전날부터 (링크가 비어 있으면 숨김, lib/preCourse.ts) */}
+      {chatUrl && chatGate && !chatGate.open && (
+        <div className="flex items-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-slate-500">
+          <Icon name="chat" size={24} />
+          <span className="text-sm"><b className="font-jua text-base text-slate-600">벨라토익 단톡방</b> · {dayLabelKo(chatGate.opensOn)}부터 여기서 들어갈 수 있어요</span>
+        </div>
+      )}
+      {chatUrl && chatGate?.open && (
         <a href={chatUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-2xl border-2 border-[#ffe58a] bg-[#fff9e0] px-4 py-3">
           <span>
             <span className="flex items-center gap-1.5 font-jua text-lg text-[#7d6728]"><Icon name="chat" size={24} />벨라토익 단톡방</span>

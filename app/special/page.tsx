@@ -30,7 +30,10 @@ export default async function SpecialPage({ searchParams }: { searchParams: Prom
   // 아직 열리지 않은(오늘 이후) 특강은 모두 보여주고, 마감된 것은 '신청이 마감됐어요'로 막아요.
   const today = todayKST();
   const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 24 * 3600 * 1000).toISOString().slice(0, 10);
-  const upcoming = events.filter((event) => event.event_date >= today);
+  // 로그인한 학생은 신청한 달(기수)의 특강만 (2026-11-27 Vella: 11월 말에 미리 들어온 12월 학생이 11월 특강을 보고 헷갈리지 않게.
+  // 특강 신청은 특강 날짜 달 기수 수강생만 할 수 있어요). 로그인 안 한 방문자는 모두 보여요.
+  const myMonths = new Set(myApps.map((a) => a.cohort));
+  const upcoming = events.filter((event) => event.event_date >= today && (!loggedIn || myMonths.has(event.event_date.slice(0, 7))));
   const open = upcoming.filter((event) => specialRegistrationOpen(event));
   // 맨 위 글자: 다가오는 첫 특강 요일 (금 → 금요 특강, 토 → 토요 특강, 그 외·없음 → 특강)
   const firstDay = upcoming.length ? new Date(`${[...upcoming].sort((x, y) => x.event_date.localeCompare(y.event_date))[0].event_date}T00:00:00Z`).getUTCDay() : -1;
@@ -73,7 +76,7 @@ export default async function SpecialPage({ searchParams }: { searchParams: Prom
       <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
       <div className="space-y-6">
       {upcoming.length === 0
-        ? <p className="card text-center text-slate-500">지금 신청할 수 있는 특강이 없어요.</p>
+        ? <p className="card text-center text-slate-500">{loggedIn ? `${[...myMonths].sort().map((m) => `${Number(m.slice(5, 7))}월`).join("·")} 특강이 열리면 여기에 보여요.` : "지금 신청할 수 있는 특강이 없어요."}</p>
         : socialOnly && !loggedIn
           ? (
             <div className="card space-y-3 text-center">

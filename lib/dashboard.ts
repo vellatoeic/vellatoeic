@@ -14,8 +14,8 @@ import { missionCount, missionFor } from "./mission";
 import { publicSpecials } from "./specialPlan";
 import { deadlineBadge, specialDay, specialRegistrationOpen } from "./special";
 import { isHomeworkStickerEligible } from "./schedule";
-import { shiftMonth } from "./signupMonths";
 import { safe } from "./safe";
+import { chatGateFor, type ChatGate } from "./preCourse";
 
 // ── 학생 대시보드 (로그인한 이번 달 수강생의 첫 화면 /) ──
 // 강의실과 같은 규칙을 그대로 써요: 수업 기수(lib/classCohort) · 열람 기간(lib/viewWindow) · 수업일(lib/classCalendar, 공휴일 제외)
@@ -55,6 +55,7 @@ export type Dashboard = {
   mission: number; // 0~4
   specials: { date: string; label: string; state: "confirmed" | "pending" | "open"; badge: string | null }[];
   chat: { url: string; code: string } | null;
+  chatGate: ChatGate; // 단톡방은 학생 반 개강 전날부터 (lib/preCourse.ts)
 };
 
 export async function studentDashboard(today = todayKST()): Promise<Dashboard | null> {
@@ -107,7 +108,8 @@ export async function studentDashboard(today = todayKST()): Promise<Dashboard | 
 
   const myAttendance = stamps.attendance.filter((s) => s.app_id === app.id && days.includes(s.day));
   const myHomework = stamps.homework.filter((s) => s.app_id === app.id && days.includes(s.day) && isHomeworkStickerEligible(s.day, s.created_at));
-  const paidNow = apps.some((a) => canWatch(a) && (a.cohort === today.slice(0, 7) || a.cohort === shiftMonth(today.slice(0, 7), 1)));
+  // 단톡방: 이번 달·다음 달 납부 완료 신청 중 개강 전날이 지난 것이 있을 때만 링크·코드 (그 전에는 '○일부터 열려요')
+  const chatGate = chatUrl ? await safe("dash.chatGate", () => chatGateFor(apps, today), { open: true } as ChatGate) : null;
 
   return {
     app,
@@ -137,6 +139,7 @@ export async function studentDashboard(today = todayKST()): Promise<Dashboard | 
     audio,
     mission: missionCount(missionFor(app.id, missions)),
     specials,
-    chat: chatUrl && paidNow ? { url: chatUrl, code: chatCode } : null,
+    chat: chatUrl && chatGate?.open ? { url: chatUrl, code: chatCode } : null,
+    chatGate,
   };
 }

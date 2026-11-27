@@ -8,6 +8,8 @@ import AddToHome from "@/components/AddToHome";
 import { COURSES, KINDS, TIME_SLOTS, TRACKS } from "@/lib/config";
 import { specialDay } from "@/lib/special";
 import type { Dashboard } from "@/lib/dashboard";
+import PreCourseCard from "@/components/PreCourseCard";
+import { dayLabelKo } from "@/lib/viewWindow";
 
 // 학생 대시보드 (로그인한 이번 달 수강생의 첫 화면). 데이터는 lib/dashboard.ts studentDashboard.
 // 토스처럼 깔끔하게: 흰 카드 · 큰 숫자 · 오른쪽 화살표 목록. 움직임: 카드가 차례로 올라오고 진행 링이 차올라요.
@@ -85,6 +87,9 @@ export default function StudentDashboard({ d, profileTodo = false }: { d: Dashbo
           <Icon name="chevronRight" size={16} className="sd-chev" />
         </Link>
       )}
+
+      {/* 개강 전: '○월 수업 준비 중' 카드 (지난달 안내와 헷갈리지 않게, lib/preCourse.ts) */}
+      {d.dStart !== null && d.first && <PreCourseCard pre={{ app: a, first: d.first, dStart: d.dStart }} chat={d.chatGate} />}
 
       {/* 컴퓨터(1024px 이상)에서는 왼쪽: 라이브·진행·오늘 할 일 / 오른쪽: 카드·단톡방·메뉴 (휴대폰은 위아래 그대로) */}
       <div className="sd-cols">
@@ -204,6 +209,12 @@ export default function StudentDashboard({ d, profileTodo = false }: { d: Dashbo
           <span className="sd-row-txt"><b>벨라토익 단톡방</b><small>{d.chat.code ? `참여코드 ${d.chat.code}` : "눌러서 들어가요"}</small></span>
           <Icon name="external" size={16} className="sd-chev" />
         </a>
+      )}
+      {!d.chat && d.chatGate && !d.chatGate.open && (
+        <div className="sd-card sd-notice opacity-80">
+          <Icon name="chat" size={36} />
+          <span className="sd-row-txt"><b>벨라토익 단톡방</b><small>{dayLabelKo(d.chatGate.opensOn)}부터 여기서 들어갈 수 있어요</small></span>
+        </div>
       )}
 
       <section className="sd-card sd-menu">
