@@ -46,6 +46,7 @@
 | `40_receipt_checks.sql` | 완료 · 2026-11-26 · npm run sql | 수강증 자동 확인: 읽은 기록 표(receipt_checks) · 신청서의 수강증 상태 칸(applications.receipt_status) · 비공개 사진 보관함(receipts) 추가 |
 | `41_address_detail.sql` | 완료 · 2026-11-26 · npm run sql | 택배 상세주소 따로 저장: 신청서(applications)·YBM 인강 주문(ybm_orders)에 상세주소 칸(address_detail)만 추가해요. 여러 번 실행해도 안전해요. |
 | `43_mock_scores.sql` | 완료 · 2026-11-27 · npm run sql | 모의고사 성적(첫토익 연동) + 학생 개인번호 6자리: 새 표 2개(student_numbers · firsttoeic_exam_results)와 신청서의 개인번호 칸(applications.student_no)만 추가해요. 여러 번 실행해도 안전해요. |
+| `44_student_profiles.sql` | 완료 · 2026-11-27 · npm run sql | 학생 '내 정보'(처음 로그인 뒤 한 장씩 묻기): 휴대폰 번호(동명이인 구분) · 목표 점수 · 토익 공부 이유를 개인번호별로 저장하는 새 표(student_profiles)만 추가해요. 여러 번 실행해도 안전해요. |
 
 > 2026-11-13 새 Supabase 프로젝트(서울)로 이사: `scripts/migrate-db.mjs --run`으로 옛 DB의 public 구조·데이터·권한·RLS·보관함 설정을 그대로 복사했어요. 위 기록(1~32)은 새 DB에도 그대로 들어 있어요.
 > `33_speed_cleanup.sql`: 옛 DB 확인 결과 ①인덱스 4개만 들어 있고 ②10월 이전 정리는 실행되지 않은 상태로 이사됐어요(완료로 기록하지 않음). 정리는 `35_october_cleanup.sql`로 따로 해요.

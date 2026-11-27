@@ -12,7 +12,8 @@ import { TEST_LABEL } from "@/lib/tests";
 import { missionCount } from "@/lib/mission";
 import { watchSummary } from "@/lib/watchlist";
 import { changeCohort, cycleAttendance, cycleHomework, extendAudio, unlinkLogin, viewAsStudent } from "@/app/actions";
-import { listLoginLinks } from "@/lib/db";
+import { listLoginLinks, getStudentProfiles } from "@/lib/db";
+import { phoneLabel as profilePhone, reasonLabel } from "@/lib/profile";
 import { PROVIDER_LABEL } from "@/lib/socialLogin";
 import { movableCohorts } from "@/lib/cohortMove";
 import { thisMonthKST } from "@/lib/config";
@@ -38,6 +39,8 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
   const { mv = "" } = await searchParams;
   const a = await getApplication(id);
   if (!a) notFound();
+  // 학생 '내 정보' (휴대폰 · 목표 점수 · 공부 이유, SQL 44): 동명이인 구분용
+  const profile = a.student_no ? (await getStudentProfiles([a.student_no]).catch(() => []))[0] ?? null : null;
   const today = todayKST();
   const [days, holidays, { attendance, homework }, tests, [mission], regs, events, apps] = await Promise.all([
     classDaysOf(a), holidaysOf(a.cohort), listStamps([a.id]), listTestResults({ cohort: a.cohort, appIds: [a.id] }),
@@ -84,6 +87,13 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
           <div>
             <p className="text-sm text-slate-500">{cohortLabel(a.cohort)} · {classSlotLabel(a)} · {KINDS[a.kind].short}</p>
             <h2 className="font-jua text-3xl text-sky-ink">{a.name}{a.student_no && <span className="ml-2 align-middle font-body text-base font-bold tracking-widest text-sky-deep" title="모의고사 개인번호">#{a.student_no}</span>}</h2>
+            {profile && (
+              <p className="mt-1 text-sm text-slate-600">
+                {profile.phone && <>휴대폰 <b>{profilePhone(profile.phone)}</b> · </>}
+                {profile.target_score && <>목표 <b>{profile.target_score}점</b> · </>}
+                {profile.reasons.length > 0 && <>이유 {profile.reasons.map(reasonLabel).join(", ")}{profile.reason_note ? ` (${profile.reason_note})` : ""}</>}
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {/* 이 학생이 보는 화면(대시보드·강의실)을 보기 전용으로 열어요 */}

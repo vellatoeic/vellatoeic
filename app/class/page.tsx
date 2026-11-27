@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { myProfileState } from "@/lib/profileServer";
 import { after } from "next/server";
 import { BOOKS, COURSES, PARTS, TIME_SLOTS, TRACKS, TRACK_PARTS, cohortLabel, todayKST, won } from "@/lib/config";
 import { liveState } from "@/lib/live";
@@ -53,6 +54,7 @@ export const metadata = { title: "강의실 · vella_toeic", robots: { index: fa
 export default async function ClassRoom({ searchParams }: { searchParams: Promise<{ t?: string; expired?: string }> }) {
   after(() => safe("expireUnpaid", () => expireUnpaid(), null)); // 30분 지난 입금 대기 자동 취소는 화면을 보낸 뒤에 (1분에 한 번, 실패해도 강의실은 열려요)
   const { loggedIn, apps } = await activeStudentApps();
+  const profileTodo = loggedIn && apps.length > 0 && ((await safe("class.profile", () => myProfileState(), null))?.steps.length ?? 0) > 0;
   if (!loggedIn) return <LoginCard />;
   // 환불·삭제된 수강생은 아무것도 볼 수 없어요. 취소된 신청만 있으면 취소 안내를 보여줘요.
   if (apps.length === 0) {
@@ -323,6 +325,13 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
       </div>
       <div className="space-y-6">
+      {profileTodo && (
+        <Link href="/welcome" className="flex items-center justify-between gap-3 rounded-2xl border-2 border-sky-main bg-white px-4 py-3">
+          <span className="inline-flex items-center gap-2 font-bold text-sky-ink"><Icon name="people" size={24} />내 정보 입력이 남았어요 <span className="text-sm font-normal text-slate-500">· 1분</span></span>
+          <span className="text-sky-main">›</span>
+        </Link>
+      )}
+
       {/* 모의고사 개인번호 + 성적 (SQL 43) */}
       {(() => {
         const no = apps.map((a) => a.student_no).find((x) => !!x);

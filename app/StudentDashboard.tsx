@@ -46,7 +46,7 @@ function Ring({ done, total }: { done: number; total: number }) {
   );
 }
 
-export default function StudentDashboard({ d }: { d: Dashboard }) {
+export default function StudentDashboard({ d, profileTodo = false }: { d: Dashboard; profileTodo?: boolean }) {
   const a = d.app;
   const slot = a.slot;
   const title = d.dStart !== null
@@ -69,6 +69,14 @@ export default function StudentDashboard({ d }: { d: Dashboard }) {
           <span className="sd-chip"><Icon name={a.kind === "onsite" ? "school" : "laptop"} size={16} />{KINDS[a.kind].short}</span>
         </p>
       </header>
+
+      {profileTodo && (
+        <Link href="/welcome" className="sd-card sd-notice">
+          <Icon name="people" size={36} />
+          <span className="sd-row-txt"><b>내 정보 입력이 남았어요</b><small>휴대폰 · 목표 점수 · 공부 이유 · 1분이면 끝나요</small></span>
+          <Icon name="chevronRight" size={16} className="sd-chev" />
+        </Link>
+      )}
 
       {d.pendingCount > 0 && (
         <Link href="/class" className="sd-card sd-notice">

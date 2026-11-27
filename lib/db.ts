@@ -229,6 +229,7 @@ type Mem = {
   receiptChecks: ReceiptCheck[];
   studentNumbers?: string[];
   examResults?: ExamResultRow[];
+  profiles?: StudentProfile[];
 };
 const g = globalThis as unknown as { __vellaMem?: Mem };
 const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [], testResults: [], testOverrides: [], testDoubles: [], notices: [], noticeReads: [], ybmOrders: [], loginLinks: [], receiptChecks: [] });
@@ -1925,4 +1926,36 @@ export async function countExamReview(): Promise<number> {
     return count ?? 0;
   }
   return (mem.examResults ?? []).filter((r) => r.match_status === "review").length;
+}
+
+// ── 학생 '내 정보' (SQL 44, 규칙 lib/profile.ts) ──
+export type StudentProfile = { student_no: string; phone: string | null; target_score: number | null; reasons: string[]; reason_note: string | null; updated_at?: string };
+
+export async function getStudentProfiles(nos: string[]): Promise<StudentProfile[]> {
+  const ok = [...new Set(nos.filter((n) => /^[1-9][0-9]{5}$/.test(n)))];
+  if (ok.length === 0) return [];
+  if (sb) {
+    const db = sb;
+    return inChunks(ok, async (chunk) => {
+      const { data, error } = await db.from("student_profiles").select("student_no,phone,target_score,reasons,reason_note,updated_at").in("student_no", chunk);
+      if (error) throw error;
+      return data as StudentProfile[];
+    });
+  }
+  return (mem.profiles ?? []).filter((p) => ok.includes(p.student_no));
+}
+
+// 칸 하나씩 저장 (한 장에 한 질문): 없으면 만들고, 있으면 그 칸만 바꿔요
+export async function saveStudentProfile(no: string, patch: Partial<Omit<StudentProfile, "student_no" | "updated_at">>) {
+  if (!/^[1-9][0-9]{5}$/.test(no)) return;
+  const row = { student_no: no, ...patch, updated_at: new Date().toISOString() };
+  if (sb) {
+    const { error } = await sb.from("student_profiles").upsert(row, { onConflict: "student_no" });
+    if (error) throw error;
+    return;
+  }
+  const list = (mem.profiles ??= []);
+  const old = list.find((p) => p.student_no === no);
+  if (old) Object.assign(old, row);
+  else list.push({ phone: null, target_score: null, reasons: [], reason_note: null, ...row });
 }

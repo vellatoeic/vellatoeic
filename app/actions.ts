@@ -9,7 +9,7 @@ import {
 } from "@/lib/config";
 import {
   createApplication, listApplications, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, setHomeworkStar, drawGift, getGiftDraw, saveGiftItem, deleteGiftItem, setGiftSent, type GiftDraw, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  appsByAccount, getLoginLink, saveLoginLink, linkAccount, deleteLoginLink, reserveStudentNo, appsByStudentNos, updateExamResult, deleteExamResults, type Application,
+  appsByAccount, getLoginLink, saveLoginLink, linkAccount, deleteLoginLink, reserveStudentNo, appsByStudentNos, updateExamResult, deleteExamResults, saveStudentProfile, type Application,
   getReceiptCheck, findReceiptTwins, updateReceiptChecks, listReceiptChecks, dropReceiptImage,
   saveMission, type Mission, createYbmOrder, listYbmOrders, updateYbmOrders, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, setTestDouble, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudioLink, setAudioOrder, deleteAudios, createSpecialMaterialLink, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, listDepositEvents, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture, cleanupOrphanSpecialFiles,
 } from "@/lib/db";
@@ -18,7 +18,6 @@ import { parseBankSms } from "@/lib/bankSms";
 import { checkTestAnswer, earlyTestDay, testsForClassDay, type TestKind } from "@/lib/tests";
 import { classDaysOf, planFor, takesTests } from "@/lib/dailyTests";
 import { classDaysOf as calendarDaysOf } from "@/lib/classCalendar";
-import { currentClassApp } from "@/lib/dashboard";
 import { noticeIdentity } from "@/lib/noticeView";
 import type { NoticeSection, NoticeTarget } from "@/lib/notices";
 import { activeStudentApps } from "@/lib/student";
@@ -40,6 +39,10 @@ import { currentAltIssues } from "@/lib/altIssuesServer";
 import { adjustedBooks } from "@/lib/manualLink";
 import { safe } from "@/lib/safe";
 import { isStudentNo, numberForGroup } from "@/lib/mockScores";
+import { cleanPhone, cleanReasons, cleanTarget } from "@/lib/profile";
+import { LINK_LATER_COOKIE } from "@/lib/profileServer";
+import { cookies } from "next/headers";
+import { ensureStudentNo } from "@/lib/studentNumbers";
 import { BOARD_ROWS, dateLabel, defaultTitle, sessionNo, targetsOf } from "@/lib/lectureBoard";
 import { scheduleDays } from "@/lib/classCalendar";
 import { receiptVerdict } from "@/lib/receipt/verdict";
@@ -231,9 +234,8 @@ export async function studentLogin(_: FormState, fd: FormData): Promise<FormStat
   await setStudent(result.apps.map((a) => a.id));
   const next = clean(fd.get("next"));
   if (next === "/check" || next.startsWith("/check?") || next === "/class" || next === "/class/scores" || next === "/mission" || next === "/faq") redirect(next);
-  // 이번 달 수강생이면 첫 화면(학생 대시보드)으로, 아니면 강의실로
-  const current = await safe("login.current", () => currentClassApp(result.apps!), null);
-  redirect(current ? "/" : "/class");
+  // 정해진 화면이 없으면 /go: '내 정보'(휴대폰·목표 점수·공부 이유)가 남았으면 그 화면, 아니면 이번 달 수강생은 첫 화면·그 외 강의실
+  redirect("/go");
 }
 
 // ── 구글·카카오 로그인: 처음 한 번 '내 신청 찾기' ─────────────
@@ -1620,4 +1622,49 @@ export async function removeExamResults(fd: FormData) {
   await deleteExamResults(fd.getAll("del").map(clean));
   revalidatePath("/admin/scores");
   revalidatePath("/class/scores");
+}
+
+
+// ── 학생 '내 정보' (처음 로그인 뒤 한 장에 한 질문, SQL 44) ──
+// 저장한 뒤 다음 질문으로 (edit=1이면 '내 정보'로 돌아가요). 강사 '학생 화면 보기' 중에는 저장하지 않아요.
+async function profileNo(): Promise<string | null> {
+  if (await isViewOnly()) return null;
+  const { apps } = await activeStudentApps();
+  if (apps.length === 0) return null;
+  return ensureStudentNo(apps);
+}
+const afterProfile = (fd: FormData) => redirect(clean(fd.get("edit")) === "1" ? "/me?saved=1" : "/welcome");
+
+export async function saveProfilePhone(_: FormState, fd: FormData): Promise<FormState> {
+  const phone = cleanPhone(clean(fd.get("phone")));
+  if (!phone) return { error: "휴대폰 번호를 정확히 입력해 주세요. (예: 010-1234-5678)" };
+  const no = await profileNo();
+  if (!no) return { error: (await isViewOnly()) ? VIEW_ONLY : "먼저 로그인해 주세요." };
+  await saveStudentProfile(no, { phone });
+  afterProfile(fd);
+  return {};
+}
+export async function saveProfileTarget(_: FormState, fd: FormData): Promise<FormState> {
+  const target = cleanTarget(clean(fd.get("target")));
+  if (!target) return { error: "목표 점수를 10~990 사이 숫자로 적어 주세요." };
+  const no = await profileNo();
+  if (!no) return { error: (await isViewOnly()) ? VIEW_ONLY : "먼저 로그인해 주세요." };
+  await saveStudentProfile(no, { target_score: target });
+  afterProfile(fd);
+  return {};
+}
+export async function saveProfileReasons(_: FormState, fd: FormData): Promise<FormState> {
+  const reasons = cleanReasons(fd.getAll("reason").map(clean));
+  if (reasons.length === 0) return { error: "하나 이상 골라 주세요." };
+  const no = await profileNo();
+  if (!no) return { error: (await isViewOnly()) ? VIEW_ONLY : "먼저 로그인해 주세요." };
+  const note = clean(fd.get("note")).slice(0, 100);
+  await saveStudentProfile(no, { reasons, reason_note: reasons.includes("etc") && note ? note : null });
+  afterProfile(fd);
+  return {};
+}
+// '카카오·구글 연결'은 나중에 (7일 동안 다시 묻지 않아요, '내 정보'에서 언제든 연결)
+export async function skipLinkStep() {
+  (await cookies()).set(LINK_LATER_COOKIE, "1", { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 7 });
+  redirect("/welcome");
 }

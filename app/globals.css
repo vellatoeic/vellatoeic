@@ -163,3 +163,14 @@ body:has(.tabbar) .site-foot { padding-bottom: 104px; }
 
 /* 컴퓨터에서 넓게 쓰는 학생 화면 (2026-11-26 반응형): 바깥 기본 폭(max-w-3xl)을 벗어나 최대 72rem. 휴대폰·태블릿은 그대로 */
 @media (min-width: 1024px) { .wide { margin-inline: calc(50% - min(36rem, 50vw - 1rem)); } }
+
+/* 메뉴 서랍 묶음 (2026-11-27): 닫힌 채로 시작, 누르면 열려요 */
+.dr-group { border-radius: 16px; }
+.dr-group + .dr-group, .dr-login + .dr-group { margin-top: 6px; }
+.dr-group > summary { display: flex; align-items: center; gap: 8px; padding: 12px 12px; border-radius: 14px; list-style: none; cursor: pointer; font-weight: 800; font-size: 1rem; color: var(--color-sky-ink); background: #f3f9fd; }
+.dr-group > summary::-webkit-details-marker { display: none; }
+.dr-group > summary::after { content: ""; margin-left: auto; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform 0.2s; opacity: 0.6; }
+.dr-group[open] > summary::after { transform: rotate(-135deg); }
+.dr-group[open] > summary { background: var(--color-sky-soft); }
+.dr-group > .dr-item { margin-left: 6px; }
+.dr-badge { padding: 2px 8px; border-radius: 99px; font-size: 0.7rem; font-weight: 800; color: #fff; background: var(--color-sky-deep); }

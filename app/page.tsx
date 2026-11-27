@@ -16,6 +16,7 @@ import { COURSE_CARDS, startLabel } from "@/lib/homeCourses";
 import { homeCourseMonth } from "@/lib/homeCoursesServer";
 import { studentDashboard } from "@/lib/dashboard";
 import StudentDashboard from "./StudentDashboard";
+import { myProfileState } from "@/lib/profileServer";
 import {
   BIG_QUOTE, BRAND, CAREER, CLASSES_INTRO, COURSE_EVENTS, COURSE_NOTE,
   PERKS, POINTS, PROOFS, REVIEWS, TRACKS_INTRO, type ClassIntro,
@@ -77,7 +78,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ h
   // 로그인한 이번 달 수강생(납부 완료 · 수업 기수 · 열람 기간 안)이면 첫 화면은 학생 대시보드예요. (?home=1 이면 소개 화면)
   if ((await searchParams).home !== "1") {
     const dash = await safe("home.dashboard", () => studentDashboard(), null);
-    if (dash) return <StudentDashboard d={dash} />;
+    if (dash) return <StudentDashboard d={dash} profileTodo={((await safe("home.profile", () => myProfileState(), null))?.steps.length ?? 0) > 0} />;
   }
   // 이번 달 특강이 하나라도 있으면(마감·지난 특강 포함) 메뉴를 보여줘요. 신청 가능하면 '특강 신청', 아니면 '특강 다시 보기'.
   const month = todayKST().slice(0, 7);

@@ -6,25 +6,29 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { studentLogout } from "@/app/actions";
 
-// 머리 오른쪽 메뉴 서랍. 첫 화면 구역 + 수강생 메뉴 + YBM 수강 신청.
+// 머리 오른쪽 메뉴 서랍 (2026-11-27 Vella): 벨라토익 소개(맨 위) → 교재 신청 → 수강생 전용(표시). 묶음은 모두 닫힌 채로 시작하고 누르면 열려요.
 // 서랍은 body 바로 아래에 그려요(포털): 머리의 흐림 효과(backdrop-filter) 안에 두면
 // 아이폰 사파리 등에서 화면 전체가 아니라 머리 높이 안에 갇혀 보여요.
-const SITE: [string, string, string][] = [
+const ABOUT: [string, string, string][] = [
   ["/#teacher", "laurel", "벨라쌤 소개"],
   ["/#project", "hourglass", "한 달 최단 프로젝트"],
   ["/#finder", "target", "나에게 맞는 반 찾기"],
   ["/#proof", "trophy", "성적 인증 · 후기"],
   ["/#courses", "calendar", "강좌 시간표"],
   ["/about", "school", "벨라토익 소개 · 수강 신청 방법"],
+  ["/faq", "book", "자주 묻는 질문"],
 ];
-const STUDENT: [string, string, string][] = [
+const BOOKS: [string, string, string][] = [
   ["/guide/onsite", "school", "현장 수강생 · 교재 신청"],
   ["/guide/online", "laptop", "불라방 수강생 · 교재 신청"],
+];
+const STUDENT: [string, string, string][] = [
+  ["/me", "people", "내 정보"],
   ["/class", "star", "강의실"],
+  ["/class/scores", "trophy", "모의고사 결과"],
   ["/mission", "clipboard", "첫 수업 미션"],
   ["/special", "mic", "특강"],
   ["/notices", "megaphone", "공지"],
-  ["/faq", "book", "자주 묻는 질문"],
 ];
 const YBM_URL = "https://www.ybmedu.com/seomyon/vellatoeic";
 
@@ -65,20 +69,28 @@ export default function SiteMenu({ loggedIn = false }: { loggedIn?: boolean }) {
               </button>
             </div>
             <nav className="dr-body">
-              <p className="dr-label">수강생</p>
               {!loggedIn && (
                 <Link href="/login" className="dr-item dr-login" onClick={() => setOpen(false)}>
                   <img src="/img/icons/lock.png" alt="" />
                   로그인
                 </Link>
               )}
-              {STUDENT.map(item)}
-              <p className="dr-label">벨라토익</p>
-              {SITE.map(item)}
-              <a className="dr-item" href={YBM_URL} target="_blank" rel="noopener noreferrer">
-                <img src="/img/icons/calendar.png" alt="" />
-                YBM에서 수강 신청 ↗
-              </a>
+              <details className="dr-group">
+                <summary>벨라토익 소개</summary>
+                {ABOUT.map(item)}
+                <a className="dr-item" href={YBM_URL} target="_blank" rel="noopener noreferrer">
+                  <img src="/img/icons/calendar.png" alt="" />
+                  YBM에서 수강 신청 ↗
+                </a>
+              </details>
+              <details className="dr-group">
+                <summary>교재 신청</summary>
+                {BOOKS.map(item)}
+              </details>
+              <details className="dr-group">
+                <summary>수강생 전용{!loggedIn && <span className="dr-badge">로그인 필요</span>}</summary>
+                {STUDENT.map(item)}
+              </details>
             </nav>
             {loggedIn && (
               <form action={studentLogout} className="dr-foot">
