@@ -230,6 +230,7 @@ type Mem = {
   studentNumbers?: string[];
   examResults?: ExamResultRow[];
   profiles?: StudentProfile[];
+  exams?: ExamInfoRow[];
 };
 const g = globalThis as unknown as { __vellaMem?: Mem };
 const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [], testResults: [], testOverrides: [], testDoubles: [], notices: [], noticeReads: [], ybmOrders: [], loginLinks: [], receiptChecks: [] });
@@ -1969,4 +1970,48 @@ export async function examRowsOf(examId: string): Promise<Pick<ExamResultRow, "r
     return data as Pick<ExamResultRow, "result_id" | "name" | "match_status" | "linked_no">[];
   }
   return (mem.examResults ?? []).filter((r) => r.exam_id === examId);
+}
+
+// ── 모의고사 회차 공개 스위치 (SQL 46) ── 표에 없는 회차는 비공개
+export type ExamInfoRow = { exam_id: string; title: string; exam_date: string; session: number | null; published: boolean; published_at: string | null; updated_at?: string };
+export async function listExams(): Promise<ExamInfoRow[]> {
+  if (sb) {
+    const db = sb;
+    return allRows<ExamInfoRow>((from, to) => db.from("firsttoeic_exams").select("exam_id,title,exam_date,session,published,published_at,updated_at").order("exam_date", { ascending: false }).order("exam_id").range(from, to));
+  }
+  return [...(mem.exams ?? [])];
+}
+export async function publishedExamIds(ids: string[]): Promise<Set<string>> {
+  const ok = [...new Set(ids.filter(isUuid))];
+  if (ok.length === 0) return new Set();
+  if (sb) {
+    const { data, error } = await sb.from("firsttoeic_exams").select("exam_id").in("exam_id", ok).eq("published", true);
+    if (error) throw error;
+    return new Set((data as { exam_id: string }[]).map((r) => r.exam_id));
+  }
+  return new Set((mem.exams ?? []).filter((e) => e.published && ok.includes(e.exam_id)).map((e) => e.exam_id));
+}
+// 받을 때: 회차 이름·날짜만 새로 적고 공개 여부는 그대로 (처음이면 비공개로 만들어져요)
+export async function upsertExamInfo(e: { exam_id: string; title: string; exam_date: string; session: number | null }) {
+  const now = new Date().toISOString();
+  if (sb) {
+    const { error } = await sb.from("firsttoeic_exams").upsert({ ...e, updated_at: now }, { onConflict: "exam_id" });
+    if (error) throw error;
+    return;
+  }
+  const list = (mem.exams ??= []);
+  const old = list.find((x) => x.exam_id === e.exam_id);
+  if (old) Object.assign(old, e, { updated_at: now });
+  else list.push({ ...e, published: false, published_at: null, updated_at: now });
+}
+export async function setExamPublished(examId: string, published: boolean) {
+  if (!isUuid(examId)) return;
+  const patch = { published, published_at: published ? new Date().toISOString() : null, updated_at: new Date().toISOString() };
+  if (sb) {
+    const { error } = await sb.from("firsttoeic_exams").update(patch).eq("exam_id", examId);
+    if (error) throw error;
+    return;
+  }
+  const e = (mem.exams ?? []).find((x) => x.exam_id === examId);
+  if (e) Object.assign(e, patch);
 }

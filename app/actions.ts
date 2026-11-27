@@ -9,7 +9,7 @@ import {
 } from "@/lib/config";
 import {
   createApplication, listApplications, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, setHomeworkStar, drawGift, getGiftDraw, saveGiftItem, deleteGiftItem, setGiftSent, type GiftDraw, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  appsByAccount, getLoginLink, saveLoginLink, linkAccount, deleteLoginLink, reserveStudentNo, appsByStudentNos, updateExamResult, deleteExamResults, saveStudentProfile, type Application,
+  appsByAccount, getLoginLink, saveLoginLink, linkAccount, deleteLoginLink, reserveStudentNo, appsByStudentNos, updateExamResult, deleteExamResults, saveStudentProfile, listExamResults, listExams, upsertExamInfo, setExamPublished, type Application,
   getReceiptCheck, findReceiptTwins, updateReceiptChecks, listReceiptChecks, dropReceiptImage,
   saveMission, type Mission, createYbmOrder, listYbmOrders, updateYbmOrders, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, setTestDouble, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudioLink, setAudioOrder, deleteAudios, createSpecialMaterialLink, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, listDepositEvents, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture, cleanupOrphanSpecialFiles,
 } from "@/lib/db";
@@ -38,7 +38,7 @@ import { altFixResult, altTrackError, findPrevAlt, planBooks } from "@/lib/altCo
 import { currentAltIssues } from "@/lib/altIssuesServer";
 import { adjustedBooks } from "@/lib/manualLink";
 import { safe } from "@/lib/safe";
-import { isStudentNo, numberForGroup } from "@/lib/mockScores";
+import { isStudentNo, matchResult, numberForGroup } from "@/lib/mockScores";
 import { cleanPhone, cleanReasons, cleanTarget } from "@/lib/profile";
 import { LINK_LATER_COOKIE } from "@/lib/profileServer";
 import { cookies } from "next/headers";
@@ -1667,4 +1667,42 @@ export async function saveProfileReasons(_: FormState, fd: FormData): Promise<Fo
 export async function skipLinkStep() {
   (await cookies()).set(LINK_LATER_COOKIE, "1", { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 7 });
   redirect("/welcome");
+}
+
+
+// 모의고사 회차 공개 스위치 (SQL 46): 공개해야 학생에게 점수가 보여요 (공개 전엔 '채점 결과를 정리하고 있어요')
+export async function setExamPublish(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const examId = clean(fd.get("exam_id"));
+  const on = clean(fd.get("on")) === "1";
+  if (!(await listExams()).some((e) => e.exam_id === examId)) {
+    // 공개 스위치 전에 받은 회차: 받은 성적에서 회차 정보를 가져와 만들어요
+    const r = (await listExamResults()).find((x) => x.exam_id === examId);
+    if (!r) return;
+    await upsertExamInfo({ exam_id: examId, title: r.exam_title, exam_date: r.exam_date, session: r.session });
+  }
+  await setExamPublished(examId, on);
+  revalidatePath("/admin/scores");
+  revalidatePath("/class/scores");
+}
+
+// [다시 판정]: '확인 필요' 결과만 지금 개인번호로 다시 맞춰 봐요 (학생이 나중에 번호를 받았을 때). 선생님 연결은 건드리지 않아요.
+export async function rejudgeExamReview(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const examId = clean(fd.get("exam_id"));
+  const review = (await listExamResults()).filter((r) => r.match_status === "review" && (!examId || r.exam_id === examId));
+  const apps = await appsByStudentNos(review.flatMap((r) => (r.student_no ? [r.student_no] : [])));
+  const namesByNo = new Map<string, string[]>();
+  for (const a of apps) if (a.student_no) namesByNo.set(a.student_no, [...(namesByNo.get(a.student_no) ?? []), a.name]);
+  let matched = 0;
+  for (const r of review) {
+    const m = matchResult(r, namesByNo);
+    if (m.status === "matched") {
+      await updateExamResult(r.result_id, { linked_no: m.linked_no, match_status: "matched", match_note: null });
+      matched++;
+    } else if (m.note !== r.match_note) await updateExamResult(r.result_id, { linked_no: null, match_status: "review", match_note: m.note });
+  }
+  revalidatePath("/admin/scores");
+  revalidatePath("/class/scores");
+  redirect(`/admin/scores?${examId ? `e=${examId}&` : ""}rejudged=${matched}`);
 }

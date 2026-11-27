@@ -167,3 +167,54 @@ export function carryManualLinks(
   }
   return out;
 }
+
+// ── 화면 규칙 (결과화면 가이드 1.2·2·3장) ──
+export const PART_NAMES: Record<number, string> = { 1: "사진 묘사", 2: "질의응답", 3: "짧은 대화", 4: "짧은 담화", 5: "단문 빈칸 채우기", 6: "장문 빈칸 채우기", 7: "독해" };
+export const pct = (correct: number, total: number) => (total > 0 ? Math.round((correct / total) * 100) : 0);
+
+type ScoreRow = { result_id: string; exam_date: string; session: number | null; total: number; blank_sheet: boolean };
+// 정렬: 시험일 최신이 위, 같은 날이면 회차 번호 큰 것이 위
+export const byExamDesc = <T extends { exam_date: string; session: number | null }>(a: T, b: T) => b.exam_date.localeCompare(a.exam_date) || (b.session ?? -1) - (a.session ?? -1);
+
+// 바로 전 회차와 비교한 총점 차이 (백지·첫 응시는 비교 안 함). rows는 같은 학생의 보이는 결과들
+export function scoreDeltas(rows: ScoreRow[]): Map<string, number> {
+  const scored = rows.filter((r) => !r.blank_sheet).sort(byExamDesc);
+  const out = new Map<string, number>();
+  scored.forEach((r, i) => { const prev = scored[i + 1]; if (prev) out.set(r.result_id, r.total - prev.total); });
+  return out;
+}
+
+// 틀린 문항을 파트별로 (파트 순서, 문항 번호 순서)
+export function wrongByPart<T extends { q: number; part: number }>(wrong: T[]): { part: number; items: T[] }[] {
+  const parts = [...new Set(wrong.map((w) => w.part))].sort((a, b) => a - b);
+  return parts.map((part) => ({ part, items: wrong.filter((w) => w.part === part).sort((a, b) => a.q - b.q) }));
+}
+
+// 회차 통계 (백지 제외): 인원 · 평균 총점/LC/RC · 100점 단위 분포 · 파트별 평균 정답률
+export function examStats(rows: { total: number; lc_score: number; rc_score: number; blank_sheet: boolean; parts: { part: number; correct: number; total: number }[] }[]) {
+  const ok = rows.filter((r) => !r.blank_sheet);
+  const avg = (f: (r: (typeof ok)[number]) => number) => (ok.length ? Math.round(ok.reduce((s, r) => s + f(r), 0) / ok.length) : 0);
+  const buckets = new Map<number, number>();
+  for (const r of ok) { const b = Math.min(900, Math.floor(r.total / 100) * 100); buckets.set(b, (buckets.get(b) ?? 0) + 1); }
+  const partAvg = [1, 2, 3, 4, 5, 6, 7].map((part) => {
+    let c = 0, t = 0;
+    for (const r of ok) for (const p of r.parts) if (p.part === part) { c += p.correct; t += p.total; }
+    return { part, pct: pct(c, t) };
+  });
+  return { count: ok.length, blank: rows.length - ok.length, total: avg((r) => r.total), lc: avg((r) => r.lc_score), rc: avg((r) => r.rc_score), buckets: [...buckets.entries()].sort((a, b) => a[0] - b[0]), partAvg };
+}
+
+// 확인 필요 사유 묶음 (관리 칩)
+export type ReviewReason = "no_number" | "mismatch" | "not_found" | "other";
+export function reviewReason(note: string | null): ReviewReason {
+  if (note === "학생번호 없음") return "no_number";
+  if (note === "학생번호와 이름이 달라요") return "mismatch";
+  if (note === "일치하는 학생 없음") return "not_found";
+  return "other";
+}
+export const REVIEW_REASONS: { id: ReviewReason; label: string; hint: string }[] = [
+  { id: "no_number", label: "학생번호 없음", hint: "이름으로 찾아 연결" },
+  { id: "mismatch", label: "번호·이름 다름", hint: "이름 쪽 학생인지 확인 후 연결" },
+  { id: "not_found", label: "일치하는 학생 없음", hint: "가입 안내 또는 이름 확인" },
+  { id: "other", label: "기타", hint: "" },
+];

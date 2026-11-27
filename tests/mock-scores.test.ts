@@ -1,7 +1,7 @@
 // 첫토익 모의고사 성적 연동 (설계서 v1): 형식 검사 · 학생 연결 · 개인번호
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { carryManualLinks, isStudentNo, matchResult, numberForGroup, parsePayload, randomStudentNo, sameName, staleResultIds } from "@/lib/mockScores";
+import { byExamDesc, examStats, reviewReason, scoreDeltas, wrongByPart, PART_NAMES, carryManualLinks, isStudentNo, matchResult, numberForGroup, parsePayload, randomStudentNo, sameName, staleResultIds } from "@/lib/mockScores";
 
 const result = (over: Record<string, unknown> = {}) => ({
   result_id: "f3a1c9d2-0000-4000-8000-000000000002",
@@ -109,4 +109,44 @@ test("1.1 다시 스캔: 지워지는 선생님 연결은 같은 이름 새 결�
   assert.equal(carry.has("new4"), false); // 원래 선생님 연결이 아니었음
   // 새 결과가 번호로 자동 연결(matched)됐으면 이어받을 필요 없음
   assert.equal(carryManualLinks(removed, [{ result_id: "n", name: "홍길동", status: "matched" }]).size, 0);
+});
+
+test("화면: 시험일 최신 → 같은 날이면 회차 큰 것이 위, 지난 회차 대비(백지·첫 응시 제외)", () => {
+  const rows = [
+    { result_id: "a", exam_date: "2026-11-27", session: 1, total: 700, blank_sheet: false },
+    { result_id: "b", exam_date: "2026-11-27", session: 2, total: 740, blank_sheet: false },
+    { result_id: "c", exam_date: "2026-12-04", session: 1, total: 720, blank_sheet: false },
+    { result_id: "d", exam_date: "2026-12-11", session: 1, total: 0, blank_sheet: true },
+  ];
+  assert.deepEqual([...rows].sort(byExamDesc).map((r) => r.result_id), ["d", "c", "b", "a"]);
+  const d = scoreDeltas(rows);
+  assert.equal(d.get("c"), -20);
+  assert.equal(d.get("b"), 40);
+  assert.equal(d.has("a"), false); // 첫 응시
+  assert.equal(d.has("d"), false); // 백지
+});
+
+test("화면: 틀린 문항은 파트별로 묶고 번호 순서, 파트 이름", () => {
+  const g = wrongByPart([{ q: 147, part: 7 }, { q: 22, part: 2 }, { q: 8, part: 2 }]);
+  assert.deepEqual(g.map((x) => [x.part, x.items.map((i) => i.q)]), [[2, [8, 22]], [7, [147]]]);
+  assert.equal(PART_NAMES[2], "질의응답");
+  assert.equal(PART_NAMES[5], "단문 빈칸 채우기");
+});
+
+test("관리: 회차 통계(백지 제외) · 확인 필요 사유 묶음", () => {
+  const part = (c: number) => [1, 2, 3, 4, 5, 6, 7].map((p) => ({ part: p, correct: c, total: 10 }));
+  const st = examStats([
+    { total: 800, lc_score: 400, rc_score: 400, blank_sheet: false, parts: part(8) },
+    { total: 600, lc_score: 300, rc_score: 300, blank_sheet: false, parts: part(6) },
+    { total: 0, lc_score: 5, rc_score: 5, blank_sheet: true, parts: part(0) },
+  ]);
+  assert.equal(st.count, 2);
+  assert.equal(st.blank, 1);
+  assert.equal(st.total, 700);
+  assert.deepEqual(st.buckets, [[600, 1], [800, 1]]);
+  assert.equal(st.partAvg[0].pct, 70);
+  assert.equal(reviewReason("학생번호 없음"), "no_number");
+  assert.equal(reviewReason("학생번호와 이름이 달라요"), "mismatch");
+  assert.equal(reviewReason("일치하는 학생 없음"), "not_found");
+  assert.equal(reviewReason("선생님이 연결을 풀었어요"), "other");
 });

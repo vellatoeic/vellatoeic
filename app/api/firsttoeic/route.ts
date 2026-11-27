@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createHash, timingSafeEqual } from "crypto";
 import { allow, count } from "@/lib/rateLimit";
 import { carryManualLinks, matchResult, parsePayload, staleResultIds } from "@/lib/mockScores";
-import { appsByStudentNos, deleteExamResults, examRowsOf, getExamResults, upsertExamResults, type ExamResultRow } from "@/lib/db";
+import { appsByStudentNos, deleteExamResults, examRowsOf, getExamResults, upsertExamInfo, upsertExamResults, type ExamResultRow } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -98,6 +98,7 @@ export async function POST(req: NextRequest) {
     }
     const answer = out.map((o) => (carry.has(o.result_id) ? { result_id: o.result_id, status: "manual", student_id: carry.get(o.result_id) } : o));
     if (!dry_run) {
+      await upsertExamInfo({ exam_id: exam.id, title: exam.title, exam_date: exam.date, session: exam.session }); // 회차 (새 회차는 비공개로 시작, 공개 여부는 그대로)
       await upsertExamResults(rows); // 먼저 저장하고
       if (stale.length > 0) await deleteExamResults(stale); // 그다음 이번 명단에 없는 예전 결과를 지워요
     }
