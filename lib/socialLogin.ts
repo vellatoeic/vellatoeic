@@ -62,7 +62,8 @@ export function googleClaims(idToken: string, clientId: string, nowSec: number):
     const issOk = c.iss === "https://accounts.google.com" || c.iss === "accounts.google.com";
     if (!audOk || !issOk || typeof c.sub !== "string" || !c.sub || typeof c.exp !== "number" || c.exp < nowSec) return null;
     const email = typeof c.email === "string" && c.email_verified !== false ? c.email : null;
-    return { sub: c.sub, email, name: typeof c.name === "string" ? c.name : null };
+    const picture = typeof c.picture === "string" && /^https:\/\//.test(c.picture) ? c.picture : null;
+    return { sub: c.sub, email, name: typeof c.name === "string" ? c.name : null, ...(picture ? { picture } : {}) };
   } catch {
     return null;
   }

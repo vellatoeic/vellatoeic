@@ -1683,6 +1683,7 @@ export type LoginLink = {
   account_id: string;
   email: string | null;
   nickname: string | null;
+  photo_url?: string | null; // 카카오·구글 프로필 사진 (SQL 47)
   created_at: string;
   last_login_at: string | null;
 };
@@ -1711,7 +1712,7 @@ export async function listLoginLinks(accountIds: string[]): Promise<LoginLink[]>
 }
 
 // 연결 저장 (이미 있으면 학생 번호·이메일·별명만 바꿔요) + 마지막 로그인 시각
-export async function saveLoginLink(l: Pick<LoginLink, "provider" | "subject" | "account_id" | "email" | "nickname">) {
+export async function saveLoginLink(l: Pick<LoginLink, "provider" | "subject" | "account_id" | "email" | "nickname"> & { photo_url?: string | null }) {
   const row = { ...l, last_login_at: new Date().toISOString() };
   if (sb) {
     const { error } = await sb.from("login_links").upsert(row, { onConflict: "provider,subject" });
@@ -1723,7 +1724,7 @@ export async function saveLoginLink(l: Pick<LoginLink, "provider" | "subject" | 
   else mem.loginLinks.push({ ...row, created_at: row.last_login_at });
 }
 
-export async function touchLoginLink(provider: LoginLink["provider"], subject: string, patch: Pick<LoginLink, "email" | "nickname">) {
+export async function touchLoginLink(provider: LoginLink["provider"], subject: string, patch: Pick<LoginLink, "email" | "nickname"> & { photo_url?: string | null }) {
   const row = { ...patch, last_login_at: new Date().toISOString() };
   if (sb) {
     const { error } = await sb.from("login_links").update(row).eq("provider", provider).eq("subject", subject);
@@ -1930,7 +1931,7 @@ export async function countExamReview(): Promise<number> {
 }
 
 // ── 학생 '내 정보' (SQL 44, 규칙 lib/profile.ts) ──
-export type StudentProfile = { student_no: string; phone: string | null; target_score: number | null; reasons: string[]; reason_note: string | null; updated_at?: string };
+export type StudentProfile = { student_no: string; phone: string | null; target_score: number | null; reasons: string[]; reason_note: string | null; updated_at?: string; last_login_at?: string | null; last_login_via?: string | null; last_seen_at?: string | null };
 
 export async function getStudentProfiles(nos: string[]): Promise<StudentProfile[]> {
   const ok = [...new Set(nos.filter((n) => /^[1-9][0-9]{5}$/.test(n)))];
@@ -1938,7 +1939,7 @@ export async function getStudentProfiles(nos: string[]): Promise<StudentProfile[
   if (sb) {
     const db = sb;
     return inChunks(ok, async (chunk) => {
-      const { data, error } = await db.from("student_profiles").select("student_no,phone,target_score,reasons,reason_note,updated_at").in("student_no", chunk);
+      const { data, error } = await db.from("student_profiles").select("student_no,phone,target_score,reasons,reason_note,updated_at,last_login_at,last_login_via,last_seen_at").in("student_no", chunk);
       if (error) throw error;
       return data as StudentProfile[];
     });

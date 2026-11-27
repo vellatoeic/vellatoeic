@@ -43,6 +43,7 @@ import { cleanPhone, cleanReasons, cleanTarget } from "@/lib/profile";
 import { LINK_LATER_COOKIE } from "@/lib/profileServer";
 import { cookies } from "next/headers";
 import { ensureStudentNo } from "@/lib/studentNumbers";
+import { recordLogin } from "@/lib/loginActivity";
 import { BOARD_ROWS, dateLabel, defaultTitle, sessionNo, targetsOf } from "@/lib/lectureBoard";
 import { scheduleDays } from "@/lib/classCalendar";
 import { receiptVerdict } from "@/lib/receipt/verdict";
@@ -232,6 +233,7 @@ export async function studentLogin(_: FormState, fd: FormData): Promise<FormStat
     return { error: result.error };
   }
   await setStudent(result.apps.map((a) => a.id));
+  await safe("recordLogin.pin", () => recordLogin(result.apps!, "pin"), undefined); // 학생 명단: 마지막 로그인(이름+비밀번호)
   const next = clean(fd.get("next"));
   if (next === "/check" || next.startsWith("/check?") || next === "/class" || next === "/class/scores" || next === "/mission" || next === "/faq") redirect(next);
   // 정해진 화면이 없으면 /go: '내 정보'(휴대폰·목표 점수·공부 이유)가 남았으면 그 화면, 아니면 이번 달 수강생은 첫 화면·그 외 강의실
@@ -256,10 +258,12 @@ export async function linkWithPin(_: FormState, fd: FormData): Promise<FormState
   const link = await getLoginLink(pending.p, pending.sub);
   const plan = planLink(found.filter((a) => checkPin(pin, a.pin_hash)), link?.account_id ?? null, randomUUID);
   await linkAccount(plan.accountId, plan.attach, plan.merge);
-  await saveLoginLink({ provider: pending.p, subject: pending.sub, account_id: plan.accountId, email: pending.email, nickname: pending.nick });
+  await saveLoginLink({ provider: pending.p, subject: pending.sub, account_id: plan.accountId, email: pending.email, nickname: pending.nick, photo_url: pending.photo ?? null });
   await clearPendingLink();
   await setAccount(plan.accountId);
-  await setStudent((await appsByAccount(plan.accountId)).filter(isActive).map((a) => a.id));
+  const linkedApps = (await appsByAccount(plan.accountId)).filter(isActive);
+  await setStudent(linkedApps.map((a) => a.id));
+  await safe("recordLogin.firstLink", () => recordLogin(linkedApps, pending.p), undefined);
   redirect(safeNext(clean(fd.get("next"))));
 }
 
@@ -270,7 +274,7 @@ export async function startFresh(fd: FormData) {
   if (!pending) redirect("/guide");
   const link = await getLoginLink(pending.p, pending.sub);
   const accountId = link?.account_id ?? randomUUID();
-  await saveLoginLink({ provider: pending.p, subject: pending.sub, account_id: accountId, email: pending.email, nickname: pending.nick });
+  await saveLoginLink({ provider: pending.p, subject: pending.sub, account_id: accountId, email: pending.email, nickname: pending.nick, photo_url: pending.photo ?? null });
   await clearPendingLink();
   await setAccount(accountId);
   redirect(isSignupNext(next) ? next : "/guide");

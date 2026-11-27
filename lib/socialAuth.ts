@@ -31,7 +31,9 @@ export function authorizeUrl(p: Provider, origin: string, state: string, verifie
   return `https://kauth.kakao.com/oauth/authorize?${q}`;
 }
 
-export type Profile = { sub: string; email: string | null; nickname: string | null };
+export type Profile = { sub: string; email: string | null; nickname: string | null; photo?: string | null };
+// 프로필 사진 주소: https만 (카카오가 http로 줄 때가 있어 https로 바꿔요)
+const photoUrl = (v: unknown): string | null => (typeof v === "string" && /^https?:\/\/\S+$/.test(v) && v.length < 1000 ? v.replace(/^http:/, "https:") : null);
 
 const post = (url: string, body: URLSearchParams) =>
   fetch(url, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded;charset=utf-8" }, body, cache: "no-store", signal: AbortSignal.timeout(8000) });
@@ -48,7 +50,7 @@ export async function fetchProfile(p: Provider, origin: string, code: string, ve
       if (!res.ok) return fail(p, `token ${res.status}`);
       const j = (await res.json()) as { id_token?: unknown };
       const c = typeof j.id_token === "string" ? googleClaims(j.id_token, clientId, Math.floor(Date.now() / 1000)) : null;
-      return c ? { sub: c.sub, email: c.email, nickname: c.name } : fail(p, "id_token");
+      return c ? { sub: c.sub, email: c.email, nickname: c.name, photo: photoUrl((c as { picture?: string }).picture) } : fail(p, "id_token");
     }
     const body = new URLSearchParams({ grant_type: "authorization_code", client_id: process.env.KAKAO_REST_API_KEY ?? "", redirect_uri, code });
     if (process.env.KAKAO_CLIENT_SECRET) body.set("client_secret", process.env.KAKAO_CLIENT_SECRET);
@@ -58,10 +60,12 @@ export async function fetchProfile(p: Provider, origin: string, code: string, ve
     if (typeof t.access_token !== "string") return fail(p, "access_token");
     const me = await fetch("https://kapi.kakao.com/v2/user/me", { headers: { Authorization: `Bearer ${t.access_token}` }, cache: "no-store", signal: AbortSignal.timeout(8000) });
     if (!me.ok) return fail(p, `me ${me.status}`);
-    const u = (await me.json()) as { id?: unknown; kakao_account?: { email?: unknown; profile?: { nickname?: unknown } }; properties?: { nickname?: unknown } };
+    const u = (await me.json()) as { id?: unknown; kakao_account?: { email?: unknown; profile?: { nickname?: unknown; profile_image_url?: unknown; thumbnail_image_url?: unknown; is_default_image?: unknown } }; properties?: { nickname?: unknown; profile_image?: unknown } };
     if (typeof u.id !== "number" && typeof u.id !== "string") return fail(p, "id");
     const nick = u.kakao_account?.profile?.nickname ?? u.properties?.nickname;
-    return { sub: String(u.id), email: typeof u.kakao_account?.email === "string" ? u.kakao_account.email : null, nickname: typeof nick === "string" ? nick : null };
+    const prof = u.kakao_account?.profile;
+    const photo = prof?.is_default_image === true ? null : photoUrl(prof?.profile_image_url ?? prof?.thumbnail_image_url ?? u.properties?.profile_image); // 기본 이미지면 사진 없음
+    return { sub: String(u.id), email: typeof u.kakao_account?.email === "string" ? u.kakao_account.email : null, nickname: typeof nick === "string" ? nick : null, photo };
   } catch (e) {
     return fail(p, e instanceof Error ? e.name : "error");
   }

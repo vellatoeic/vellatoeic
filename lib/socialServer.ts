@@ -5,6 +5,8 @@ import { getStudentIds, isAdmin, setAccount, setAdmin, setPendingLink, setStuden
 import { isActive, loginApps } from "./access";
 import { effectiveMode, isAdminLogin, isSignupNext, loginModeOf, parseAdminLogins, planLink, readyProviders, showPinLogin, showSocialLogin, withAdminLogin, type Provider } from "./socialLogin";
 import type { Profile } from "./socialAuth";
+import { recordLogin } from "./loginActivity";
+import { safe } from "./safe";
 
 // 지금 학생 로그인 화면에 보여줄 것: 켜진 구글·카카오 버튼 + 이름·비밀번호 칸을 보여줄지
 export async function loginSetup() {
@@ -20,25 +22,28 @@ export async function socialSignIn(p: Provider, prof: Profile, next: string, lin
   // 관리자로 등록된 계정이면 학생 버튼으로 눌러도 관리 화면으로
   if (isAdminLogin(await adminLogins(), p, prof.sub)) return adminSignIn(p, prof);
   const link = await getLoginLink(p, prof.sub);
-  const pending = { p, sub: prof.sub, email: prof.email, nick: prof.nickname };
+  const pending = { p, sub: prof.sub, email: prof.email, nick: prof.nickname, photo: prof.photo ?? null };
   const session = !link && linkSession ? (await getApplications(await getStudentIds())).filter(isActive) : [];
   if (session.length > 0) {
     const plan = planLink(session, null, randomUUID);
     await linkAccount(plan.accountId, plan.attach, plan.merge);
-    await saveLoginLink({ provider: p, subject: prof.sub, account_id: plan.accountId, email: prof.email, nickname: prof.nickname });
+    await saveLoginLink({ provider: p, subject: prof.sub, account_id: plan.accountId, email: prof.email, nickname: prof.nickname, photo_url: prof.photo ?? null });
     await setAccount(plan.accountId);
-    await setStudent((await appsByAccount(plan.accountId)).filter(isActive).map((a) => a.id));
+    const linked = (await appsByAccount(plan.accountId)).filter(isActive);
+    await setStudent(linked.map((a) => a.id));
+    await safe("recordLogin.link", () => recordLogin(linked, p), undefined);
     return next;
   }
   if (!link) {
     await setPendingLink(pending);
     return `/login?next=${encodeURIComponent(next)}`;
   }
-  await touchLoginLink(p, prof.sub, { email: prof.email, nickname: prof.nickname });
+  await touchLoginLink(p, prof.sub, { email: prof.email, nickname: prof.nickname, photo_url: prof.photo ?? null });
   await setAccount(link.account_id);
   const r = loginApps(await appsByAccount(link.account_id), () => true);
   if (r.apps) {
     await setStudent(r.apps.map((a) => a.id));
+    await safe("recordLogin.social", () => recordLogin(r.apps!, p), undefined);
     return next;
   }
   if (r.cancelledId) return `/my/${r.cancelledId}`; // 취소된 신청만 있으면 취소 안내 화면으로

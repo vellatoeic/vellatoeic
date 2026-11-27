@@ -110,7 +110,7 @@ export async function takeOAuthState(): Promise<OAuthState | null> {
 
 // 처음 로그인한 구글·카카오 계정: 이름+비밀번호로 내 신청을 찾을 때까지 20분 기억해요
 // none = 이미 연결된 계정인데 수강 신청이 하나도 없을 때
-export type PendingLink = { p: "google" | "kakao"; sub: string; email: string | null; nick: string | null; none?: boolean };
+export type PendingLink = { p: "google" | "kakao"; sub: string; email: string | null; nick: string | null; photo?: string | null; none?: boolean };
 const LINK_MS = 20 * 60 * 1000;
 export async function setPendingLink(l: PendingLink) {
   (await cookies()).set("vella_link", sealTimed(l), { ...cookieOpts, maxAge: LINK_MS / 1000 });
