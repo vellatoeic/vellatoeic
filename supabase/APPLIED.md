@@ -48,6 +48,7 @@
 | `43_mock_scores.sql` | 완료 · 2026-11-27 · npm run sql | 모의고사 성적(첫토익 연동) + 학생 개인번호 6자리: 새 표 2개(student_numbers · firsttoeic_exam_results)와 신청서의 개인번호 칸(applications.student_no)만 추가해요. 여러 번 실행해도 안전해요. |
 | `44_student_profiles.sql` | 완료 · 2026-11-27 · npm run sql | 학생 '내 정보'(처음 로그인 뒤 한 장씩 묻기): 휴대폰 번호(동명이인 구분) · 목표 점수 · 토익 공부 이유를 개인번호별로 저장하는 새 표(student_profiles)만 추가해요. 여러 번 실행해도 안전해요. |
 | `45_login_mode_both.sql` | 완료 · 2026-11-27 · npm run sql | 학생 로그인 방식 '카카오·구글만'(social) → '둘 다'(both): 새 사이트 배포(2026-11-27)부터 임시로 예전처럼 이름 + 비밀번호로 들어오고, 들어온 뒤 카카오·구글을 연결해요. |
+| `42_desk_8f.sql` | 완료 · 2026-11-27 · npm run sql | 불라방 현장 수령 장소 1층 데스크 → 8층 데스크: 자주 묻는 질문(faq_items) 문구만 바꿔요 (2026-11-26, 신청·납부 데이터는 그대로) |
 
 > 2026-11-13 새 Supabase 프로젝트(서울)로 이사: `scripts/migrate-db.mjs --run`으로 옛 DB의 public 구조·데이터·권한·RLS·보관함 설정을 그대로 복사했어요. 위 기록(1~32)은 새 DB에도 그대로 들어 있어요.
 > `33_speed_cleanup.sql`: 옛 DB 확인 결과 ①인덱스 4개만 들어 있고 ②10월 이전 정리는 실행되지 않은 상태로 이사됐어요(완료로 기록하지 않음). 정리는 `35_october_cleanup.sql`로 따로 해요.
