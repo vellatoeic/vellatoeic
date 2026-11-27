@@ -1,12 +1,13 @@
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import { isAdmin } from "@/lib/auth";
-import { currentCohort, getSetting, isPreview } from "@/lib/db";
+import { getSetting, isPreview } from "@/lib/db";
 import { holidayKey, parseHolidays, defaultHolidays, scheduleKey, schoolDaysFor, SCHEDULE_CLASSES, type ScheduleClass } from "@/lib/schedule";
 import { classCohortNow } from "@/lib/classCohort";
 import { shiftMonth } from "@/lib/signupMonths";
 import { classRoster, loadTimetable } from "@/lib/timetableServer";
 import { holidaysFor } from "@/lib/timetable";
+import { targetCohort } from "@/lib/monthlyChecklist";
 import AdminTabs from "../AdminTabs";
 import LoginForm from "../LoginForm";
 import ScheduleEditor from "./ScheduleEditor";
@@ -23,8 +24,9 @@ const dayLabel = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10
 export default async function SchedulePage({ searchParams }: { searchParams: Promise<{ cohort?: string; klass?: string; saved?: string; kept?: string }> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
   const params = await searchParams;
-  const [recruit, running] = await Promise.all([currentCohort(), classCohortNow()]);
-  const cohort = /^\d{4}-(0[1-9]|1[0-2])$/.test(params.cohort ?? "") ? params.cohort! : recruit;
+  const [running, prepare] = await Promise.all([classCohortNow(), targetCohort()]);
+  // 처음 열면 '준비할 달'(이번 달 개강 전이면 이번 달, 개강했으면 다음 달) — 모집 기수 설정이 지난달로 남아 있어도 12월부터 보여요
+  const cohort = /^\d{4}-(0[1-9]|1[0-2])$/.test(params.cohort ?? "") ? params.cohort! : prepare;
   const klass = Object.hasOwn(SCHEDULE_CLASSES, params.klass ?? "") ? params.klass as ScheduleClass : "start-all";
   const [table, savedDays, savedHolidays, confirmedRaw] = await Promise.all([
     loadTimetable(cohort),
@@ -34,7 +36,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   ]);
   const roster = await classRoster(cohort, table.marks);
   const confirmed = confirmedRaw === "1";
-  const months = [...new Set([shiftMonth(running, -1), running, shiftMonth(running, 1), shiftMonth(running, 2), cohort])].sort();
+  const months = [...new Set([shiftMonth(prepare, -1), prepare, shiftMonth(prepare, 1), shiftMonth(prepare, 2), cohort])].sort();
   const weekdayHolidays = Object.entries(holidaysFor(cohort, table.savedHolidays, {})).filter(([d]) => { const w = new Date(`${d}T00:00:00Z`).getUTCDay(); return d.startsWith(`${cohort}-`) && w >= 1 && w <= 5; });
 
   return (
@@ -49,11 +51,11 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
             <Link key={m} href={`/admin/schedule?cohort=${m}`} aria-current={m === cohort ? "page" : undefined}
               className={`rounded-2xl px-3 py-3 text-center font-extrabold ${m === cohort ? "bg-sky-deep text-white shadow-[0_3px_0_#1f6f9e]" : "bg-sky-soft text-sky-ink"}`}>
               {m.slice(0, 4) !== cohort.slice(0, 4) ? `${m.slice(2, 4)}년 ` : ""}{Number(m.slice(5, 7))}월 수업
-              <span className="block text-xs font-bold opacity-80">{m === running ? "지금 수업 중" : m === recruit ? "모집 중" : m < running ? "지난달" : "다음"}</span>
+              <span className="block text-xs font-bold opacity-80">{m === prepare ? "지금 준비할 달" : m < prepare ? (m === running ? "지금 수업 중" : "지난달") : "다음"}</span>
             </Link>
           ))}
         </nav>
-        <p className="text-xs text-slate-500">11월 말에 개강하는 12월반처럼 앞달에 시작해도 &apos;12월 수업&apos;을 고르면 돼요. 달력에 앞달 마지막 주도 보여요.</p>
+        <p className="text-xs text-slate-500">11월 말에 개강하는 12월반처럼 앞달에 시작해도 &apos;12월 수업&apos;을 고르면 돼요. 달력 첫 줄에 앞달 날짜(예: 11/30)도 있어요.</p>
       </section>
 
       {params.saved && (

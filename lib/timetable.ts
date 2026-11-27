@@ -1,6 +1,6 @@
 // ── 일정표 (강사가 한 달 수업을 한 장에, 2026-11-27 Vella) ──
 // 먼저 '몇 월 수업'인지 고르고, [월수반]·[화목반]·[특강] 버튼을 골라 날짜를 눌러요. 주 4일반(종합·단과·속성) = 월수반 + 화목반 전부.
-// 12월반이 11월 말에 개강하는 달도 있어서 달력은 앞달 마지막 주 ~ 다음 달 첫 주까지 보여주고, 그 날짜도 그 기수 수업일로 저장해요.
+// 12월반이 11월 말에 개강하는 달도 있어서 달력은 1일이 있는 주(앞달 날짜 포함) ~ 다음 달 첫 주까지 보여주고, 그 날짜도 그 기수 수업일로 저장해요.
 // 공휴일은 대한민국 공휴일 표(lib/krHolidays.ts)로 자동 표시, 공휴일에 수업을 넣으면 수업이 우선이에요.
 // 저장하면 7개 반 수업일·공휴일·특강 초안이 한 번에 바뀌어서 강의실·출석·숙제·테스트·음원·열람 기간·수강증 반 대조가 모두 이 일정표를 따라가요(기준선).
 // 개강일 = 첫 수업일, 종강일 = 마지막 수업일. DB 없이 계산해요. 자동 테스트: tests/timetable.test.ts
@@ -23,9 +23,10 @@ const shiftMonth = (cohort: string, n: number) => {
 const isDay = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`)) && new Date(`${d}T00:00:00Z`).toISOString().startsWith(d);
 export const monthEnd = (cohort: string) => addDays(`${shiftMonth(cohort, 1)}-01`, -1);
 
-// 일정표 달력 범위(일~토): 그 달 1일 7일 전이 있는 주 ~ 마지막 날 7일 뒤가 있는 주 (12월: 11/22 ~ 1/9)
+// 일정표 달력 범위(일~토): 그 달 1일이 있는 주 ~ 마지막 날 7일 뒤가 있는 주 (12월: 11/29 ~ 1/9)
+// 앞달 말 개강은 늘 1일과 같은 주(예: 12/1(화) → 11/30(월))라 앞달은 그 주만 보여줘요 (앞달만 있는 줄이 맨 위에 있으면 지난달 달력처럼 보여요)
 export function timetableRange(cohort: string) {
-  const a = addDays(`${cohort}-01`, -7);
+  const a = `${cohort}-01`;
   const b = addDays(monthEnd(cohort), 7);
   return { start: addDays(a, -weekdayOf(a)), end: addDays(b, 6 - weekdayOf(b)) };
 }

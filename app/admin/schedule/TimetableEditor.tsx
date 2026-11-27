@@ -2,7 +2,7 @@
 
 // [일정표] 한 장 편집 (2026-11-27 Vella): 달은 페이지 맨 위에서 먼저 고르고, [월수반]·[화목반]·[특강] 버튼을 골라 날짜를 눌러요.
 // 주 4일반 = 월수반 + 화목반 전부. 특강은 날짜를 누르면 어떤 특강인지 골라요. 공휴일은 자동(빨간 날), 공휴일에 수업을 넣으면 수업이 우선.
-// 앞달 마지막 주 ~ 다음 달 첫 주까지 보여줘서 11월 말 개강하는 12월반도 넣을 수 있어요. 저장하면 모든 학생 화면이 이 일정표를 따라가요.
+// 1일이 있는 주(앞달 날짜 포함) ~ 다음 달 첫 주까지 보여줘서 11월 말 개강하는 12월반도 넣을 수 있어요. 저장하면 모든 학생 화면이 이 일정표를 따라가요.
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "@/components/Icon";
@@ -147,7 +147,7 @@ export default function TimetableEditor({ cohort, initialMarks, savedHolidays, s
         </p>
         {msg && <p className="rounded-xl bg-sky-soft px-3 py-2 text-sm font-bold text-sky-ink">{msg}</p>}
 
-        {/* 달력 (일~토, 앞달 마지막 주 ~ 다음 달 첫 주) */}
+        {/* 달력 (일~토, 1일이 있는 주 ~ 다음 달 첫 주) */}
         <div className="grid grid-cols-7 gap-1 text-center">
           {[..."일월화수목금토"].map((d, i) => <div key={d} className={`py-1 text-xs font-bold ${i === 0 ? "text-red-500" : i === 6 ? "text-blue-600" : "text-slate-500"}`}>{d}</div>)}
           {weeks.flat().map((day, i) => {

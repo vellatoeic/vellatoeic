@@ -42,10 +42,11 @@ test("종강일을 주면 그날까지만 채워요", () => {
 test("앞달 말 개강: 12월반이 11/30(월)에 시작해도 12월 수업으로 저장·표시돼요", () => {
   // 달력은 앞달 마지막 주 ~ 다음 달 첫 주
   const weeks = timetableWeeks("2026-12");
-  assert.equal(weeks[0][0], "2026-11-22");
+  assert.equal(weeks[0][0], "2026-11-29"); // 12/1이 있는 주부터 (앞달만 있는 줄은 없어요)
   assert.equal(weeks.at(-1)!.at(-1), "2027-01-09");
   assert.equal(inRange("2026-11-30", "2026-12"), true);
-  assert.equal(inRange("2026-11-15", "2026-12"), false);
+  assert.equal(inRange("2026-11-27", "2026-12"), false);
+  assert.equal(timetableWeeks("2027-05")[0][0], "2027-04-25"); // 5/1(토) → 4/26(월) 개강도 넣을 수 있어요
   const m = autoFill("2026-12", "2026-11-30", { "2026-12-25": "성탄절" });
   const s = summarize(m);
   assert.equal(s.first, "2026-11-30");
