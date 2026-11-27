@@ -28,6 +28,8 @@ export async function specialPreview(cohort: string) {
 // 초안 만들기·맞추기: 같은 날짜 특강이 있거나 같은 제목 공개 특강이 그 달에 있으면 만들지 않아요.
 // 요일을 바꾸면 공개 전 초안만 날짜를 옮겨요.
 export async function syncSpecialDrafts(cohort: string) {
+  // [일정표]에서 특강 날짜를 직접 고른 달은 저장할 때 초안을 이미 맞췄어요 → 요일 계산으로 날짜를 되돌리지 않아요
+  if (await getSetting(`special_dates:${cohort}`)) return { created: 0, moved: 0 };
   const weekday = await specialWeekday(cohort);
   const first = await openingDay(cohort);
   if (!weekday || !first) return { created: 0, moved: 0 };

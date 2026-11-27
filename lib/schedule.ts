@@ -1,4 +1,5 @@
 import type { CourseId, Track } from "./config";
+import { krHolidaysOf } from "./krHolidays";
 
 export type ScheduleClass = "start-all" | "start-mw" | "start-tt" | "solve-all" | "solve-mw" | "solve-tt" | "intensive-all";
 
@@ -35,8 +36,9 @@ export function holidayKey(cohort: string) {
   return `holidays_${cohort}`;
 }
 
+// 공휴일을 저장하지 않은 달의 기본값 = 대한민국 공휴일 표(lib/krHolidays.ts)
 export function defaultHolidays(cohort: string): Record<string, string> {
-  if (cohort !== "2026-10") return {};
+  if (cohort !== "2026-10") return krHolidaysOf(cohort);
   return {
     "2026-10-05": "공휴일",
     "2026-10-09": "한글날",

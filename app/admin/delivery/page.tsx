@@ -10,7 +10,9 @@ import { specialDay } from "@/lib/special";
 import { classCohortNow } from "@/lib/classCohort";
 import { isActive } from "@/lib/access";
 import { adminReviveYbm } from "@/app/actions";
-import { splitAddress } from "@/lib/address";
+import { regionLines, splitAddress } from "@/lib/address";
+import { shiftMonth } from "@/lib/signupMonths";
+import CopyText from "../CopyText";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "불라방 · vella_toeic", robots: { index: false } };
@@ -23,17 +25,28 @@ type Pick = keyof typeof PICKS;
 const SOURCES = { all: "전체", academy: "학원 불라방", ybm: "YBM 인강" } as const;
 type Source = keyof typeof SOURCES;
 
-export default async function DeliveryPage({ searchParams }: { searchParams: Promise<{ from?: string; pick?: string }> }) {
+export default async function DeliveryPage({ searchParams }: { searchParams: Promise<{ from?: string; pick?: string; report?: string }> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
-  const { from: raw, pick: rawPick } = await searchParams;
+  const { from: raw, pick: rawPick, report: rawReport } = await searchParams;
   const from: Source = raw === "academy" || raw === "ybm" ? raw : "all";
   const pick: Pick = rawPick === "desk" || rawPick === "ship" ? rawPick : "all";
   const cohort = await currentCohort();
   // 모집 기수 + 지금 수업 중인 기수 (모집 기수를 바꿔도 이번 달 택배가 빠지지 않게)
-  const cohorts = new Set([cohort, await classCohortNow()]);
+  const classNow = await classCohortNow();
+  const cohorts = new Set([cohort, classNow]);
   await cleanupYbmProofs().catch(() => {});
   await cleanupYbmOrders().catch(() => {});
-  const online = (await listApplications()).filter((a) => cohorts.has(a.cohort) && a.kind === "online" && isActive(a));
+  const allApps = await listApplications();
+  const online = allApps.filter((a) => cohorts.has(a.cohort) && a.kind === "online" && isActive(a));
+  // 학원 전달용 택배 명단 (2026-11-26 Vella): 그 달 수업 신청(= 전달 중순 ~ 그 달 2주차 접수) 중 택배로 받은 학원 불라방 학생,
+  // 납부 완료·발송 완료만(미납·취소·환불 빼요), 신청 순서대로 '1. 이름: 부산 사하구' (주소는 시·구까지)
+  const reportMonths = [...new Set([shiftMonth(classNow, -1), classNow, cohort])].sort();
+  const report = reportMonths.includes(rawReport ?? "") ? rawReport! : classNow;
+  const reportRows = allApps
+    .filter((a) => a.cohort === report && a.kind === "online" && a.pickup === "delivery" && (a.status === "paid" || a.status === "shipped"))
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const reportText = regionLines(reportRows.map((a) => ({ name: a.name, address: a.address })));
+  const reportHref = (m: string) => `/admin/delivery?${new URLSearchParams({ ...(pick === "ship" ? { pick } : {}), report: m }).toString()}#report`;
   // 현장 수령(데스크): 수령 희망 날짜·시간 순 (미정은 맨 뒤) → 같으면 이름순
   const desk: DeskRow[] = online
     .filter((a) => a.pickup === "classroom")
@@ -104,6 +117,26 @@ export default async function DeliveryPage({ searchParams }: { searchParams: Pro
         {delivery.length > 0 ? (
           <DeliveryList rows={delivery} csv={from === "all" ? "/admin/delivery/csv" : `/admin/delivery/csv?from=${from}`} />
         ) : <p className="text-center text-slate-500">택배 신청자가 아직 없어요.</p>}
+      </section>
+
+      {/* 학원 전달용 택배 명단: 버튼 하나로 '1. 이름: 부산 사하구' 복사 → 학원 카톡에 바로 붙여 넣기 */}
+      <section id="report" className="card scroll-mt-20 space-y-3 !p-4 sm:!p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-jua text-xl text-sky-ink">학원 전달용 택배 명단</h3>
+            <p className="text-sm text-slate-600">{Number(report.slice(5, 7))}월 수업 신청(전달 중순 ~ {Number(report.slice(5, 7))}월 2주차 접수) 중 택배로 받은 학생 {reportRows.length}명 · 납부 완료·발송 완료만 · 주소는 시·구까지</p>
+          </div>
+          <CopyText text={reportText} label={`${reportRows.length}명 명단 복사`} className="btn !py-2 !text-sm" />
+        </div>
+        <nav className="flex flex-wrap gap-2" aria-label="수강 월">
+          {reportMonths.map((m) => (
+            <a key={m} href={reportHref(m)} aria-current={report === m ? "page" : undefined}
+              className={`rounded-full px-4 py-1.5 text-sm font-bold ${report === m ? "bg-sky-deep text-white" : "bg-white text-sky-ink ring-1 ring-sky-main"}`}>
+              {cohortLabel(m)}
+            </a>
+          ))}
+        </nav>
+        <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl bg-sky-soft p-3 font-sans text-sm text-slate-700">{reportText || "이 달 택배로 받은 학생이 아직 없어요."}</pre>
       </section>
 
       {/* 관리자가 취소한 인강 주문 (30분 자동 취소는 보이지 않아요) */}

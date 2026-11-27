@@ -12,6 +12,22 @@ import type { ReceiptClass } from "@/lib/receipt/classes";
 import { ocrReceipt, shrinkForReview } from "@/lib/receipt/server";
 import { ocrAllowed } from "@/lib/receipt/usage";
 import { signupMonths } from "@/lib/signupMonthsServer";
+import { scheduleDays } from "@/lib/classCalendar";
+import { SCHEDULE_CLASSES, scheduleClassFor, type ScheduleClass } from "@/lib/schedule";
+
+const dayText = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}(${"일월화수목금토"[new Date(`${d}T00:00:00Z`).getUTCDay()]})`;
+
+// [일정표] 기준 반별 수업일 (기수 × 7개 반) — 수업일이 없는 반은 수강증이 그 반으로 맞춰지지 않고, 찾은 반에는 기간을 보여줘요
+async function timetableOf(cohorts: string[]) {
+  const keys = Object.keys(SCHEDULE_CLASSES) as ScheduleClass[];
+  const rows = await Promise.all(cohorts.flatMap((c) => keys.map(async (k) => [`${c}|${k}`, await scheduleDays(c, k)] as const)));
+  const days = new Map(rows);
+  const of = (c: Pick<ReceiptClass, "cohort" | "course" | "track">) => days.get(`${c.cohort}|${scheduleClassFor(c.course, c.track)}`) ?? [];
+  return {
+    open: (c: ReceiptClass) => of(c).length > 0,
+    line: (c: ReceiptClass) => { const d = of(c); return d.length ? `수업 ${dayText(d[0])} ~ ${dayText(d.at(-1)!)} · ${d.length}회` : ""; },
+  };
+}
 
 export type ReceiptResult = {
   id?: string;
@@ -19,6 +35,7 @@ export type ReceiptResult = {
   message: string;
   classes: ReceiptClass[];
   kind: Kind | null;
+  schedules?: string[]; // classes와 같은 순서: [일정표] 기준 그 반 수업 기간 (예: 수업 12/1(화) ~ 12/24(목) · 16회)
 };
 
 const MAX_BYTES = 4 * 1024 * 1024;
@@ -39,6 +56,7 @@ export async function readReceiptAction(fd: FormData): Promise<ReceiptResult> {
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const cohorts = (await signupMonths()).map((m) => m.cohort);
+  const table = await timetableOf(cohorts).catch(() => null);
   const today = todayKST();
   const image_hash = createHash("sha256").update(bytes).digest("hex");
 
@@ -60,7 +78,7 @@ export async function readReceiptAction(fd: FormData): Promise<ReceiptResult> {
       reasons = [`글자를 읽지 못함 (${out.reason.slice(0, 60)})`];
     } else {
       ocr_text = out.result.text;
-      analysis = analyzeReceipt(out.result.text, cohorts, today);
+      analysis = analyzeReceipt(out.result.text, cohorts, today, table?.open);
       outcome = analysis.status;
       message = analysis.message;
       reasons = analysis.reasons;
@@ -84,5 +102,6 @@ export async function readReceiptAction(fd: FormData): Promise<ReceiptResult> {
     ocr_ms,
   }, image);
 
-  return { id, status: outcome, message, classes: analysis?.classes ?? [], kind: analysis?.kind ?? null };
+  const classes = analysis?.classes ?? [];
+  return { id, status: outcome, message, classes, kind: analysis?.kind ?? null, schedules: table ? classes.map(table.line) : [] };
 }

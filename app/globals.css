@@ -173,4 +173,12 @@ body:has(.tabbar) .site-foot { padding-bottom: 104px; }
 .dr-group[open] > summary::after { transform: rotate(-135deg); }
 .dr-group[open] > summary { background: var(--color-sky-soft); }
 .dr-group > .dr-item { margin-left: 6px; }
+/* 강사 모드 메뉴: 분류 제목 + 두 칸 타일 */
+.dr-mode { margin: 2px 4px 10px; display: inline-flex; padding: 4px 12px; border-radius: 99px; font-size: 0.78rem; font-weight: 800; color: #fff; background: var(--color-sky-ink); }
+.dr-sec + .dr-sec { margin-top: 14px; }
+.dr-sec > h3 { margin: 0 6px 6px; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.02em; color: #64748b; }
+.dr-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.dr-tile { display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 8px 10px; border-radius: 14px; background: #f3f9fd; font-size: 0.92rem; font-weight: 700; line-height: 1.25; color: var(--color-sky-ink); }
+.dr-tile img { width: 28px; height: 28px; object-fit: contain; flex: none; }
+.dr-tile:hover, .dr-tile[aria-current="true"] { background: var(--color-sky-soft); box-shadow: inset 0 0 0 2px var(--color-sky-main); }
 .dr-badge { padding: 2px 8px; border-radius: 99px; font-size: 0.7rem; font-weight: 800; color: #fff; background: var(--color-sky-deep); }

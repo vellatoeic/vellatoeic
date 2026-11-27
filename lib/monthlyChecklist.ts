@@ -50,7 +50,7 @@ export async function monthlyChecklist(today = todayKST()): Promise<{ cohort: st
   const weekday = await getSetting(`special_weekday:${cohort}`);
   items.push(gate(`${shiftMonth(cohort, -1)}-20`, published > 0 && draftCount === 0, {
     key: "special", title: `${mon} 특강 요일 고르기 → 초안 확인 → 공개`,
-    detail: !weekday && monthSpecials.length === 0 ? "[수업일 설정]에서 특강 요일을 골라 주세요" : draftCount ? `초안 ${draftCount}개 공개 전` : published ? `${published}개 공개` : "수업일 [확인했어요]를 누르면 초안이 생겨요",
+    detail: !weekday && monthSpecials.length === 0 ? "[일정표]에서 특강 날짜를 골라 주세요" : draftCount ? `초안 ${draftCount}개 공개 전` : published ? `${published}개 공개` : "수업일 [확인했어요]를 누르면 초안이 생겨요",
     href: !weekday && monthSpecials.length === 0 ? `/admin/schedule?cohort=${cohort}` : "/admin/special",
   }));
   // 3. 다음 달 수업일 확인 ([수업일 설정] '확인' 버튼). 공휴일 있는 달은 빨간 강조

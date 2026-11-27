@@ -34,6 +34,7 @@ import { linkWaitingDeposit } from "@/lib/deposits";
 import { signupMonths } from "@/lib/signupMonthsServer";
 import { expireUnpaid } from "@/lib/cancellations";
 import { syncSpecialDrafts, weekdayKey } from "@/lib/specialDrafts";
+import { saveTimetableData } from "@/lib/timetableServer";
 import { altFixResult, altTrackError, findPrevAlt, planBooks } from "@/lib/altContinue";
 import { currentAltIssues } from "@/lib/altIssuesServer";
 import { adjustedBooks } from "@/lib/manualLink";
@@ -514,6 +515,29 @@ export async function saveSchoolSchedule(fd: FormData) {
   ]);
   revalidatePath("/admin/schedule");
   revalidatePath("/class");
+}
+
+// [일정표] 한 장 저장: 날짜마다 월수반·화목반 → 7개 반 수업일, 공휴일, 특강 날짜(공개 전 초안 맞추기) (lib/timetableServer.ts)
+export async function saveTimetable(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const cohort = clean(fd.get("cohort"));
+  if (!validCohort(cohort)) return;
+  const inMonth = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d) && d.startsWith(`${cohort}-`) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
+  const json = (key: string): unknown => { try { return JSON.parse(largeField(fd, key)); } catch { return null; } };
+  const rawMarks = json("marks");
+  const marks: Record<string, "mw" | "tt"> = {};
+  if (rawMarks && typeof rawMarks === "object" && !Array.isArray(rawMarks)) {
+    for (const [d, m] of Object.entries(rawMarks)) {
+      const w = new Date(`${d}T00:00:00Z`).getUTCDay();
+      if (inMonth(d) && w >= 1 && w <= 5 && (m === "mw" || m === "tt")) marks[d] = m;
+    }
+  }
+  const holidays = parseHolidays(largeField(fd, "holidays"), cohort);
+  const rawSpecials = json("specials");
+  const specials = Array.isArray(rawSpecials) ? [...new Set(rawSpecials.filter((d): d is string => typeof d === "string" && inMonth(d)))].sort().slice(0, 2) : [];
+  const result = await saveTimetableData(cohort, marks, holidays, specials);
+  revalidatePath("/", "layout");
+  redirect(`/admin/schedule?cohort=${cohort}&saved=1${result.kept ? `&kept=${result.kept}` : ""}`);
 }
 
 export async function copyPreviousSchedule(fd: FormData) {

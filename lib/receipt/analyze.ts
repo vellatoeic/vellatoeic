@@ -72,8 +72,9 @@ const monthLabel = (cohorts: readonly string[]) => cohorts.map((c) => `${Number(
  * @param text OCR 원문
  * @param cohorts 지금 신청받는 달 (lib/signupMonths) — 이 달들의 반만 찾아요
  * @param today 오늘 (한국 날짜)
+ * @param open [일정표]에 수업일이 있는 반인지 (없으면 모든 반)
  */
-export function analyzeReceipt(text: string, cohorts: readonly string[], today: string): ReceiptAnalysis {
+export function analyzeReceipt(text: string, cohorts: readonly string[], today: string, open?: (c: ReceiptClass) => boolean): ReceiptAnalysis {
   const p = parseReceipt(text);
   const base = { kind: toApplyKind(p), receiptName: receiptStudentName(p.text), capturedAt: p.capturedAt, reading: readingOf(p) };
 
@@ -84,7 +85,7 @@ export function analyzeReceipt(text: string, cohorts: readonly string[], today: 
     return { ...base, status: "reject", message, classes: [], reasons: [message] };
   }
 
-  const { result } = matchSections(p, sectionsFor(cohorts));
+  const { result } = matchSections(p, sectionsFor(cohorts, open));
   const classes = result.kind === "match" ? result.sectionIds.map(classOfSection).filter((c): c is ReceiptClass => !!c) : [];
   const blockers: AutoApproveBlocker[] = autoApproveBlockers({
     parsed: p,

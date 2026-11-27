@@ -25,3 +25,15 @@ test("예전 직접 입력 주소는 나눌 수 없어서 기본주소에 전부
   assert.deepEqual([a.zip, a.base, a.detail], ["", "부산 사하구 낙동대로 1 301호", ""]);
   assert.deepEqual(splitAddress(null), { zip: "", base: "", detail: "", full: "" });
 });
+
+test("학원 전달용 지역: 시·도 + 시·군·구까지만", async () => {
+  const { regionOf, regionLines } = await import("@/lib/address");
+  assert.equal(regionOf("[49300] 부산 사하구 낙동대로 1 (하단동), 301호"), "부산 사하구");
+  assert.equal(regionOf("부산광역시 해운대구 센텀중앙로 97"), "부산 해운대구");
+  assert.equal(regionOf("[51500] 경남 창원시 성산구 중앙대로 1, 2층"), "경남 창원시 성산구");
+  assert.equal(regionOf("경상남도 김해시 김해대로 1"), "경남 김해시");
+  assert.equal(regionOf("경기 성남시 분당구 판교역로 1"), "경기 성남시 분당구");
+  assert.equal(regionOf("세종특별자치시 한누리대로 1"), "세종");
+  assert.equal(regionOf(null), "");
+  assert.equal(regionLines([{ name: "김태우", address: "부산 사하구 낙동대로 1" }, { name: "김지민", address: "경남 창원시 의창구 1" }]), "1. 김태우: 부산 사하구\n2. 김지민: 경남 창원시 의창구");
+});

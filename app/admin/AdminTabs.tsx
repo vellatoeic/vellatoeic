@@ -32,7 +32,7 @@ export default async function AdminTabs({ active }: { active: "apps" | "roster" 
           <Link href="/admin/tests" className={tab(active === "tests")}>오늘의 테스트</Link>
           <Link href="/admin/stamps" className={tab(active === "stamps")}>출석·숙제</Link>
           <Link href="/admin/scores" className={tab(active === "scores")}>모의고사{dot(examReview)}</Link>
-          <Link href="/admin/schedule" className={tab(active === "schedule")}>수업일 설정</Link>
+          <Link href="/admin/schedule" className={tab(active === "schedule")}>일정표</Link>
           <Link href="/admin/lectures" className={tab(active === "lectures")}>강의 관리</Link>
           <Link href="/admin/audio" className={tab(active === "audio")}>LC 음원</Link>
           <Link href="/admin/notices" className={tab(active === "notices")}>공지</Link>

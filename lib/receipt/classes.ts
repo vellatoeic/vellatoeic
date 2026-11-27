@@ -39,13 +39,15 @@ export function classOfSection(id: string): ReceiptClass | null {
 }
 
 // 신청을 받는 달들의 모든 반 (요일 미지정 'alt'는 새로 고를 수 없어서 빼요)
-export function sectionsFor(cohorts: readonly string[]): Section[] {
+// open: [일정표]에 그 반 수업일이 있는지 (없는 반은 수강증이 그 반으로 맞춰지지 않아요)
+export function sectionsFor(cohorts: readonly string[], open: (c: ReceiptClass) => boolean = () => true): Section[] {
   const out: Section[] = [];
   for (const cohort of cohorts) {
     for (const course of Object.keys(COURSES) as CourseId[]) {
       for (const track of COURSES[course].tracks) {
         if (track === "alt") continue;
         for (const slot of SLOTS) {
+          if (!open({ cohort, course, track, slot })) continue;
           out.push({
             id: sectionId({ cohort, course, track, slot }),
             term: cohort,

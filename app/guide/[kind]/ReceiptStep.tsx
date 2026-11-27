@@ -87,8 +87,9 @@ export default function ReceiptStep({ kind, result, onResult, menu }: { kind: Ki
           {result.status === "match" && !wrongPage ? (
             <>
               <p className="font-jua text-lg text-emerald-800">수강증을 확인했어요</p>
-              {result.classes.map((c) => (
-                <p key={c.cohort} className="font-bold text-slate-800">{classTextWithLevel(c)}{result.kind ? ` · ${KINDS[result.kind].short}` : ""}</p>
+              {result.classes.map((c, i) => (
+                <p key={c.cohort} className="font-bold text-slate-800">{classTextWithLevel(c)}{result.kind ? ` · ${KINDS[result.kind].short}` : ""}
+                  {result.schedules?.[i] && <span className="block text-sm font-semibold text-sky-ink">{result.schedules[i]}</span>}</p>
               ))}
               <p className="text-xs text-slate-600">아래 반·과정·시간이 수강증대로 채워졌어요.</p>
             </>

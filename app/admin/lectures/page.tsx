@@ -76,7 +76,7 @@ export default async function Lectures({ searchParams }: { searchParams: Promise
         {day !== today && <a href="/admin/lectures" className="font-bold text-sky-deep underline">오늘로</a>}
         {nextDay && <a href={`/admin/lectures?d=${nextDay}`} className="btn-ghost !px-3 !py-1.5 ml-auto inline-flex items-center gap-1">{dateLabel(nextDay)}<Icon name="chevronRight" size={14} /></a>}
       </nav>
-      {!isClassDay && <p className="rounded-2xl bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-700">{dateLabel(day)}은 [수업일 설정]에 없는 날이에요. 보강·특별 수업이면 그대로 올려도 돼요.</p>}
+      {!isClassDay && <p className="rounded-2xl bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-700">{dateLabel(day)}은 [일정표]에 없는 날이에요. 보강·특별 수업이면 그대로 올려도 돼요.</p>}
       <LectureBoard cohort={dayCohort} date={day} dateText={`${cohortLabel(dayCohort)} ${sessionText ? `${sessionText}회 · ` : ""}${dateLabel(day)}`} rows={rows} />
 
       <details className="card !p-4">
