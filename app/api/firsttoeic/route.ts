@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createHash, timingSafeEqual } from "crypto";
 import { allow, count } from "@/lib/rateLimit";
-import { matchResult, parsePayload } from "@/lib/mockScores";
-import { appsByStudentNos, getExamResults, upsertExamResults, type ExamResultRow } from "@/lib/db";
+import { carryManualLinks, matchResult, parsePayload, staleResultIds } from "@/lib/mockScores";
+import { appsByStudentNos, deleteExamResults, examRowsOf, getExamResults, upsertExamResults, type ExamResultRow } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +11,8 @@ export const dynamic = "force-dynamic";
 // - 한 요청 = 회차 하나, results 300개까지. 한 행이라도 형식이 틀리면 전체 거부(400, 하나도 저장 안 함).
 // - dry_run이면 검사·연결 판정만 하고 저장하지 않아요(응답 모양은 같음).
 // - 같은 result_id가 다시 오면 덮어쓰기. 관리자가 손으로 연결한(manual) 결과는 연결을 바꾸지 않아요.
+// - 한 번의 전송 = 그 회차의 지금 전체 명단(결과화면 가이드 1.1): 실제 전송이면 같은 회차의 예전 결과 중 이번에 없는 result_id는 지워요.
+//   다시 스캔돼 지워지는 '선생님 연결' 결과는 이름이 딱 한 명씩 같으면 새 결과로 연결을 이어받아요. 결과가 0개인 요청은 지우지 않아요.
 // - 이름·생년월일이 들어 있어서 본문은 기록(console)하지 않아요.
 
 const WINDOW = 10 * 60 * 1000;
@@ -49,6 +51,9 @@ export async function POST(req: NextRequest) {
     const namesByNo = new Map<string, string[]>();
     for (const a of apps) if (a.student_no) namesByNo.set(a.student_no, [...(namesByNo.get(a.student_no) ?? []), a.name]);
     const existing = new Map((await getExamResults(results.map((r) => r.result_id))).map((r) => [r.result_id, r]));
+    const examRows = await examRowsOf(exam.id);
+    const stale = staleResultIds(examRows.map((r) => r.result_id), results.map((r) => r.result_id));
+    const staleRows = examRows.filter((r) => stale.includes(r.result_id));
 
     const rows: ExamResultRow[] = [];
     const out = results.map((r) => {
@@ -82,8 +87,21 @@ export async function POST(req: NextRequest) {
         ? { result_id: r.result_id, status: "review", note: m.note }
         : { result_id: r.result_id, status: m.status, student_id: m.linked_no };
     });
-    if (!dry_run) await upsertExamResults(rows);
-    return reply(200, { ok: true, dry_run, results: out });
+    // 다시 스캔된 학생: 지워질 '선생님 연결'을 새 결과로 이어받아요 (판정 결과·응답에도 반영)
+    const carry = carryManualLinks(staleRows, rows.map((r) => ({ result_id: r.result_id, name: r.name, status: r.match_status })));
+    for (const row of rows) {
+      const no = carry.get(row.result_id);
+      if (!no) continue;
+      row.linked_no = no;
+      row.match_status = "manual";
+      row.match_note = "다시 스캔 · 선생님 연결 이어받음";
+    }
+    const answer = out.map((o) => (carry.has(o.result_id) ? { result_id: o.result_id, status: "manual", student_id: carry.get(o.result_id) } : o));
+    if (!dry_run) {
+      await upsertExamResults(rows); // 먼저 저장하고
+      if (stale.length > 0) await deleteExamResults(stale); // 그다음 이번 명단에 없는 예전 결과를 지워요
+    }
+    return reply(200, { ok: true, dry_run, results: answer });
   } catch (e) {
     console.error("firsttoeic receive failed", e instanceof Error ? e.name : "error", results.length); // 건수만
     return reply(500, { ok: false, error: "server_error" });

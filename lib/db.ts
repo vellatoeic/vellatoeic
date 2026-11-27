@@ -1861,18 +1861,18 @@ export async function examResultsByNos(nos: string[]): Promise<ExamResultRow[]> 
   const ok = [...new Set(nos.filter((n) => /^[0-9]{6}$/.test(n)))];
   if (ok.length === 0) return [];
   if (sb) {
-    const { data, error } = await sb.from("firsttoeic_exam_results").select("*").in("linked_no", ok).order("exam_date", { ascending: false });
+    const { data, error } = await sb.from("firsttoeic_exam_results").select("*").in("linked_no", ok).order("exam_date", { ascending: false }).order("session", { ascending: false, nullsFirst: false });
     if (error) throw error;
     return data as ExamResultRow[];
   }
-  return (mem.examResults ?? []).filter((r) => r.linked_no && ok.includes(r.linked_no)).sort((a, b) => b.exam_date.localeCompare(a.exam_date));
+  return (mem.examResults ?? []).filter((r) => r.linked_no && ok.includes(r.linked_no)).sort((a, b) => b.exam_date.localeCompare(a.exam_date) || (b.session ?? -1) - (a.session ?? -1));
 }
 
 // 관리 화면: 받은 성적 전부 (최근 시험이 위, 1,000줄씩 끝까지)
 export async function listExamResults(): Promise<ExamResultRow[]> {
   if (sb) {
     const db = sb;
-    return allRows<ExamResultRow>((from, to) => db.from("firsttoeic_exam_results").select("*").order("exam_date", { ascending: false }).order("name").order("result_id").range(from, to));
+    return allRows<ExamResultRow>((from, to) => db.from("firsttoeic_exam_results").select("*").order("exam_date", { ascending: false }).order("session", { ascending: false, nullsFirst: false }).order("name").order("result_id").range(from, to));
   }
   return [...(mem.examResults ?? [])].sort((a, b) => b.exam_date.localeCompare(a.exam_date) || a.name.localeCompare(b.name));
 }
@@ -1958,4 +1958,15 @@ export async function saveStudentProfile(no: string, patch: Partial<Omit<Student
   const old = list.find((p) => p.student_no === no);
   if (old) Object.assign(old, row);
   else list.push({ phone: null, target_score: null, reasons: [], reason_note: null, ...row });
+}
+
+// 1.1: 이 회차에 지금 저장된 결과 (지울 것·이어받을 연결 찾기용, 이름·연결만)
+export async function examRowsOf(examId: string): Promise<Pick<ExamResultRow, "result_id" | "name" | "match_status" | "linked_no">[]> {
+  if (!isUuid(examId)) return [];
+  if (sb) {
+    const { data, error } = await sb.from("firsttoeic_exam_results").select("result_id,name,match_status,linked_no").eq("exam_id", examId);
+    if (error) throw error;
+    return data as Pick<ExamResultRow, "result_id" | "name" | "match_status" | "linked_no">[];
+  }
+  return (mem.examResults ?? []).filter((r) => r.exam_id === examId);
 }

@@ -1,7 +1,7 @@
 // 첫토익 모의고사 성적 연동 (설계서 v1): 형식 검사 · 학생 연결 · 개인번호
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isStudentNo, matchResult, numberForGroup, parsePayload, randomStudentNo, sameName } from "@/lib/mockScores";
+import { carryManualLinks, isStudentNo, matchResult, numberForGroup, parsePayload, randomStudentNo, sameName, staleResultIds } from "@/lib/mockScores";
 
 const result = (over: Record<string, unknown> = {}) => ({
   result_id: "f3a1c9d2-0000-4000-8000-000000000002",
@@ -83,4 +83,30 @@ test("개인번호: 6자리, 첫 자리 0 아님, 같은 학생은 가장 먼저
   assert.equal(isStudentNo("012345"), false);
   assert.equal(numberForGroup([{ student_no: null, created_at: "2026-12-01" }]), null);
   assert.equal(numberForGroup([{ student_no: "222222", created_at: "2026-12-01" }, { student_no: "111111", created_at: "2026-11-01" }, { student_no: null, created_at: "2027-01-01" }]), "111111");
+});
+
+test("1.1 한 번의 전송 = 그 회차 전체 명단: 이번에 없는 result_id만 지우고, 빈 요청은 안 지움", () => {
+  assert.deepEqual(staleResultIds(["a", "b", "c"], ["a", "C"]), ["b"]);
+  assert.deepEqual(staleResultIds(["a", "b"], []), []);
+  assert.deepEqual(staleResultIds([], ["a"]), []);
+});
+
+test("1.1 다시 스캔: 지워지는 선생님 연결은 같은 이름 새 결과로 이어받기 (한 명씩일 때만)", () => {
+  const removed = [
+    { result_id: "old1", name: "홍길동", match_status: "manual" as const, linked_no: "111111" },
+    { result_id: "old2", name: "김민지", match_status: "manual" as const, linked_no: "222222" },
+    { result_id: "old3", name: "김민지", match_status: "manual" as const, linked_no: "333333" },
+    { result_id: "old4", name: "이서윤", match_status: "review" as const, linked_no: null },
+  ];
+  const incoming = [
+    { result_id: "new1", name: "홍 길동", status: "review" as const },
+    { result_id: "new2", name: "김민지", status: "review" as const },
+    { result_id: "new4", name: "이서윤", status: "review" as const },
+  ];
+  const carry = carryManualLinks(removed, incoming);
+  assert.equal(carry.get("new1"), "111111"); // 이어받음
+  assert.equal(carry.has("new2"), false); // 동명이인(지워지는 쪽 두 명) → 선생님이 다시
+  assert.equal(carry.has("new4"), false); // 원래 선생님 연결이 아니었음
+  // 새 결과가 번호로 자동 연결(matched)됐으면 이어받을 필요 없음
+  assert.equal(carryManualLinks(removed, [{ result_id: "n", name: "홍길동", status: "matched" }]).size, 0);
 });

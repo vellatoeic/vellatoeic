@@ -142,3 +142,28 @@ export function numberForGroup(apps: { student_no?: string | null; created_at: s
   const withNo = apps.filter((a) => isStudentNo(a.student_no)).sort((a, b) => a.created_at.localeCompare(b.created_at));
   return withNo[0]?.student_no ?? null;
 }
+
+// ── 1.1 한 번의 전송 = 그 회차의 지금 전체 명단 (결과화면 가이드 2026-11-27) ──
+// 실제 전송이면 같은 회차(exam.id)의 예전 결과 중 이번 요청에 없는 result_id는 지워요(다시 스캔·강사 삭제).
+// 결과가 하나도 없는 요청은 지우지 않아요(실수로 빈 명단이 와도 성적이 사라지지 않게).
+export function staleResultIds(existingIds: string[], incomingIds: string[]): string[] {
+  if (incomingIds.length === 0) return [];
+  const keep = new Set(incomingIds.map((x) => x.toLowerCase()));
+  return existingIds.filter((id) => !keep.has(id.toLowerCase()));
+}
+
+// 다시 스캔되어 지워지는 '선생님 연결(manual)' 결과의 연결을, 같은 회차에 새로 온 '확인 필요' 결과로 이어받아요.
+// 이름이 같고(공백 무시) 지워지는 쪽·새로 온 쪽 모두 그 이름이 딱 한 명일 때만 (동명이인이면 선생님이 다시 연결)
+export function carryManualLinks(
+  removed: { result_id: string; name: string; match_status: MatchStatus; linked_no: string | null }[],
+  incoming: { result_id: string; name: string; status: MatchStatus }[],
+): Map<string, string> {
+  const out = new Map<string, string>();
+  const manual = removed.filter((r) => r.match_status === "manual" && r.linked_no);
+  for (const m of manual) {
+    if (manual.filter((x) => sameName(x.name, m.name)).length !== 1) continue;
+    const fresh = incoming.filter((i) => sameName(i.name, m.name));
+    if (fresh.length === 1 && fresh[0].status === "review") out.set(fresh[0].result_id, m.linked_no!);
+  }
+  return out;
+}
