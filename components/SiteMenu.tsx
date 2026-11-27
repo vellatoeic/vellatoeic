@@ -35,7 +35,7 @@ const YBM_URL = "https://www.ybmedu.com/seomyon/vellatoeic";
 // 강사 모드(관리 화면) 전용 메뉴 (2026-11-27 Vella: '강사모드 전용 + 카테고리화'): 하는 일 순서로 묶어 한눈에 보이게 펼쳐 둬요.
 const TEACHER: { title: string; items: [string, string, string][] }[] = [
   { title: "매일 수업", items: [["/admin/stamps", "homework", "출석·숙제"], ["/admin/lectures", "live", "강의 관리"], ["/admin/tests", "stopwatch", "오늘의 테스트"], ["/admin/qr", "qr", "QR 출석"]] },
-  { title: "신청 · 교재", items: [["/admin", "clipboard", "신청 관리"], ["/admin/roster", "school", "현장 명단"], ["/admin/delivery", "parcel", "불라방"], ["/admin/students", "people", "학생 찾기"]] },
+  { title: "신청 · 교재", items: [["/admin", "clipboard", "신청 관리"], ["/admin/roster", "school", "현장 명단"], ["/admin/delivery", "parcel", "불라방"], ["/admin/students", "people", "학생 명단"]] },
   { title: "한 달 준비", items: [["/admin/schedule", "calendar", "일정표"], ["/admin/special", "mic", "특강 관리"], ["/admin/audio", "headphones", "LC 음원"]] },
   { title: "성적 · 소통", items: [["/admin/scores", "trophy", "모의고사"], ["/admin/notices", "megaphone", "공지"], ["/admin/faq", "book", "FAQ"]] },
   { title: "화면 보기", items: [["/admin/view-as", "reading", "학생 화면으로 보기"], ["/?home=1", "laptop", "홈페이지"]] },

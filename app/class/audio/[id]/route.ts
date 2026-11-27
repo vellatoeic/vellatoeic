@@ -5,6 +5,8 @@ import { canDownloadAudio } from "@/lib/access";
 import { audioDownloadUrl, getAudio } from "@/lib/db";
 import { studentAudioWindow } from "@/lib/audio";
 import { todayKST } from "@/lib/config";
+import { cohortOpenAt } from "@/lib/viewWindowServer";
+import { isOpened } from "@/lib/viewWindow";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +21,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const { apps } = await activeStudentApps();
     const candidates = apps.filter((a) => a.cohort === audio.cohort);
     const periods = new Map(await Promise.all(candidates.map(async (a) => [a.id, await studentAudioWindow(a)] as const)));
-    allowed = canDownloadAudio(candidates, audio, (a) => periods.get(a.id) ?? null, todayKST());
+    // 개강일은 오전 9시부터 (예비수강생은 그 전에 받을 수 없어요)
+    allowed = isOpened(await cohortOpenAt(audio.cohort).catch(() => null)) && canDownloadAudio(candidates, audio, (a) => periods.get(a.id) ?? null, todayKST());
   }
   if (!allowed) return new NextResponse("다운로드 기간이 아니거나 받을 수 없는 음원이에요.", { status: 403 });
 

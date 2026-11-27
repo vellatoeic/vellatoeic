@@ -40,8 +40,8 @@ import { expireUnpaid } from "@/lib/cancellations";
 import { getApplications } from "@/lib/db";
 import { getStudentIds } from "@/lib/auth";
 import CancelledNotice from "@/components/CancelledNotice";
-import { viewInfo } from "@/lib/viewWindowServer";
-import { dayLabelKo, viewPhase, viewableCohorts } from "@/lib/viewWindow";
+import { cohortOpenAt, viewInfo } from "@/lib/viewWindowServer";
+import { canViewNow, dayLabelKo, isOpened, openLabel, viewOpen, viewPhase, viewableCohorts } from "@/lib/viewWindow";
 import { signupMonths } from "@/lib/signupMonthsServer";
 import { safe } from "@/lib/safe";
 import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
@@ -91,18 +91,21 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
   const showGift = !!myDraw || (!!giftDone && giftWindowOpen(giftDone.status.last, today));
   const stamps = await safe("listStamps", () => listStamps(paid.map((a) => a.id)), { attendance: [], homework: [] });
   const missions = await safe("listMissions", () => listMissions(apps.map((a) => a.id)), []);
-  // LC 음원: 본인 반 첫 수업일(또는 납부일)부터 종강일까지 보여요. (종강 직전 납부는 최소 7일)
+  // 권한 오픈: 기수마다 개강일 오전 9시 (그 전에는 예비수강생 · 강의 목록·라이브 링크·음원이 안 열려요). 계산에 실패하면 막지 않아요.
+  const opensAt = new Map(await safe("cohortOpenAt", () => Promise.all([...new Set(paid.map((a) => a.cohort))].map(async (c) => [c, await cohortOpenAt(c)] as const)), []));
+  const opened = (c: string) => isOpened(opensAt.get(c));
+  // LC 음원: 본인 반 첫 수업일(또는 납부일)부터 종강일까지 보여요. (종강 직전 납부는 최소 7일, 개강일은 오전 9시부터)
   const audioBoxes = new Map(await safe("audioBoxes", () => Promise.all(paid.filter((a) => audioBooksFor(a).length > 0).map(async (a) => {
     const period = await studentAudioWindow(a);
     const books = audioBooksFor(a);
-    const list = period && today >= period.start && today <= period.end
+    const list = period && today >= period.start && today <= period.end && opened(a.cohort)
       ? (await listAudios(a.cohort)).filter((x) => books.includes(x.book))
       : [];
     return [a.id, { period, list }] as const;
   })), []));
   // 지금 다운로드 기간인 음원 (배너·팝업은 첫 번째 것 기준)
   const audioNow = paid.map((a) => ({ a, box: audioBoxes.get(a.id) }))
-    .find((x) => x.box?.period && today >= x.box.period.start && today <= x.box.period.end && x.box.list.length > 0);
+    .find((x) => x.box?.period && today >= x.box.period.start && today <= x.box.period.end && opened(x.a.cohort) && x.box.list.length > 0);
   const latestMission = missionCount(missionFor([...apps].sort((a, b) => b.cohort.localeCompare(a.cohort))[0].id, missions));
   const boardKeys = [...new Map(paid.map((a) => {
     const klass = scheduleClassFor(a.course, a.track);
@@ -128,8 +131,12 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
   // 맨 위 탭 [☀️ 오전반 | 🌙 저녁반]: 본인 시간대가 먼저 선택되고, 교차 수강을 위해 다른 시간대로 바꿔 볼 수 있어요.
   // 열람 기간: 공식 '종강일까지', 실제 '다음 달 개강 전날까지' (lib/viewWindow.ts). 지난 신청은 기록(스티커판 등)만 보여요.
   // 계산에 실패하면 막지 않고 모두 열어 둬요 (지난 강의·라이브가 반드시 보이게)
-  const view = await safe("viewInfo", () => viewInfo(paid), new Map(paid.map((a) => [a.id, { end: "9999-12-31", until: "9999-12-31" }])));
-  const viewable = (a: (typeof paid)[number]) => today <= (view.get(a.id)?.until ?? "");
+  const view = await safe("viewInfo", () => viewInfo(paid), new Map(paid.map((a) => [a.id, { end: "9999-12-31", until: "9999-12-31", openAt: null as string | null }])));
+  // inWindow = 열람 마감 전(개강 전 예비수강생 포함: 라이브 '다음 수업' 안내·스티커판), viewable = 개강일 9시가 지나 강의를 볼 수 있음
+  const inWindow = (a: (typeof paid)[number]) => viewOpen(view.get(a.id)?.until ?? "", today);
+  const viewable = (a: (typeof paid)[number]) => canViewNow(view.get(a.id), today);
+  // 개강 전(9시 전) 납부 완료 신청: 맨 위에 '○월 강의실은 ○/○(○) 오전 9시에 열려요'
+  const notOpened = paid.filter((a) => inWindow(a) && !viewable(a) && view.get(a.id)?.openAt).sort((x, y) => x.cohort.localeCompare(y.cohort));
   // 강의는 열람 가능한 신청의 기수만 읽어요 (연장 기간 포함, 끝난 기수는 읽지 않아요)
   const lectureCohorts = viewableCohorts(paid, view, today);
   const lectures = lectureCohorts.length ? await listLectures(lectureCohorts) : [];
@@ -138,9 +145,9 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
   const hasNextOf = (a: (typeof paid)[number]) => apps.some((x) => x.cohort === shiftMonth(a.cohort, 1));
   const signupMonth = (await safe("signupMonths", () => signupMonths(), []))[0] ?? null;
   // 열람 가능한 신청이 없고 이번 달·다음 달 신청도 없으면 맨 위에 '열람 기간이 끝났어요'
-  const allClosed = paid.length > 0 && !paid.some(viewable) && !apps.some((x) => x.cohort === today.slice(0, 7) || x.cohort === nextMonth);
+  const allClosed = paid.length > 0 && !paid.some(inWindow) && !apps.some((x) => x.cohort === today.slice(0, 7) || x.cohort === nextMonth);
   const lastClosed = [...paid].sort((x, y) => y.cohort.localeCompare(x.cohort))[0];
-  const liveApp = paid.find((a) => a.cohort === cohort && viewable(a));
+  const liveApp = paid.find((a) => a.cohort === cohort && inWindow(a));
   const { t, expired } = await searchParams;
   // 시작반 격일반 이어듣기: 개강 3일 전 ~ 첫 수업일까지 '지난달 교재 챙겨 오기' 카드 (첫 수업일이 지나면 숨김)
   const bringBooks = await safe("bringBooks", async () => {
@@ -237,6 +244,14 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
           )}
         </div>
       )}
+
+      {/* '○월 수업 준비 중' 카드(PreCourseCard)가 같은 달을 보여주면 겹치지 않게 숨겨요 (수업 중인 학생의 다음 달 · 개강일 0~9시에 보여요) */}
+      {[...new Map(notOpened.filter((a) => pre?.app.cohort !== a.cohort).map((a) => [a.cohort, a])).values()].map((a) => (
+        <div key={`open-${a.cohort}`} className="rounded-3xl border-2 border-sky-main bg-white p-5 text-center">
+          <p className="flex items-center justify-center gap-2 font-jua text-2xl text-sky-ink"><Icon name="calendar" size={30} />{Number(a.cohort.slice(5, 7))}월 강의실은 {openLabel(view.get(a.id)!.openAt!)}에 열려요</p>
+          <p className="mt-1 text-sm text-slate-600">개강일 오전 9시부터 라이브 입장·지난 강의·LC 음원이 자동으로 열려요.</p>
+        </div>
+      ))}
 
       {pending.map((a) => (
         <div key={a.id} className="rounded-3xl border-2 border-amber-300 bg-amber-50 p-5 text-center">
@@ -418,9 +433,11 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
               if (!box?.period || today > box.period.end) return null;
               const [, m, d] = box.period.end.split("-").map(Number);
               const left = dayDiff(today, box.period.end);
-              if (today < box.period.start) {
+              if (today < box.period.start || !opened(a.cohort)) {
                 const [, sm, sd] = box.period.start.split("-").map(Number);
-                return <p className="mt-4 rounded-2xl bg-sky-soft p-4 text-sm text-slate-600"><Icon name="headphones" size={20} className="mr-1" />LC 음원은 {sm}/{sd}부터 종강일({m}/{d})까지 받을 수 있어요.</p>;
+                const openAt = opensAt.get(a.cohort);
+                const from = today < box.period.start || !openAt ? `${sm}/${sd}` : openLabel(openAt);
+                return <p className="mt-4 rounded-2xl bg-sky-soft p-4 text-sm text-slate-600"><Icon name="headphones" size={20} className="mr-1" />LC 음원은 {from}부터 종강일({m}/{d})까지 받을 수 있어요.</p>;
               }
               return (
                 // 다운로드 기간에는 항상 펼쳐 둬요. 누른 파일은 '받음 ✓' (이 기기에 기록)

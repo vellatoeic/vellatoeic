@@ -6,7 +6,7 @@ import { expireUnpaid, purgeTimedOut } from "@/lib/cancellations";
 import { safe } from "@/lib/safe";
 import { countExamReview, purgeReceipts } from "@/lib/db";
 
-export default async function AdminTabs({ active }: { active: "apps" | "roster" | "stamps" | "lectures" | "schedule" | "special" | "delivery" | "audio" | "faq" | "tests" | "notices" | "scores" }) {
+export default async function AdminTabs({ active }: { active: "apps" | "roster" | "students" | "stamps" | "lectures" | "schedule" | "special" | "delivery" | "audio" | "faq" | "tests" | "notices" | "scores" }) {
   // 관리 화면을 열 때마다: 30분 지난 입금 대기 자동 취소 + 자동 취소 7일 지난 것 삭제
   await safe("expireUnpaid", () => expireUnpaid(Date.now()), null);
   await safe("purgeTimedOut", () => purgeTimedOut(), undefined);
@@ -29,6 +29,7 @@ export default async function AdminTabs({ active }: { active: "apps" | "roster" 
           <Link href="/admin" className={tab(active === "apps")}>신청 관리{dot(appsTodo)}</Link>
           <Link href="/admin/roster" className={tab(active === "roster")}>현장 명단</Link>
           <Link href="/admin/delivery" className={tab(active === "delivery")}>불라방{dot(delivery + desk)}</Link>
+          <Link href="/admin/students" className={tab(active === "students")}>학생 명단</Link>
           <Link href="/admin/tests" className={tab(active === "tests")}>오늘의 테스트</Link>
           <Link href="/admin/stamps" className={tab(active === "stamps")}>출석·숙제</Link>
           <Link href="/admin/scores" className={tab(active === "scores")}>모의고사{dot(examReview)}</Link>

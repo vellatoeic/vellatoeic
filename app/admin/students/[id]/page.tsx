@@ -25,6 +25,12 @@ import AdminTabs from "../../AdminTabs";
 import LoginForm from "../../LoginForm";
 import { studentDays } from "@/lib/studentDays";
 import { audioBooksFor, studentAudioWindow } from "@/lib/audio";
+import { visibleToAdmin } from "@/lib/cancellations";
+import { GRADE_LABEL, gradeOf, groupStudents, seenLabel } from "@/lib/grades";
+import { cohortWindows } from "@/lib/viewWindowServer";
+import { STATUS_SHORT, monthLabel, photoOf } from "@/lib/rosterServer";
+import { examResultsByNos } from "@/lib/db";
+import { safe } from "@/lib/safe";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "학생 정보 · vella_toeic", robots: { index: false } };
@@ -39,8 +45,6 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
   const { mv = "" } = await searchParams;
   const a = await getApplication(id);
   if (!a) notFound();
-  // 학생 '내 정보' (휴대폰 · 목표 점수 · 공부 이유, SQL 44): 동명이인 구분용
-  const profile = a.student_no ? (await getStudentProfiles([a.student_no]).catch(() => []))[0] ?? null : null;
   const today = todayKST();
   const [days, holidays, { attendance, homework }, tests, [mission], regs, events, apps] = await Promise.all([
     classDaysOf(a), holidaysOf(a.cohort), listStamps([a.id]), listTestResults({ cohort: a.cohort, appIds: [a.id] }),
@@ -61,16 +65,31 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
   };
   const eventById = new Map(events.map((e) => [e.id, e]));
   const audioWin = audioBooksFor(a).length > 0 ? await studentAudioWindow(a) : null;
-  // 이 학생 번호에 연결된 구글·카카오 로그인
-  const links = a.account_id ? await listLoginLinks([a.account_id]) : [];
-  // 같은 이름의 다른 달 신청 (수강 이력) — 최신 달이 위
-  const history = apps.filter((x) => x.name === a.name).sort((x, y) => y.cohort.localeCompare(x.cohort) || y.created_at.localeCompare(x.created_at));
+  // 같은 학생(개인번호 → 카카오·구글 번호로 묶음, 학생 명단과 같은 규칙)의 모든 달 신청
+  const group = groupStudents(apps.filter(visibleToAdmin)).find((g) => g.some((x) => x.id === a.id)) ?? [a];
+  const no = a.student_no ?? group.find((x) => x.student_no)?.student_no ?? null;
+  const accounts = [...new Set(group.map((x) => x.account_id).filter((x): x is string => !!x))];
+  // 학생 '내 정보'(휴대폰 · 목표 점수 · 공부 이유 · 마지막 로그인 · 최근 접속) · 연결된 구글·카카오 로그인 · 등급 · 모의고사
+  const [profile, links, windows, exams] = await Promise.all([
+    no ? getStudentProfiles([no]).then((x) => x[0] ?? null).catch(() => null) : Promise.resolve(null),
+    accounts.length ? listLoginLinks(accounts) : Promise.resolve([]),
+    safe("student.windows", () => cohortWindows(group.map((x) => x.cohort)), new Map()),
+    no ? safe("student.exams", () => examResultsByNos([no]), []) : Promise.resolve([]),
+  ]);
+  const grade = gradeOf(group, windows, today, Date.now());
+  const photo = photoOf(links);
+  const VIA: Record<string, string> = { pin: "이름+비밀번호", kakao: "카카오", google: "구글" };
+  const at = (iso: string) => new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  // 수강 이력: 같은 학생의 모든 달 + 이름만 같은 다른 신청(동명이인일 수 있어요) — 최신 달이 위
+  const groupIds = new Set(group.map((x) => x.id));
+  const bare = (n: string) => n.replace(/\s/g, "");
+  const history = apps.filter((x) => groupIds.has(x.id) || bare(x.name) === bare(a.name)).sort((x, y) => y.cohort.localeCompare(x.cohort) || y.created_at.localeCompare(x.created_at));
   const phone = a.phone?.replace(/(\d{3})(\d{3,4})(\d{4})/, "$1-$2-$3");
   const chip = "rounded-full px-2.5 py-0.5 text-xs font-bold";
 
   return (
     <div className="space-y-5 pt-8">
-      <AdminTabs active="apps" />
+      <AdminTabs active="students" />
       {mv && (() => {
         const [target, n, changed, errors] = mv.split("|");
         return (
@@ -84,9 +103,29 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
 
       <section className="card space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+          {photo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={photo} alt="" referrerPolicy="no-referrer" className="h-16 w-16 shrink-0 rounded-full object-cover ring-2 ring-sky-main" />
+          ) : (
+            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-sky-soft font-jua text-2xl text-sky-deep">{a.name.slice(0, 1)}</span>
+          )}
           <div>
             <p className="text-sm text-slate-500">{cohortLabel(a.cohort)} · {classSlotLabel(a)} · {KINDS[a.kind].short}</p>
-            <h2 className="font-jua text-3xl text-sky-ink">{a.name}{a.student_no && <span className="ml-2 align-middle font-body text-base font-bold tracking-widest text-sky-deep" title="모의고사 개인번호">#{a.student_no}</span>}</h2>
+            <h2 className="font-jua text-3xl text-sky-ink">{a.name}{no && <span className="ml-2 align-middle font-body text-base font-bold tracking-widest text-sky-deep" title="모의고사 개인번호">#{no}</span>}</h2>
+            {/* 등급(날짜로 자동) · 로그인 방법 · 최근 접속 */}
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              {grade.grades.includes("student") && <span className={`${chip} bg-emerald-100 text-emerald-700`}>{GRADE_LABEL.student} · {grade.current.map((c) => `${Number(c.slice(5, 7))}월`).join("·")}</span>}
+              {grade.pre.map((p) => <span key={p.cohort} className={`${chip} ${p.pending ? "bg-amber-100 text-amber-700" : "bg-sky-main/60 text-sky-ink"}`}>{Number(p.cohort.slice(5, 7))}월 {GRADE_LABEL.pre}{p.pending ? " · 입금 대기" : ""}</span>)}
+              {grade.grades.includes("general") && <span className={`${chip} bg-slate-100 text-slate-500`}>{GRADE_LABEL.general}</span>}
+              {links.length === 0 ? <span className={`${chip} bg-slate-100 text-slate-500`}>이름+비밀번호</span> : [...new Set(links.map((l) => l.provider))].map((p) => (
+                <span key={p} className={`${chip} ${p === "kakao" ? "bg-[#fee500] text-[#3c1e1e]" : "bg-white text-slate-700 ring-1 ring-slate-300"}`}>{PROVIDER_LABEL[p]}</span>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              최근 접속 <b className="text-sky-ink">{seenLabel(profile?.last_seen_at, today)}</b>
+              {profile?.last_login_at && <> · 마지막 로그인 {VIA[profile.last_login_via ?? ""] ?? ""} {at(profile.last_login_at)}</>}
+            </p>
             {profile && (
               <p className="mt-1 text-sm text-slate-600">
                 {profile.phone && <>휴대폰 <b>{profilePhone(profile.phone)}</b> · </>}
@@ -94,6 +133,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
                 {profile.reasons.length > 0 && <>이유 {profile.reasons.map(reasonLabel).join(", ")}{profile.reason_note ? ` (${profile.reason_note})` : ""}</>}
               </p>
             )}
+          </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {/* 이 학생이 보는 화면(대시보드·강의실)을 보기 전용으로 열어요 */}
@@ -146,6 +186,10 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
               <input type="hidden" name="provider" value={l.provider} />
               <input type="hidden" name="subject" value={l.subject} />
               <input type="hidden" name="id" value={a.id} />
+              {l.photo_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={l.photo_url} alt="" referrerPolicy="no-referrer" className="h-6 w-6 rounded-full object-cover" />
+              )}
               <span>
                 {PROVIDER_LABEL[l.provider]}{l.email || l.nickname ? ` · ${l.email ?? l.nickname}` : ""}
                 {l.last_login_at && <span className="text-slate-400"> · 마지막 {new Date(l.last_login_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" })}</span>}
@@ -181,8 +225,23 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
         {s.reasons.length > 0 && <p className="flex flex-wrap gap-1">{s.reasons.map((r) => <span key={r} className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-600"><Icon name="siren" size={14} className="mr-1" />{r}</span>)}</p>}
       </section>
 
-      {(regs.length > 0 || history.length > 1) && (
+      {(regs.length > 0 || history.length > 1 || exams.length > 0) && (
         <div className="grid gap-4 lg:grid-cols-2">
+          {exams.length > 0 && (
+            <section className="card text-sm">
+              <p className="flex items-center gap-1 font-jua text-lg text-sky-ink"><Icon name="chart" size={24} />모의고사 <span className="text-sm text-slate-400">({exams.length}회 · 최근이 위)</span></p>
+              <ul className="mt-2 divide-y divide-sky-soft">
+                {exams.slice(0, 6).map((r) => (
+                  <li key={r.result_id} className="flex flex-wrap items-center gap-2 py-2">
+                    <span className="text-slate-500">{Number(r.exam_date.slice(5, 7))}/{Number(r.exam_date.slice(8, 10))}</span>
+                    <span className="flex-1 text-slate-700">{r.exam_title}</span>
+                    {r.blank_sheet ? <span className="text-slate-400">채점 못 함</span> : <><b className="font-jua text-lg text-sky-ink">{r.total}</b><span className="text-xs text-slate-500">LC {r.lc_score} · RC {r.rc_score}</span></>}
+                  </li>
+                ))}
+              </ul>
+              <Link href="/admin/scores" className="mt-1 inline-block text-xs text-sky-deep underline">모의고사 관리로</Link>
+            </section>
+          )}
           {regs.length > 0 && (
             <section className="card text-sm">
               <p className="flex items-center gap-1 font-jua text-lg text-sky-ink"><Icon name="mic" size={24} />특강 신청</p>
@@ -202,14 +261,15 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
           )}
           {history.length > 1 && (
             <section className="card text-sm">
-              <p className="flex items-center gap-1 font-jua text-lg text-sky-ink"><Icon name="book" size={24} />수강 이력 <span className="text-sm text-slate-400">(같은 이름)</span></p>
+              <p className="flex items-center gap-1 font-jua text-lg text-sky-ink"><Icon name="book" size={24} />수강 이력 <span className="text-sm text-slate-400">(최근 달이 위)</span></p>
               <ul className="mt-2 divide-y divide-sky-soft">
                 {history.map((h) => (
                   <li key={h.id} className="py-2">
-                    {h.id === a.id ? <b className="text-sky-ink"><Icon name="play" size={16} className="mr-1" />{cohortLabel(h.cohort)} {classSlotLabel(h)} · {KINDS[h.kind].short} (지금 보는 신청)</b> : (
-                      <Link href={`/admin/students/${h.id}`} className="text-sky-deep underline">{cohortLabel(h.cohort)} {classSlotLabel(h)} · {KINDS[h.kind].short}</Link>
+                    {h.id === a.id ? <b className="text-sky-ink"><Icon name="play" size={16} className="mr-1" />{monthLabel(h)} (지금 보는 신청)</b> : (
+                      <Link href={`/admin/students/${h.id}`} className="text-sky-deep underline">{monthLabel(h)}</Link>
                     )}
-                    <span className="ml-2 text-xs text-slate-400">{STATUS[h.status]}</span>
+                    <span className={`ml-2 text-xs ${h.status === "pending" ? "font-bold text-amber-600" : "text-slate-400"}`}>{h.status === "cancelled" && h.cancel_reason === "timeout" ? "자동 취소됨" : STATUS_SHORT[h.status]}</span>
+                    {!groupIds.has(h.id) && <span className="ml-1 text-xs text-amber-600">(이름만 같음 · 동명이인일 수 있어요)</span>}
                   </li>
                 ))}
               </ul>

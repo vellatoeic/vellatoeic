@@ -5,18 +5,37 @@ import { KINDS, classSlotLabel, cohortLabel } from "@/lib/config";
 import { isPreview, listApplications } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { summariesFor } from "@/lib/studentSummary";
+import { todayKST } from "@/lib/config";
+import { buildRoster } from "@/lib/rosterServer";
 import AdminTabs from "../AdminTabs";
 import LoginForm from "../LoginForm";
+import RosterTable from "./RosterTable";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "학생 찾기 · vella_toeic", robots: { index: false } };
+export const metadata = { title: "학생 명단 · vella_toeic", robots: { index: false } };
 
 const STATUS = { pending: "미납", paid: "납부 완료", shipped: "납부 완료", refunded: "환불", cancelled: "취소" } as const;
 
-// 관리 화면 어디서나 쓰는 학생 검색: 이름·입금자·연락처 → 한 명이면 바로 통합 화면
-export default async function StudentSearch({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+// 관리 [학생 명단] (검색어 없이 열면): 학생 한 명 = 한 줄, 등급(수강생·예비수강생·일반)·수강 월·레벨·로그인·최근 접속
+// 관리 화면 어디서나 쓰는 학생 검색(?q=): 이름·입금자·연락처 → 한 명이면 바로 통합 화면 (예전 그대로)
+export default async function StudentSearch({ searchParams }: { searchParams: Promise<{ q?: string; g?: string }> }) {
   if (!(await isAdmin())) return <LoginForm preview={isPreview} />;
-  const raw = ((await searchParams).q ?? "").trim();
+  const sp = await searchParams;
+  const raw = (sp.q ?? "").trim();
+  if (!raw) {
+    const { rows, cohorts } = await buildRoster();
+    const g = sp.g === "student" || sp.g === "pre" || sp.g === "general" ? sp.g : "all";
+    return (
+      <div className="space-y-5 pt-8">
+        <AdminTabs active="students" />
+        <div>
+          <h2 className="flex flex-wrap items-center gap-1.5 font-jua text-2xl text-sky-ink"><Icon name="people" size={28} />학생 명단 <span className="text-base text-slate-500">· {rows.length}명</span></h2>
+          <p className="mt-1 text-sm text-slate-500">등급은 날짜로 자동으로 바뀌어요 · 예비수강생은 개강일 오전 9시에 수강생이 되고, 수강생은 다음 달 개강일 0시에 일반이 돼요.</p>
+        </div>
+        <RosterTable rows={rows} cohorts={cohorts} today={todayKST()} initialGrade={g} />
+      </div>
+    );
+  }
   const q = raw.replace(/[\s-]/g, "");
   const found = q
     ? (await listApplications())
@@ -29,7 +48,7 @@ export default async function StudentSearch({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-5 pt-8">
-      <AdminTabs active="apps" />
+      <AdminTabs active="students" />
       <h2 className="flex flex-wrap items-center gap-1.5 font-jua text-2xl text-sky-ink"><Icon name="search" size={26} />&apos;{raw}&apos; 찾기 <span className="text-base text-slate-500">· {found.length}건 (최근 달이 위)</span></h2>
       {!q ? <p className="card text-center text-slate-500">위 검색창에 이름을 입력해 주세요.</p> : found.length === 0 ? <p className="card text-center text-slate-500">찾는 학생이 없어요.</p> : (
         <div className="card overflow-x-auto !p-4">

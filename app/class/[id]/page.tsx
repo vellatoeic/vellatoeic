@@ -5,6 +5,7 @@ import { getLecture } from "@/lib/db";
 import { activeStudentApps } from "@/lib/student";
 import { canOpenLecture } from "@/lib/access";
 import { viewInfo } from "@/lib/viewWindowServer";
+import { canViewNow, isOpened } from "@/lib/viewWindow";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "강의 · vella_toeic", robots: { index: false } };
@@ -15,10 +16,12 @@ export default async function Watch({ params }: { params: Promise<{ id: string }
 
   // 로그인 안 했거나, 이 강의를 볼 권한이 없으면 강의실로 (주소를 직접 입력해도 같아요)
   if (!lecture || !canOpenLecture(apps, lecture)) redirect("/class");
+  // 개강일 오전 9시 전이면 강의실로 (예비수강생 · 강의실 맨 위에 여는 시각 안내)
   // 열람 기간(다음 달 개강 전날)이 지났으면 강의실로 보내 안내해요
   const info = await viewInfo(apps);
   const today = todayKST();
-  if (!canOpenLecture(apps.filter((a) => today <= (info.get(a.id)?.until ?? "")), lecture)) redirect("/class?expired=1");
+  if (!canOpenLecture(apps.filter((a) => isOpened(info.get(a.id)?.openAt)), lecture)) redirect("/class");
+  if (!canOpenLecture(apps.filter((a) => canViewNow(info.get(a.id), today)), lecture)) redirect("/class?expired=1");
 
   return (
     <div className="stagger space-y-5 pt-8">

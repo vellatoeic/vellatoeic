@@ -6,7 +6,8 @@ import { canWatch, liveLinkFor } from "./access";
 import { classAppsFor } from "./classCohort";
 import { classDaysOf } from "./classCalendar";
 import { studentDays } from "./studentDays";
-import { viewInfo } from "./viewWindowServer";
+import { cohortOpenAt, viewInfo } from "./viewWindowServer";
+import { isOpened } from "./viewWindow";
 import { liveState } from "./live";
 import { studentTests, takesTests } from "./dailyTests";
 import { audioBooksFor, dayDiff, studentAudioWindow } from "./audio";
@@ -102,8 +103,10 @@ export async function studentDashboard(today = todayKST()): Promise<Dashboard | 
   ]);
 
   const state = liveState(app, days);
+  // 라이브 링크는 개강일 오전 9시부터 (그 전엔 '곧 시작'만)
+  const openAt = await safe("dash.openAt", () => cohortOpenAt(cohort), null);
   const live = state.open
-    ? { open: true as const, label: state.label, link: (() => { const l = liveLinkFor(app, lectures, state.slot); return l ? `https://youtu.be/${l.youtube_id}` : null; })() }
+    ? { open: true as const, label: state.label, link: (() => { const l = isOpened(openAt) ? liveLinkFor(app, lectures, state.slot) : null; return l ? `https://youtu.be/${l.youtube_id}` : null; })() }
     : { open: false as const, next: state.next };
 
   const myAttendance = stamps.attendance.filter((s) => s.app_id === app.id && days.includes(s.day));
