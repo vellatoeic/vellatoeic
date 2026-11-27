@@ -1,4 +1,6 @@
 import LoginModeCard from "./LoginModeCard";
+import { fillStudentNumbers } from "@/lib/studentNumbers";
+import { safe } from "@/lib/safe";
 import Icon from "@/components/Icon";
 import { adminAlerts } from "@/lib/adminAlerts";
 import { BOOKS, COURSES, KINDS, TRACKS, TRACK_ORDER, slotTag, bookStatusLabel, cohortLabel, roundOf, thisMonthKST, won, type BookId, type CourseId, type TimeSlot } from "@/lib/config";
@@ -236,6 +238,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   const thisMonth = thisMonthKST();
   // 한 번만: 예전 회차 덮어쓰기로 틀린 이번 달·다음 달 신청 교재를 자동 회차로 바로잡아요 (결과는 이번 한 번만 보여줘요)
   const roundFix = await fixRoundsOnce();
+  // 모의고사 개인번호: 이번 모집 기수부터 번호가 비어 있는 학생에게 채워요 (SQL 43, lib/studentNumbers.ts)
+  await safe("fillStudentNumbers", () => fillStudentNumbers(now), 0);
   const checklist = await monthlyChecklist();
   const alerts = await adminAlerts();
   // 이번 모집 기수에서 아직 입금 확인이 안 된 학생 (수업 전에 확인해야 라이브·강의가 열려요)

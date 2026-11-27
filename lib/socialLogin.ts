@@ -37,7 +37,7 @@ export const showSocialLogin = (m: LoginMode) => m !== "pin";
 
 // 로그인 뒤 돌아갈 주소: 사이트 안의 정해진 화면만 (다른 사이트로 보내지 않아요)
 // 정해지지 않았으면 /go → 관리자 / 신청 후 / 신청 전 중 알맞은 화면 (lib/zones.ts)
-const NEXT_OK = [/^\/go$/, /^\/class$/, /^\/class\/tests$/, /^\/check(\?[\w=&%.-]*)?$/, /^\/mission$/, /^\/faq$/, /^\/special$/, /^\/guide\/(onsite|online)$/];
+const NEXT_OK = [/^\/go$/, /^\/class$/, /^\/class\/tests$/, /^\/class\/scores$/, /^\/check(\?[\w=&%.-]*)?$/, /^\/mission$/, /^\/faq$/, /^\/special$/, /^\/guide\/(onsite|online)$/];
 export function safeNext(next: string | null | undefined): string {
   const v = (next ?? "").trim();
   return NEXT_OK.some((re) => re.test(v)) ? v : "/go";

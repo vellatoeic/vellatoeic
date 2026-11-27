@@ -21,7 +21,7 @@ export default async function StudentSearch({ searchParams }: { searchParams: Pr
   const found = q
     ? (await listApplications())
         // 학생 검색에서는 30분 자동 취소 신청도 보여요 ('자동 취소됨', 7일 뒤 자동 삭제)
-        .filter((a) => `${a.name}${a.depositor}${a.phone ?? ""}`.replace(/\s/g, "").includes(q))
+        .filter((a) => `${a.name}${a.depositor}${a.phone ?? ""}${a.student_no ?? ""}`.replace(/\s/g, "").includes(q))
         .sort((a, b) => b.cohort.localeCompare(a.cohort) || b.created_at.localeCompare(a.created_at))
     : [];
   if (found.length === 1) redirect(`/admin/students/${found[0].id}`);

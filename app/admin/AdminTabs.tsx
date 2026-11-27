@@ -4,15 +4,16 @@ import { logout, markAppsSeen } from "@/app/actions";
 import { adminAlerts } from "@/lib/adminAlerts";
 import { expireUnpaid, purgeTimedOut } from "@/lib/cancellations";
 import { safe } from "@/lib/safe";
-import { purgeReceipts } from "@/lib/db";
+import { countExamReview, purgeReceipts } from "@/lib/db";
 
-export default async function AdminTabs({ active }: { active: "apps" | "roster" | "stamps" | "lectures" | "schedule" | "special" | "delivery" | "audio" | "faq" | "tests" | "notices" }) {
+export default async function AdminTabs({ active }: { active: "apps" | "roster" | "stamps" | "lectures" | "schedule" | "special" | "delivery" | "audio" | "faq" | "tests" | "notices" | "scores" }) {
   // 관리 화면을 열 때마다: 30분 지난 입금 대기 자동 취소 + 자동 취소 7일 지난 것 삭제
   await safe("expireUnpaid", () => expireUnpaid(Date.now()), null);
   await safe("purgeTimedOut", () => purgeTimedOut(), undefined);
   // 수강증: 제출 안 한 기록은 하루 뒤, 확인이 끝난 사진·원문은 7일 뒤 자동으로 지워요 (무료 보관함 1GB 보호)
   await safe("purgeReceipts", () => purgeReceipts(), { dropped: 0, stripped: 0 });
   const { fresh, waiting, checks, delivery, desk, refunds, receipts } = await adminAlerts();
+  const examReview = await safe("examReview", () => countExamReview(), 0); // 첫토익 모의고사 성적 중 학생 연결 확인 필요
   const tab = (on: boolean) =>
     `relative rounded-full px-4 py-2 font-bold ${on ? "bg-sky-deep text-white" : "bg-white text-sky-ink"}`;
   const dot = (n: number) => n > 0 && (
@@ -30,6 +31,7 @@ export default async function AdminTabs({ active }: { active: "apps" | "roster" 
           <Link href="/admin/delivery" className={tab(active === "delivery")}>불라방{dot(delivery + desk)}</Link>
           <Link href="/admin/tests" className={tab(active === "tests")}>오늘의 테스트</Link>
           <Link href="/admin/stamps" className={tab(active === "stamps")}>출석·숙제</Link>
+          <Link href="/admin/scores" className={tab(active === "scores")}>모의고사{dot(examReview)}</Link>
           <Link href="/admin/schedule" className={tab(active === "schedule")}>수업일 설정</Link>
           <Link href="/admin/lectures" className={tab(active === "lectures")}>강의 관리</Link>
           <Link href="/admin/audio" className={tab(active === "audio")}>LC 음원</Link>

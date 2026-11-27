@@ -176,6 +176,11 @@ export default function StudentDashboard({ d }: { d: Dashboard }) {
             <small>{d.audio.count === 0 ? "올라오면 알려드려요" : `${md(d.audio.end)}까지 · D-${d.audio.left}`}</small>
           </Link>
         )}
+        <Link href="/class/scores" className="sd-card sd-mini">
+          <Icon name="trophy" size={40} />
+          <b>모의고사 성적</b>
+          <small>{a.student_no ? `개인번호 ${a.student_no}` : "개인번호 · 성적 보기"}</small>
+        </Link>
         {d.mission < 4 && (
           <Link href="/mission" className="sd-card sd-mini">
             <Icon name="clipboard" size={40} />
@@ -196,6 +201,7 @@ export default function StudentDashboard({ d }: { d: Dashboard }) {
       <section className="sd-card sd-menu">
         <Row href="/class" icon="star" title="강의실 전체 보기" sub="스티커판 · 지난 강의 · LC 음원 · 선물" />
         {d.tests && <Row href="/class/tests" icon="chart" title="내 테스트 기록" sub="점수 그래프 · 밀린 테스트" />}
+        <Row href="/class/scores" icon="trophy" title="내 모의고사 성적" sub="개인번호 · 총점 · 틀린 문항" />
         <Row href="/special" icon="mic" title="특강" sub="신청 · 자료 · 다시 보기" />
         <Row href="/notices" icon="megaphone" title="공지" />
         <Row href="/faq" icon="book" title="자주 묻는 질문" />

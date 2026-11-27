@@ -133,6 +133,12 @@
 - next.config: serverExternalPackages tesseract.js + outputFileTracingIncludes '/guide/*'(엔진 파일). 빠지면 배포 뒤 글자 읽기가 멈추고 모두 선생님 확인으로 가요.
 - 2단계(아직 안 함): 실물로 1~2주 확인한 뒤 강의실 조건을 '수강증 + 교재비'로(lib/access.ts). 테스트 tests/receipt.test.ts · tests/receipt-db.test.ts · tests/receipt-kit/(키트 시험, vitest-shim).
 
+## 모의고사 성적 · 개인번호 (SQL 43, 첫토익 연동 설계서 v1 2026-11-27)
+- 개인번호 6자리(applications.student_no, 첫 자리 0 아님): 모의고사 답안지 앞면 '수험번호' 칸에 적어요. 학생 화면에서는 '개인번호'라고 불러요. 장부 student_numbers(번호 PK)에 먼저 넣어 겹치지 않고 다시 쓰지 않아요(reserveStudentNo). 교재 신청할 때 같은 학생(같은 이름+비밀번호 또는 같은 카카오·구글 계정, 환불 포함)의 예전 번호를 그대로, 없으면 새로(lib/mockScores numberForGroup, 실패해도 신청은 받음). 비어 있는 학생은 관리 첫 화면·[모의고사]를 열 때 이번 모집 기수부터 채우고(lib/studentNumbers fillStudentNumbers, 같은 account_id는 같은 번호), 학생이 '모의고사 성적'을 열 때도 채워요(ensureStudentNo, 강사 학생 화면 보기 중에는 안 만듦). 관리 학생 통합 화면 이름 옆 #번호, 학생 검색에 번호도.
+- 받기: POST /api/firsttoeic(첫토익이 회차 하나씩, results 300개까지), 헤더 x-firsttoeic-key = Vercel 환경변수 FIRSTTOEIC_SYNC_KEY(첫토익 쪽 VELLA_SYNC_KEY와 같은 값, 16자 미만·없음이면 500), SHA-256 후 timingSafeEqual, 틀린 키 10분 10번이면 차단, 본문·이름은 기록하지 않음. 형식(설계서 4장)은 lib/mockScores.ts parsePayload — 한 행이라도 틀리면 400 '어느 칸이 왜' + 하나도 저장 안 함, dry_run이면 판정만. 같은 result_id는 덮어쓰기(받은 시각 유지). 응답 {ok, dry_run, results:[{result_id, status, student_id(개인번호) | note}]}, GET 등 405.
+- 연결 규칙(설계서 5장, matchResult): 번호가 있고 그 번호 학생 이름과 같으면(공백 무시) matched, 이름이 다르면 review '학생번호와 이름이 달라요', 번호 없음·못 찾음 → review(이름만으로 자동 연결 안 함). 생년월일은 받지 않아요(2026-11-27). 관리자가 연결한 manual은 다시 와도 그대로. 표 firsttoeic_exam_results(linked_no = 개인번호로 학생 연결).
+- 학생: /class/scores '내 모의고사 성적'(개인번호 크게 + 회차별 총점·LC·RC·파트 정답률·틀린 문항(무응답)·총평·파트별 코멘트·분석지 링크, 백지는 '채점하지 못했어요'), 학생 첫 화면 카드·메뉴, 강의실 오른쪽 칸 '모의고사 성적 · 개인번호'. 관리: [모의고사] 탭(확인 필요 수 빨간 숫자): 회차별 받음·연결·확인 필요, '확인 필요' 목록(이름이 한 명과 딱 맞으면 미리 골라 둠 — 그래도 [선택한 연결 저장]을 눌러야 연결, 동명이인은 직접 고르기, 개인번호 직접 입력, 삭제), 받은 성적 전체(연결 풀기). 테스트 tests/mock-scores.test.ts.
+
 ## 남은 주의사항
 - 격일반 이어듣기·두 달째 요일은 서버가 자동 판단(lib/altContinue.ts): 지난달 기수 + 같은 이름·비밀번호 + 같은 반 격일반 + 납부 완료 신청이 있으면 두 달째. 시작반 격일반 두 달째는 이어듣기 자동(LC만), 없으면 교재 3권(학생 선택보다 서버 판단 우선, '네'인데 기록 없으면 확인 창에 안내). 두 달째는 반대 요일만(월·수 → 화·목, 화·목 → 월·수), 다르면 제출·확인 창에서 막아요. 처음 듣는 학생은 제한 없음. 확인 창의 교재·금액은 서버 미리 확인(previewApplication) 결과.
 - 이미 들어온 신청 점검: 신청 관리 '⚠️ 격일반 확인 필요'(이번 달·다음 달 격일반): 지난달 기록과 같은 요일 → '요일: ○반이어야 해요', 시작반 이어듣기인데 기록 없음 → '교재 3권이어야 해요', 기록 있는데 이어듣기 아님 → '이어듣기 대상'. [바로 고치기](요일은 반 변경, 이어듣기는 교재·금액 재계산, 납부 완료면 금액 유지하고 차이만 표시) / [동명이인 · 무시](settings alt_ignore). 관리 화면은 비밀번호 비교가 불가능해 같은 이름으로 찾아요. 할 일 카드에도 n건(lib/altIssuesServer.ts).

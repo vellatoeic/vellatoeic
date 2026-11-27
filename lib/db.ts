@@ -1,4 +1,5 @@
 import "server-only";
+import { randomStudentNo, type MatchStatus } from "./mockScores";
 import { forget, memo } from "./requestMemo";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { TestDouble, TestKind, TestOverride } from "./tests";
@@ -34,12 +35,13 @@ export type Application = {
   audio_extended_until?: string | null; // 관리자가 음원 기간을 다시 열어준 마지막 날
   account_id?: string | null; // 구글·카카오 로그인으로 묶인 학생 번호 (연결 전 신청은 비어 있어요, SQL 39)
   receipt_status?: ReceiptStatus | null; // 수강증 확인 (비어 있음 = 수강증 없이 받은 예전 신청)
+  student_no?: string | null; // 개인번호 6자리 (모의고사 답안지 '수험번호' 칸, 같은 학생 = 같은 번호, SQL 43)
 };
 
 export type NewApplication = Omit<Application, "id" | "status" | "created_at">;
 
 // 신청 조회에 쓰는 칸 (비밀번호 해시 pin_hash는 로그인 확인 때만 읽어요)
-const APP_COLS = "id,cohort,kind,course,track,continuing,slot,pickup_date,pickup_time,books,pickup,name,phone,depositor,address,amount,status,created_at,paid_at,cancelled_at,cancel_reason,pending_from,books_adjusted,audio_extended_until,account_id,receipt_status,address_detail";
+const APP_COLS = "id,cohort,kind,course,track,continuing,slot,pickup_date,pickup_time,books,pickup,name,phone,depositor,address,amount,status,created_at,paid_at,cancelled_at,cancel_reason,pending_from,books_adjusted,audio_extended_until,account_id,receipt_status,address_detail,student_no";
 
 // ── 수강증 자동 확인 (SQL 40) ──
 // auto = 수강증대로 자동 확인 · review = 선생님 확인 필요 · approved = 선생님이 확인함
@@ -225,6 +227,8 @@ type Mem = {
   ybmOrders: YbmOrder[];
   loginLinks: LoginLink[];
   receiptChecks: ReceiptCheck[];
+  studentNumbers?: string[];
+  examResults?: ExamResultRow[];
 };
 const g = globalThis as unknown as { __vellaMem?: Mem };
 const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [], testResults: [], testOverrides: [], testDoubles: [], notices: [], noticeReads: [], ybmOrders: [], loginLinks: [], receiptChecks: [] });
@@ -247,6 +251,8 @@ mem.noticeReads ??= [];
 mem.ybmOrders ??= [];
 mem.loginLinks ??= [];
 mem.receiptChecks ??= [];
+mem.studentNumbers ??= [];
+mem.examResults ??= [];
 
 // 그 달 날짜 범위: 1일 이상 ~ 다음 달 1일 미만 (11월처럼 30일까지인 달에 '-31'을 만들면 DB 오류가 나요)
 export function monthRange(cohort: string) {
@@ -346,7 +352,7 @@ async function listCohortApplicationsRaw(cohort: string): Promise<Application[]>
   return mem.apps.filter((a) => a.cohort === cohort);
 }
 
-type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "continuing" | "slot" | "books" | "amount" | "cohort" | "audio_extended_until" | "cancelled_at" | "cancel_reason" | "pending_from" | "books_adjusted" | "account_id" | "receipt_status">>;
+type ApplicationPatch = Partial<Pick<Application, "status" | "pin_hash" | "course" | "track" | "continuing" | "slot" | "books" | "amount" | "cohort" | "audio_extended_until" | "cancelled_at" | "cancel_reason" | "pending_from" | "books_adjusted" | "account_id" | "receipt_status" | "student_no">>;
 
 export async function updateApplication(id: string, patch: ApplicationPatch) {
   await updateApplications([id], patch);
@@ -1768,4 +1774,155 @@ export async function linkAccount(accountId: string, attach: string[], mergeFrom
   }
   for (const a of mem.apps) if ((ok.includes(a.id) && !a.account_id) || (a.account_id && from.includes(a.account_id))) a.account_id = accountId;
   for (const l of mem.loginLinks) if (from.includes(l.account_id)) l.account_id = accountId;
+}
+
+
+// ── 개인번호 6자리 · 첫토익 모의고사 성적 (SQL 43, 규칙 lib/mockScores.ts) ──
+
+export type ExamResultRow = {
+  result_id: string;
+  exam_id: string;
+  exam_title: string;
+  exam_date: string;
+  session: number | null;
+  answer_key: string | null;
+  student_no: string | null;
+  name: string;
+  birth: string | null;
+  lc_correct: number;
+  lc_score: number;
+  rc_correct: number;
+  rc_score: number;
+  total: number;
+  parts: { part: number; correct: number; total: number }[];
+  wrong: { q: number; part: number; answer: string; chosen: string | null }[];
+  comment: string | null;
+  part_comments: { part: number; comment: string }[];
+  blank_sheet: boolean;
+  report_pdf_url: string | null;
+  linked_no: string | null;
+  match_status: MatchStatus;
+  match_note: string | null;
+  received_at?: string;
+  updated_at?: string;
+};
+
+// 새 개인번호: 장부(student_numbers)에 먼저 넣어서 겹치지 않게 해요 (이미 있으면 다른 번호로 다시)
+export async function reserveStudentNo(): Promise<string> {
+  for (let i = 0; i < 30; i++) {
+    const no = randomStudentNo();
+    if (sb) {
+      const { error } = await sb.from("student_numbers").insert({ no });
+      if (!error) return no;
+      if (error.code !== "23505") throw error; // 23505 = 이미 있는 번호 → 다시 뽑기
+      continue;
+    }
+    const list = (mem.studentNumbers ??= []);
+    if (!list.includes(no)) {
+      list.push(no);
+      return no;
+    }
+  }
+  throw new Error("개인번호를 만들지 못했어요");
+}
+
+// 이 개인번호들을 가진 신청 (이름 확인·연결용, 환불·취소 포함)
+export async function appsByStudentNos(nos: string[]): Promise<Pick<Application, "id" | "name" | "student_no" | "cohort" | "kind" | "course" | "track" | "slot" | "status" | "created_at">[]> {
+  const ok = [...new Set(nos.filter((n) => /^[0-9]{6}$/.test(n)))];
+  if (ok.length === 0) return [];
+  if (sb) {
+    const db = sb;
+    return inChunks(ok, async (chunk) => {
+      const { data, error } = await db.from("applications").select("id,name,student_no,cohort,kind,course,track,slot,status,created_at").in("student_no", chunk);
+      if (error) throw error;
+      return data as Application[];
+    });
+  }
+  return mem.apps.filter((a) => a.student_no && ok.includes(a.student_no));
+}
+
+export async function getExamResults(ids: string[]): Promise<ExamResultRow[]> {
+  const ok = [...new Set(ids.filter(isUuid))];
+  if (ok.length === 0) return [];
+  if (sb) {
+    const db = sb;
+    return inChunks(ok, async (chunk) => {
+      const { data, error } = await db.from("firsttoeic_exam_results").select("*").in("result_id", chunk);
+      if (error) throw error;
+      return data as ExamResultRow[];
+    });
+  }
+  return (mem.examResults ?? []).filter((r) => ok.includes(r.result_id));
+}
+
+// 학생 화면: 내 개인번호에 연결된 성적만 (최근 시험이 위)
+export async function examResultsByNos(nos: string[]): Promise<ExamResultRow[]> {
+  const ok = [...new Set(nos.filter((n) => /^[0-9]{6}$/.test(n)))];
+  if (ok.length === 0) return [];
+  if (sb) {
+    const { data, error } = await sb.from("firsttoeic_exam_results").select("*").in("linked_no", ok).order("exam_date", { ascending: false });
+    if (error) throw error;
+    return data as ExamResultRow[];
+  }
+  return (mem.examResults ?? []).filter((r) => r.linked_no && ok.includes(r.linked_no)).sort((a, b) => b.exam_date.localeCompare(a.exam_date));
+}
+
+// 관리 화면: 받은 성적 전부 (최근 시험이 위, 1,000줄씩 끝까지)
+export async function listExamResults(): Promise<ExamResultRow[]> {
+  if (sb) {
+    const db = sb;
+    return allRows<ExamResultRow>((from, to) => db.from("firsttoeic_exam_results").select("*").order("exam_date", { ascending: false }).order("name").order("result_id").range(from, to));
+  }
+  return [...(mem.examResults ?? [])].sort((a, b) => b.exam_date.localeCompare(a.exam_date) || a.name.localeCompare(b.name));
+}
+
+// 받기: result_id가 같으면 덮어쓰기 (받은 시각은 처음 그대로)
+export async function upsertExamResults(rows: ExamResultRow[]) {
+  if (rows.length === 0) return;
+  const now = new Date().toISOString();
+  const withTime = rows.map(({ received_at: _r, ...r }) => ({ ...r, updated_at: now }));
+  if (sb) {
+    const { error } = await sb.from("firsttoeic_exam_results").upsert(withTime, { onConflict: "result_id" });
+    if (error) throw error;
+    return;
+  }
+  const list = (mem.examResults ??= []);
+  for (const r of withTime) {
+    const old = list.find((x) => x.result_id === r.result_id);
+    if (old) Object.assign(old, r);
+    else list.push({ ...r, received_at: now });
+  }
+}
+
+// 관리자 연결·연결 풀기·삭제
+export async function updateExamResult(resultId: string, patch: Pick<ExamResultRow, "linked_no" | "match_status" | "match_note">) {
+  if (!isUuid(resultId)) return;
+  const row = { ...patch, updated_at: new Date().toISOString() };
+  if (sb) {
+    const { error } = await sb.from("firsttoeic_exam_results").update(row).eq("result_id", resultId);
+    if (error) throw error;
+    return;
+  }
+  const r = (mem.examResults ?? []).find((x) => x.result_id === resultId);
+  if (r) Object.assign(r, row);
+}
+export async function deleteExamResults(ids: string[]) {
+  const ok = ids.filter(isUuid);
+  if (ok.length === 0) return;
+  if (sb) {
+    const { error } = await sb.from("firsttoeic_exam_results").delete().in("result_id", ok);
+    if (error) throw error;
+    return;
+  }
+  mem.examResults = (mem.examResults ?? []).filter((r) => !ok.includes(r.result_id));
+}
+
+// 학생 연결 확인이 필요한 성적 수 (관리 [모의고사] 탭 빨간 숫자)
+export async function countExamReview(): Promise<number> {
+  if (sb) {
+    const { count, error } = await sb.from("firsttoeic_exam_results").select("result_id", { count: "exact", head: true }).eq("match_status", "review");
+    if (error) throw error;
+    return count ?? 0;
+  }
+  return (mem.examResults ?? []).filter((r) => r.match_status === "review").length;
 }

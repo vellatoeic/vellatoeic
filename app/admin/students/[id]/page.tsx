@@ -83,7 +83,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm text-slate-500">{cohortLabel(a.cohort)} · {classSlotLabel(a)} · {KINDS[a.kind].short}</p>
-            <h2 className="font-jua text-3xl text-sky-ink">{a.name}</h2>
+            <h2 className="font-jua text-3xl text-sky-ink">{a.name}{a.student_no && <span className="ml-2 align-middle font-body text-base font-bold tracking-widest text-sky-deep" title="모의고사 개인번호">#{a.student_no}</span>}</h2>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {/* 이 학생이 보는 화면(대시보드·강의실)을 보기 전용으로 열어요 */}

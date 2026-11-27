@@ -9,7 +9,7 @@ import {
 } from "@/lib/config";
 import {
   createApplication, listApplications, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, setHomeworkStar, drawGift, getGiftDraw, saveGiftItem, deleteGiftItem, setGiftSent, type GiftDraw, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  appsByAccount, getLoginLink, saveLoginLink, linkAccount, deleteLoginLink, type Application,
+  appsByAccount, getLoginLink, saveLoginLink, linkAccount, deleteLoginLink, reserveStudentNo, appsByStudentNos, updateExamResult, deleteExamResults, type Application,
   getReceiptCheck, findReceiptTwins, updateReceiptChecks, listReceiptChecks, dropReceiptImage,
   saveMission, type Mission, createYbmOrder, listYbmOrders, updateYbmOrders, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, setTestDouble, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudioLink, setAudioOrder, deleteAudios, createSpecialMaterialLink, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, listDepositEvents, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture, cleanupOrphanSpecialFiles,
 } from "@/lib/db";
@@ -39,6 +39,7 @@ import { altFixResult, altTrackError, findPrevAlt, planBooks } from "@/lib/altCo
 import { currentAltIssues } from "@/lib/altIssuesServer";
 import { adjustedBooks } from "@/lib/manualLink";
 import { safe } from "@/lib/safe";
+import { isStudentNo, numberForGroup } from "@/lib/mockScores";
 import { BOARD_ROWS, dateLabel, defaultTitle, sessionNo, targetsOf } from "@/lib/lectureBoard";
 import { scheduleDays } from "@/lib/classCalendar";
 import { receiptVerdict } from "@/lib/receipt/verdict";
@@ -142,9 +143,8 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
   await safe("expireUnpaid", () => expireUnpaid(Date.now()), null); // 30분 지난 입금 대기는 취소돼서 아래 중복 검사에서 빠져요 (다시 신청 가능)
   // 같은 달에 같은 이름 + 같은 비밀번호(구글·카카오만 방식은 같은 학생 번호)로 이미 낸 신청이 있으면 새로 만들지 않고 그 신청 화면으로 보내요.
   // 이름이 같아도 비밀번호가 다르면 동명이인으로 보고 새로 받아요.
-  const mine = accountId
-    ? (await appsByAccount(accountId)).filter(isActive)
-    : (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash) && isActive(a));
+  const sameStudent = accountId ? await appsByAccount(accountId) : (await findByName(name)).filter((a) => checkPin(pin, a.pin_hash));
+  const mine = sameStudent.filter(isActive);
   // 이미 구글·카카오로 연결한 학생이 이름+비밀번호로 새 달을 신청하면 같은 학생 번호를 이어 붙여요
   const account = accountId ?? mine.find((a) => a.account_id)?.account_id ?? null;
   const existing = mine.find((a) => a.cohort === cohort);
@@ -152,6 +152,8 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
     await setStudent(mine.map((a) => a.id));
     redirect(`/my/${existing.id}?again=1`);
   }
+  // 개인번호 6자리: 같은 학생(같은 이름+비밀번호 또는 같은 카카오·구글 계정)의 예전 신청 번호를 그대로, 없으면 새로 (만들지 못해도 신청은 받고 나중에 채워요)
+  const studentNo = numberForGroup(sameStudent) ?? (await safe("reserveStudentNo", () => reserveStudentNo(), null));
 
   const id = await createApplication({
     cohort,
@@ -173,6 +175,7 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
     pin_hash: social ? null : hashPin(pin),
     ...(account ? { account_id: account } : {}),
     receipt_status: verdict.status,
+    ...(studentNo ? { student_no: studentNo } : {}),
   });
   // 수강증 기록을 신청서에 연결해요. 자동 확인이면 사진과 이름 확인용 원문을 바로 지워요.
   if (verdict.status === "auto") await safe("dropReceiptImage", () => dropReceiptImage(receipt.id, receipt.image_path), undefined);
@@ -227,7 +230,7 @@ export async function studentLogin(_: FormState, fd: FormData): Promise<FormStat
   }
   await setStudent(result.apps.map((a) => a.id));
   const next = clean(fd.get("next"));
-  if (next === "/check" || next.startsWith("/check?") || next === "/class" || next === "/mission" || next === "/faq") redirect(next);
+  if (next === "/check" || next.startsWith("/check?") || next === "/class" || next === "/class/scores" || next === "/mission" || next === "/faq") redirect(next);
   // 이번 달 수강생이면 첫 화면(학생 대시보드)으로, 아니면 강의실로
   const current = await safe("login.current", () => currentClassApp(result.apps!), null);
   redirect(current ? "/" : "/class");
@@ -1585,4 +1588,36 @@ export async function adjustBooksAction(fd: FormData) {
   if (r.books.length === 0) return;
   await updateApplication(a.id, { books: r.books, amount: r.amount, books_adjusted: true });
   revalidatePath("/admin", "layout");
+}
+
+
+// ── 첫토익 모의고사 성적 연결 (관리 [모의고사], 설계서 8장) ──
+// 고른 학생(개인번호)으로 연결하면 'manual'(선생님 연결): 같은 결과가 다시 와도 연결을 바꾸지 않아요.
+// 칸 이름: pick:<result_id> = 고른 개인번호(라디오), typed:<result_id> = 직접 적은 개인번호
+export async function linkExamResults(fd: FormData) {
+  if (!(await isAdmin())) return;
+  const pairs = new Map<string, string>();
+  for (const [key, raw] of fd.entries()) {
+    const v = clean(raw);
+    if (!isStudentNo(v)) continue;
+    if (key.startsWith("pick:") && !pairs.has(key.slice(5))) pairs.set(key.slice(5), v);
+    if (key.startsWith("typed:")) pairs.set(key.slice(6), v); // 직접 적은 번호가 우선
+  }
+  if (pairs.size === 0) return;
+  const real = new Set((await appsByStudentNos([...pairs.values()])).map((a) => a.student_no)); // 실제로 있는 학생 번호만
+  for (const [id, no] of pairs) if (real.has(no)) await updateExamResult(id, { linked_no: no, match_status: "manual", match_note: "선생님 연결" });
+  revalidatePath("/admin/scores");
+  revalidatePath("/class/scores");
+}
+export async function unlinkExamResult(fd: FormData) {
+  if (!(await isAdmin())) return;
+  await updateExamResult(clean(fd.get("unlink")), { linked_no: null, match_status: "review", match_note: "선생님이 연결을 풀었어요" });
+  revalidatePath("/admin/scores");
+  revalidatePath("/class/scores");
+}
+export async function removeExamResults(fd: FormData) {
+  if (!(await isAdmin())) return;
+  await deleteExamResults(fd.getAll("del").map(clean));
+  revalidatePath("/admin/scores");
+  revalidatePath("/class/scores");
 }

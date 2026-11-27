@@ -323,6 +323,17 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
       </div>
       <div className="space-y-6">
+      {/* 모의고사 개인번호 + 성적 (SQL 43) */}
+      {(() => {
+        const no = apps.map((a) => a.student_no).find((x) => !!x);
+        return (
+          <Link href="/class/scores" className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 shadow-[0_2px_0_#d5ecf9]">
+            <span className="inline-flex items-center gap-2 font-bold text-sky-ink"><Icon name="trophy" size={24} />모의고사 성적{no && <span className="text-sm font-normal text-slate-500">· 개인번호 <b className="tracking-widest text-sky-deep">{no}</b></span>}</span>
+            <span className="text-sky-main">›</span>
+          </Link>
+        );
+      })()}
+
       {latestMission < 4 && (
         <Link href="/mission" className="flex items-center gap-3 rounded-[20px] border-2 border-[#ffd23f] bg-white p-4 shadow-[0_3px_0_#cfe6f5]">
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#e8f8ef]"><Icon name="clipboard" size={32} /></span>
