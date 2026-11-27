@@ -74,7 +74,18 @@ export function checkTestAnswer(questions: number, score: number, wrong: number[
 }
 
 // 미리 제출: 다음 수업일 1개만 (같은 달 안에서만). 없으면 null
-export function earlyTestDay(classDays: string[], today: string): string | null {
-  const next = [...classDays].sort().find((d) => d > today) ?? null;
-  return next && next.slice(0, 7) === today.slice(0, 7) ? next : null;
+export function earlyTestDay(classDays: string[], today: string, cohort?: string): string | null {
+  const sorted = [...classDays].sort();
+  const next = sorted.find((d) => d > today) ?? null;
+  if (!next) return null;
+  if (next.slice(0, 7) === today.slice(0, 7)) return next;
+  // 앞달 말에 개강한 기수(예: 12월반 11/30 개강): 수업이 시작된 뒤에는 달이 바뀌어도 같은 기수예요
+  return cohort && today >= sorted[0] && next.slice(0, 7) === cohort ? next : null;
+}
+
+// 그 기수 테스트를 내고 고칠 수 있는 기간: 그 달 안 + (앞달 말에 개강했으면) 첫 수업일부터
+export function testMonthOpen(cohort: string, classDays: string[], today: string): boolean {
+  if (today.slice(0, 7) === cohort) return true;
+  const first = [...classDays].sort()[0];
+  return !!first && today >= first && today < `${cohort}-01`;
 }

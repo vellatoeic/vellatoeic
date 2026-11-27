@@ -3,7 +3,7 @@
 import Icon from "@/components/Icon";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { cancelMyHomeworkDone, markHomeworkDone } from "@/app/actions";
-import { homeworkAssignmentDays, isHomeworkStickerEligible, weekDaysInMonth, type ScheduleClass } from "@/lib/schedule";
+import { dayNumberLabel, homeworkAssignmentDays, isHomeworkStickerEligible, weekDaysFor, type ScheduleClass } from "@/lib/schedule";
 import Cloud from "@/components/Cloud";
 import { boardStatus } from "@/lib/stickerComplete";
 
@@ -43,7 +43,7 @@ export default function StickerBoard({
 }) {
   const [newBadges, setNewBadges] = useState<string[]>([]);
   const [newStickers, setNewStickers] = useState<string[]>([]);
-  const weeks = useMemo(() => weekDaysInMonth(cohort), [cohort]);
+  const weeks = useMemo(() => weekDaysFor(cohort, scheduleDays), [cohort, scheduleDays]); // 앞달 말 개강(예: 12월반 11/30)도 달력에
   const lessonDays = useMemo(() => new Set(scheduleDays), [scheduleDays]);
   const attendanceByDay = useMemo(() => new Map(attendance.map((item) => [item.day, item])), [attendance]);
   const homeworkByDay = useMemo(() => new Map(homework.map((item) => [item.day, item])), [homework]);
@@ -185,7 +185,7 @@ export default function StickerBoard({
       ctx.textAlign = "center";
       ctx.font = `800 36px ${CANVAS_FONT}`;
       ctx.fillStyle = isHoliday ? "#e5707e" : isLesson ? "#5b88a6" : "#c6dceb";
-      ctx.fillText(String(Number(day.slice(-2))), x + cellWidth / 2, y + 51);
+      ctx.fillText(dayNumberLabel(day, cohort), x + cellWidth / 2, y + 51);
       if (isLesson) {
         const att = attendanceByDay.get(day);
         const homeworkDone = homeworkDays.has(day);
@@ -339,7 +339,7 @@ export default function StickerBoard({
                   onKeyDown={pickable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickHomeworkDay(day); } } : undefined}
                   className={`relative min-h-[74px]${pickable ? " cursor-pointer" : ""}${picked ? " ring-2 ring-[#ffd23f] ring-offset-1" : ""} min-w-0 rounded-[14px] px-px pb-1 pt-1 ${holiday ? "border-2 border-transparent bg-transparent" : !isLesson ? "border-2 border-transparent bg-transparent" : future || missed ? "border-2 border-dashed border-[#c4e2f4] bg-white" : isToday ? "border-2 border-[#2b8fc7] bg-[#eaf6fd]" : "border-2 border-[#e1f1fb] bg-[#f7fcff]"}`}>
                   {isToday && <span className="absolute -right-1 -top-2 rounded-full bg-[#2b8fc7] px-1.5 py-0.5 font-jua text-[10px] text-white">오늘</span>}
-                  <div className={`pl-1 text-left font-jua text-sm ${holiday ? "text-[#e5707e]" : isToday ? "text-[#2b8fc7]" : isLesson ? "text-[#5b88a6]" : "text-[#c6dceb]"}`}>{Number(day.slice(-2))}</div>
+                  <div className={`pl-1 text-left font-jua text-sm ${holiday ? "text-[#e5707e]" : isToday ? "text-[#2b8fc7]" : isLesson ? "text-[#5b88a6]" : "text-[#c6dceb]"}`}>{dayNumberLabel(day, cohort)}</div>
                   {holiday && <div className="mt-2 truncate font-jua text-[10px] text-[#e5707e]">{holiday}</div>}
                   {isLesson && <div className="mt-[3px] flex h-[30px] justify-center">
                     <div className="grid w-7 place-items-center">

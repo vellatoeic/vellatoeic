@@ -1,26 +1,15 @@
 import "server-only";
 // ── 일정표 불러오기·저장 (규칙은 lib/timetable.ts) ──
-// 저장 = 7개 반 수업일 + 그 기수 공휴일 + 특강 날짜(special_dates:기수)를 한 번에. 특강은 공개 전 초안만 옮기고 만들고 지워요.
+// 저장 = 7개 반 수업일 + 그 기수 공휴일(자동) + 특강(날짜·종류, special_dates:기수). 특강은 공개 전 초안만 이름 바꾸고·옮기고·만들고·지워요.
 import { createSpecialLecture, deleteSpecialLecture, getSetting, listCohortApplications, listSpecialLectures, listSpecialMaterials, listSpecialRegistrations, setSetting, updateSpecialLecture } from "./db";
 import { isActive } from "./access";
-import { krHolidaysOf } from "./krHolidays";
-import { SCHEDULE_CLASSES, defaultHolidays, holidayKey, parseHolidays, scheduleClassFor, scheduleKey, schoolDaysFor, type ScheduleClass } from "./schedule";
-import { classDaysFromMarks, marksFromDays, mismatchedClasses, planSpecialSync, type Marks } from "./timetable";
+import { SCHEDULE_CLASSES, holidayKey, parseHolidays, scheduleClassFor, scheduleKey, schoolDaysFor, type ScheduleClass } from "./schedule";
+import { classDaysFromMarks, holidaysFor, marksFromDays, mismatchedClasses, planSpecialSync, type Marks, type SpecialPick } from "./timetable";
 import { weekdayKey } from "./specialDrafts";
 
 const KEYS = Object.keys(SCHEDULE_CLASSES) as ScheduleClass[];
 export const specialDatesKey = (cohort: string) => `special_dates:${cohort}`;
 export const timetableSavedKey = (cohort: string) => `timetable_saved:${cohort}`;
-
-export function parseSpecialDates(raw: string, cohort: string): string[] | null {
-  if (!raw) return null;
-  try {
-    const v: unknown = JSON.parse(raw);
-    return Array.isArray(v) ? [...new Set(v.filter((d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) && d.startsWith(`${cohort}-`)))].sort() : null;
-  } catch {
-    return null;
-  }
-}
 
 export async function loadTimetable(cohort: string) {
   const [raws, rawHolidays, savedAt, specials] = await Promise.all([
@@ -29,13 +18,15 @@ export async function loadTimetable(cohort: string) {
     getSetting(timetableSavedKey(cohort)),
     listSpecialLectures(),
   ]);
-  const holidays = rawHolidays ? parseHolidays(rawHolidays, cohort) : defaultHolidays(cohort);
-  const days = Object.fromEntries(KEYS.map((k, i) => [k, schoolDaysFor(raws[i], cohort, k).filter((d) => !holidays[d]).sort()])) as Record<ScheduleClass, string[]>;
+  const saved = rawHolidays ? parseHolidays(rawHolidays, cohort) : {};
+  // 저장값을 읽을 때 빼는 공휴일 = 지금 강의실이 쓰는 값(저장한 공휴일, 없으면 기본값)과 같게
+  const stored = Object.fromEntries(KEYS.map((k, i) => [k, schoolDaysFor(raws[i], cohort, k)])) as Record<ScheduleClass, string[]>;
+  const active = rawHolidays ? saved : holidaysFor(cohort, {}, {});
+  const days = Object.fromEntries(KEYS.map((k) => [k, stored[k].filter((d) => !active[d]).sort()])) as Record<ScheduleClass, string[]>;
   const marks = marksFromDays(days["start-all"], days["start-mw"], days["start-tt"]);
   return {
     marks,
-    holidays,
-    publicHolidays: krHolidaysOf(cohort), // 저장한 공휴일에 없으면 칸에 흐리게 '수업함'으로 보여요
+    savedHolidays: saved, // 예전에 저장한 공휴일 (대한민국 공휴일 표와 합쳐서 보여줘요)
     specials: specials
       .filter((e) => e.event_date.startsWith(`${cohort}-`))
       .map((e) => ({ id: e.id, date: e.event_date, title: e.title, starts_at: e.starts_at.slice(0, 5), ends_at: e.ends_at?.slice(0, 5) ?? null, published: e.published !== false })),
@@ -64,11 +55,14 @@ export async function classRoster(cohort: string, marks: Marks) {
   });
 }
 
-// 특강 초안을 고른 날짜에 맞춰요. 자료·영상·신청이 있는 초안은 지우지 않아요.
-export async function applySpecialDates(cohort: string, wanted: string[]) {
-  const plan = planSpecialSync(cohort, wanted, await listSpecialLectures());
+// 특강 초안을 고른 날짜·종류에 맞춰요. 자료·영상·신청이 있는 초안은 지우지 않아요.
+export async function applySpecials(cohort: string, picks: SpecialPick[]) {
+  const plan = planSpecialSync(cohort, picks, await listSpecialLectures());
   for (const c of plan.create) await createSpecialLecture({ event_date: c.date, title: c.title, starts_at: c.starts_at, ends_at: c.ends_at, registration_deadline: null, published: false });
-  for (const m of plan.move) await updateSpecialLecture(m.id, { event_date: m.date, title: m.title, starts_at: m.starts_at, ends_at: m.ends_at });
+  for (const m of plan.move) {
+    const { id, date, ...rest } = m;
+    await updateSpecialLecture(id, { event_date: date, ...rest });
+  }
   let kept = 0;
   for (const id of plan.remove) {
     const [materials, regs, all] = await Promise.all([listSpecialMaterials(id), listSpecialRegistrations(id), listSpecialLectures()]);
@@ -78,18 +72,23 @@ export async function applySpecialDates(cohort: string, wanted: string[]) {
   return { ...plan, kept };
 }
 
-export async function saveTimetableData(cohort: string, marks: Marks, holidays: Record<string, string>, specialDates: string[]) {
-  const clean: Marks = Object.fromEntries(Object.entries(marks).filter(([d]) => !holidays[d]));
-  const days = classDaysFromMarks(clean);
+export async function saveTimetableData(cohort: string, marks: Marks, picks: SpecialPick[]) {
+  const rawHolidays = await getSetting(holidayKey(cohort));
+  // 공휴일은 자동: 범위 안 대한민국 공휴일 + 예전에 저장한 공휴일, 수업을 넣은 날은 빼요
+  // (저장은 그 달 + 앞뒤 달로 걸친 수업 기간 안의 공휴일만 — 다음 달 공휴일 때문에 '공휴일 있는 달'로 보이지 않게)
+  const days = classDaysFromMarks(marks);
+  const [first, last] = [days["start-all"][0], days["start-all"].at(-1)];
+  const holidays = Object.fromEntries(Object.entries(holidaysFor(cohort, rawHolidays ? parseHolidays(rawHolidays, cohort) : {}, marks))
+    .filter(([d]) => d.startsWith(`${cohort}-`) || (first && last && d >= first && d <= last)));
   await Promise.all([
     ...KEYS.map((k) => setSetting(scheduleKey(cohort, k), JSON.stringify(days[k]))),
     setSetting(holidayKey(cohort), JSON.stringify(holidays)),
   ]);
-  const result = await applySpecialDates(cohort, specialDates);
-  await setSetting(specialDatesKey(cohort), JSON.stringify(result.dates));
+  const result = await applySpecials(cohort, picks);
+  await setSetting(specialDatesKey(cohort), JSON.stringify(result.picks));
   // 예전 '특강 요일' 설정도 맞춰 둬요 (이번 달 할 일 · 미리보기가 같은 요일을 봐요)
-  const w = result.dates.length ? new Date(`${result.dates[0]}T00:00:00Z`).getUTCDay() : null;
+  const w = result.picks.length ? new Date(`${result.picks[0].date}T00:00:00Z`).getUTCDay() : null;
   if (w === 5 || w === 6) await setSetting(weekdayKey(cohort), String(w));
   await setSetting(timetableSavedKey(cohort), new Date().toISOString());
-  return result;
+  return { ...result, holidays };
 }

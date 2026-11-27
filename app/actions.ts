@@ -15,7 +15,7 @@ import {
 } from "@/lib/db";
 import { canWatch, isActive, loginApps } from "@/lib/access";
 import { parseBankSms } from "@/lib/bankSms";
-import { checkTestAnswer, earlyTestDay, testsForClassDay, type TestKind } from "@/lib/tests";
+import { checkTestAnswer, earlyTestDay, testMonthOpen, testsForClassDay, type TestKind } from "@/lib/tests";
 import { classDaysOf, planFor, takesTests } from "@/lib/dailyTests";
 import { classDaysOf as calendarDaysOf } from "@/lib/classCalendar";
 import { noticeIdentity } from "@/lib/noticeView";
@@ -35,6 +35,7 @@ import { signupMonths } from "@/lib/signupMonthsServer";
 import { expireUnpaid } from "@/lib/cancellations";
 import { syncSpecialDrafts, weekdayKey } from "@/lib/specialDrafts";
 import { saveTimetableData } from "@/lib/timetableServer";
+import { inRange as timetableInRange, specialInMonth } from "@/lib/timetable";
 import { altFixResult, altTrackError, findPrevAlt, planBooks } from "@/lib/altContinue";
 import { currentAltIssues } from "@/lib/altIssuesServer";
 import { adjustedBooks } from "@/lib/manualLink";
@@ -522,20 +523,23 @@ export async function saveTimetable(fd: FormData) {
   if (!(await isAdmin())) return;
   const cohort = clean(fd.get("cohort"));
   if (!validCohort(cohort)) return;
-  const inMonth = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d) && d.startsWith(`${cohort}-`) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
   const json = (key: string): unknown => { try { return JSON.parse(largeField(fd, key)); } catch { return null; } };
   const rawMarks = json("marks");
   const marks: Record<string, "mw" | "tt"> = {};
   if (rawMarks && typeof rawMarks === "object" && !Array.isArray(rawMarks)) {
     for (const [d, m] of Object.entries(rawMarks)) {
       const w = new Date(`${d}T00:00:00Z`).getUTCDay();
-      if (inMonth(d) && w >= 1 && w <= 5 && (m === "mw" || m === "tt")) marks[d] = m;
+      if (timetableInRange(d, cohort) && w >= 1 && w <= 5 && (m === "mw" || m === "tt")) marks[d] = m; // 앞달 말·다음 달 초도 돼요
     }
   }
-  const holidays = parseHolidays(largeField(fd, "holidays"), cohort);
+  // 특강: [{ date, title }] — 그 달 안 날짜만, 한 달 2개까지
   const rawSpecials = json("specials");
-  const specials = Array.isArray(rawSpecials) ? [...new Set(rawSpecials.filter((d): d is string => typeof d === "string" && inMonth(d)))].sort().slice(0, 2) : [];
-  const result = await saveTimetableData(cohort, marks, holidays, specials);
+  const picks = (Array.isArray(rawSpecials) ? rawSpecials : [])
+    .filter((p): p is { date: string; title: string } => !!p && typeof p === "object" && typeof p.date === "string" && typeof p.title === "string")
+    .filter((p) => specialInMonth(p.date, cohort) && p.title.trim())
+    .slice(0, 2)
+    .map((p) => ({ date: p.date, title: p.title.trim().slice(0, 60) }));
+  const result = await saveTimetableData(cohort, marks, picks);
   revalidatePath("/", "layout");
   redirect(`/admin/schedule?cohort=${cohort}&saved=1${result.kept ? `&kept=${result.kept}` : ""}`);
 }
@@ -814,11 +818,12 @@ export async function submitTestResult(_: FormState, fd: FormData): Promise<Form
   const app = apps.find((a) => a.id === appId);
   if (!app || !takesTests(app)) return { error: "테스트를 볼 수 있는 수강 신청이 아니에요." };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return { error: "아직 제출할 수 없는 테스트예요." };
-  if (day.slice(0, 7) !== today.slice(0, 7)) return { error: "지난달 테스트는 제출할 수 없어요." };
   const { plan } = await planFor(app.cohort);
   const classDays = await classDaysOf(app);
+  // 그 기수 기간(그 달 안, 앞달 말 개강이면 첫 수업일부터)에만 내요
+  if (!testMonthOpen(app.cohort, classDays, today)) return { error: "지난달 테스트는 제출할 수 없어요." };
   // 앞으로의 테스트는 다음 수업일 것만 미리 낼 수 있어요
-  if (day > today && day !== earlyTestDay(classDays, today)) return { error: "아직 제출할 수 없는 테스트예요. 다음 수업일 테스트만 미리 낼 수 있어요." };
+  if (day > today && day !== earlyTestDay(classDays, today, app.cohort)) return { error: "아직 제출할 수 없는 테스트예요. 다음 수업일 테스트만 미리 낼 수 있어요." };
   // 같은 날 같은 종류를 2개 보는 날도 있어서 번호까지 맞춰 찾아요 (번호가 없으면 그날 첫 번째)
   const specs = testsForClassDay(plan, classDays, day).filter((t) => t.kind === kind);
   const spec = specs.find((t) => t.no === testNo) ?? (testNo ? undefined : specs[0]);

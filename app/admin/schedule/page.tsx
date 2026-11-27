@@ -6,6 +6,7 @@ import { holidayKey, parseHolidays, defaultHolidays, scheduleKey, schoolDaysFor,
 import { classCohortNow } from "@/lib/classCohort";
 import { shiftMonth } from "@/lib/signupMonths";
 import { classRoster, loadTimetable } from "@/lib/timetableServer";
+import { holidaysFor } from "@/lib/timetable";
 import AdminTabs from "../AdminTabs";
 import LoginForm from "../LoginForm";
 import ScheduleEditor from "./ScheduleEditor";
@@ -34,20 +35,26 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const roster = await classRoster(cohort, table.marks);
   const confirmed = confirmedRaw === "1";
   const months = [...new Set([shiftMonth(running, -1), running, shiftMonth(running, 1), shiftMonth(running, 2), cohort])].sort();
-  const weekdayHolidays = Object.entries(table.holidays).filter(([d]) => { const w = new Date(`${d}T00:00:00Z`).getUTCDay(); return w >= 1 && w <= 5; });
+  const weekdayHolidays = Object.entries(holidaysFor(cohort, table.savedHolidays, {})).filter(([d]) => { const w = new Date(`${d}T00:00:00Z`).getUTCDay(); return d.startsWith(`${cohort}-`) && w >= 1 && w <= 5; });
 
   return (
     <div className="space-y-5 pt-8">
       <AdminTabs active="schedule" />
 
-      <nav className="flex flex-wrap gap-2" aria-label="달 고르기">
-        {months.map((m) => (
-          <Link key={m} href={`/admin/schedule?cohort=${m}`} aria-current={m === cohort ? "page" : undefined}
-            className={`rounded-full px-4 py-2 text-sm font-bold ${m === cohort ? "bg-sky-deep text-white" : "bg-white text-sky-ink ring-1 ring-sky-main"}`}>
-            {m.slice(0, 4) !== cohort.slice(0, 4) ? `${m.slice(2, 4)}년 ` : ""}{Number(m.slice(5, 7))}월{m === running ? " · 수업 중" : m === recruit ? " · 모집" : ""}
-          </Link>
-        ))}
-      </nav>
+      {/* ① 달 먼저 고르기 */}
+      <section className="card space-y-2 !p-4">
+        <p className="font-jua text-lg text-sky-ink">① 몇 월 수업 일정표를 만들까요?</p>
+        <nav className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="달 고르기">
+          {months.map((m) => (
+            <Link key={m} href={`/admin/schedule?cohort=${m}`} aria-current={m === cohort ? "page" : undefined}
+              className={`rounded-2xl px-3 py-3 text-center font-extrabold ${m === cohort ? "bg-sky-deep text-white shadow-[0_3px_0_#1f6f9e]" : "bg-sky-soft text-sky-ink"}`}>
+              {m.slice(0, 4) !== cohort.slice(0, 4) ? `${m.slice(2, 4)}년 ` : ""}{Number(m.slice(5, 7))}월 수업
+              <span className="block text-xs font-bold opacity-80">{m === running ? "지금 수업 중" : m === recruit ? "모집 중" : m < running ? "지난달" : "다음"}</span>
+            </Link>
+          ))}
+        </nav>
+        <p className="text-xs text-slate-500">11월 말에 개강하는 12월반처럼 앞달에 시작해도 &apos;12월 수업&apos;을 고르면 돼요. 달력에 앞달 마지막 주도 보여요.</p>
+      </section>
 
       {params.saved && (
         <p className="flex items-center gap-1.5 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
@@ -62,11 +69,10 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
       )}
 
       <TimetableEditor
-        key={`${cohort}:${table.savedAt ?? ""}:${JSON.stringify([table.marks, table.holidays, table.specials.map((p) => p.date)])}`}
+        key={`${cohort}:${table.savedAt ?? ""}:${JSON.stringify([table.marks, table.specials.map((p) => [p.date, p.title])])}`}
         cohort={cohort}
         initialMarks={table.marks}
-        initialHolidays={table.holidays}
-        publicHolidays={table.publicHolidays}
+        savedHolidays={table.savedHolidays}
         specials={table.specials}
         saved={table.saved}
       />

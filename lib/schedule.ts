@@ -25,8 +25,16 @@ export function scheduleKey(cohort: string, klass: ScheduleClass) {
   return `schooldays_${cohort}_${klass}`;
 }
 
+const monthShift = (cohort: string, n: number) => {
+  const [y, m] = cohort.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+};
+
+// 그 기수 수업일·공휴일로 저장할 수 있는 날: 그 달 + 앞뒤 한 달 (2026-11-27 Vella: 12월반이 11월 말에 개강하는 달도 있어요)
 function isDateInCohort(day: string, cohort: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !day.startsWith(`${cohort}-`)) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !/^\d{4}-\d{2}$/.test(cohort)) return false;
+  if (![monthShift(cohort, -1), cohort, monthShift(cohort, 1)].includes(day.slice(0, 7))) return false;
   const [year, month, date] = day.split("-").map(Number);
   const parsed = new Date(Date.UTC(year, month - 1, date));
   return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === date;
@@ -141,6 +149,32 @@ export function weekDaysInMonth(cohort: string): (string | null)[][] {
   return weeks;
 }
 
+// 스티커판 달력(월~금): 그 달 평일 + 앞달·다음 달로 걸친 수업일까지 (예: 12월반 11/30(월) 개강 → 첫 줄이 11/30부터)
+export function weekDaysFor(cohort: string, days: string[]): (string | null)[][] {
+  const match = /^(\d{4})-(\d{2})$/.exec(cohort);
+  if (!match) return [];
+  const monthStart = `${cohort}-01`;
+  const monthEnd = `${cohort}-${String(new Date(Date.UTC(Number(match[1]), Number(match[2]), 0)).getUTCDate()).padStart(2, "0")}`;
+  const sorted = [...days].filter((d) => isDateInCohort(d, cohort)).sort();
+  const start = sorted[0] && sorted[0] < monthStart ? sorted[0] : monthStart;
+  const end = sorted.at(-1) && sorted.at(-1)! > monthEnd ? sorted.at(-1)! : monthEnd;
+  const cells: (string | null)[] = [];
+  for (let d = start; d <= end; d = new Date(Date.parse(`${d}T00:00:00Z`) + 86400000).toISOString().slice(0, 10)) {
+    const dow = new Date(`${d}T00:00:00Z`).getUTCDay();
+    if (dow === 0 || dow === 6) continue;
+    if (cells.length === 0) cells.push(...Array(dow - 1).fill(null));
+    cells.push(d);
+  }
+  while (cells.length % 5) cells.push(null);
+  const weeks: (string | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 5) weeks.push(cells.slice(i, i + 5));
+  return weeks;
+}
+
+// 달력 칸 날짜 글자: 그 달은 '30', 앞뒤 달은 '11/30'
+export const dayNumberLabel = (day: string, cohort: string) =>
+  day.startsWith(`${cohort}-`) ? String(Number(day.slice(8, 10))) : `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))}`;
+
 export function previousMonth(cohort: string) {
   const match = /^(\d{4})-(\d{2})$/.exec(cohort);
   if (!match) return cohort;
@@ -156,6 +190,7 @@ export function shiftSchoolDays(days: string[], fromCohort: string, toCohort: st
   const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const target = new Set<string>();
   for (const source of days) {
+    if (!source.startsWith(`${fromCohort}-`)) continue; // 앞뒤 달로 걸친 날은 복사하지 않아요
     const [y, m, d] = source.split("-").map(Number);
     const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
     if (weekday === 0 || weekday === 6) continue;

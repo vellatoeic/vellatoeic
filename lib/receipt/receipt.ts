@@ -296,7 +296,9 @@ export function parseStartMonth(compact: string): number | null {
   const m = compact.match(/\d주[-~](\d{1,2})[/.:](\d{1,2})(?!\d)/) ?? compact.match(/주[-~](\d{2})[/.:17lI|]?(\d{2})\]/);
   if (!m) return null;
   const [month, day] = [Number(m[1]), Number(m[2])];
-  return month >= 1 && month <= 12 && day >= 1 && day <= 31 ? month : null;
+  if (!(month >= 1 && month <= 12 && day >= 1 && day <= 31)) return null;
+  // 벨라토익: 앞달 말에 개강하는 달이 있어요(예: 12월반 11/30 개강) → 22일 이후 개강은 다음 달 과정
+  return day >= 22 ? (month % 12) + 1 : month;
 }
 
 /** `현재시간` 라벨 — `현재` 만 맞으면 라벨로 본다 (`현재산 2026-…` 처럼 `시간` 이 뭉개진다) */

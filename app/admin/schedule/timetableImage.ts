@@ -1,6 +1,7 @@
 // [일정표] 이미지 (학원 제출용): 달력 + 반별 기간 + 특강 + 공휴일을 한 장(가로 1080px)으로 그려
 // 휴대폰이면 공유 창(카톡 등)으로 바로 보내고, 안 되면 파일로 저장해요. 이모티콘은 쓰지 않아요.
-import { summarize, type Marks } from "@/lib/timetable";
+import { summarize, timetableWeeks, type Marks } from "@/lib/timetable";
+import { dayNumberLabel } from "@/lib/schedule";
 
 const FONT = "'Pretendard Variable', Pretendard, sans-serif";
 export const COLORS = { mw: "#2b8fc7", tt: "#f08a24", special: "#7c4dcc", holiday: "#e5484d", ink: "#12466b", sub: "#5b7a90", sat: "#2b6fd6" };
@@ -11,15 +12,12 @@ export const specialShort = (title: string) => (/PART\s*5/i.test(title) ? "PART 
 
 export type ImageSpecial = { date: string; title: string; starts_at: string; ends_at: string | null };
 
-export function monthWeeks(cohort: string): (string | null)[][] {
-  const [y, m] = cohort.split("-").map(Number);
-  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const cells: (string | null)[] = Array(new Date(Date.UTC(y, m - 1, 1)).getUTCDay()).fill(null);
-  for (let d = 1; d <= last; d++) cells.push(`${cohort}-${String(d).padStart(2, "0")}`);
-  while (cells.length % 7) cells.push(null);
-  const weeks: (string | null)[][] = [];
-  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
-  return weeks;
+// 이미지에 넣을 주: 그 달 날짜가 있는 주 + 앞뒤 달로 걸친 수업·특강이 있는 주 (빈 앞뒤 주는 빼요)
+export function imageWeeks(cohort: string, marks: Marks, specials: ImageSpecial[]): (string | null)[][] {
+  const used = new Set([...Object.keys(marks), ...specials.map((p) => p.date)]);
+  return timetableWeeks(cohort)
+    .filter((w) => w.some((d) => d.startsWith(`${cohort}-`) || used.has(d)))
+    .map((w) => w.map((d) => (d.startsWith(`${cohort}-`) || used.has(d) || w.some((x) => x.startsWith(`${cohort}-`)) ? d : null)));
 }
 
 function pill(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number, fill: string) {
@@ -45,8 +43,8 @@ export function legendLines(marks: Marks, specials: ImageSpecial[], holidays: Re
 export async function drawTimetable(cohort: string, marks: Marks, specials: ImageSpecial[], holidays: Record<string, string>) {
   await Promise.all([document.fonts.load(`800 40px ${FONT}`, "일정표 0123456789 월수 화목 특강 개강 종강"), document.fonts.load(`600 28px ${FONT}`, "주 4일반 공휴일")]).catch(() => undefined);
   const s = summarize(marks);
-  const weeks = monthWeeks(cohort);
-  const lines = legendLines(marks, specials, holidays);
+  const weeks = imageWeeks(cohort, marks, specials);
+  const lines = legendLines(marks, specials, Object.fromEntries(Object.entries(holidays).filter(([d]) => d.startsWith(`${cohort}-`))));
   const W = 1080, P = 56, cw = (W - P * 2) / 7, ch = 150, headH = 300, gridTop = headH + 70;
   const legendTop = gridTop + weeks.length * ch + 48;
   const H = legendTop + 60 + lines.length * 54 + 150;
@@ -96,11 +94,12 @@ export async function drawTimetable(cohort: string, marks: Marks, specials: Imag
     ctx.strokeRect(x, y, cw, ch);
     if (!day) return;
     const hol = holidays[day];
-    if (hol) { ctx.fillStyle = "#fff1f1"; ctx.fillRect(x + 1, y + 1, cw - 2, ch - 2); }
+    const other = !day.startsWith(`${cohort}-`); // 앞뒤 달 날짜
+    if (hol) { ctx.fillStyle = "#fff1f1"; ctx.fillRect(x + 1, y + 1, cw - 2, ch - 2); } else if (other && !marks[day]) { ctx.fillStyle = "#f6f8fa"; ctx.fillRect(x + 1, y + 1, cw - 2, ch - 2); }
     ctx.textAlign = "left";
-    ctx.font = `800 30px ${FONT}`;
-    ctx.fillStyle = hol || c === 0 ? COLORS.holiday : c === 6 ? COLORS.sat : COLORS.ink;
-    ctx.fillText(String(Number(day.slice(8))), x + 12, y + 38);
+    ctx.font = `800 ${other ? 24 : 30}px ${FONT}`;
+    ctx.fillStyle = hol || c === 0 ? COLORS.holiday : c === 6 ? COLORS.sat : other ? "#8aa0b2" : COLORS.ink;
+    ctx.fillText(dayNumberLabel(day, cohort), x + 12, y + 38);
     if (day === s.first || day === s.last) {
       const t = day === s.first ? "개강" : "종강";
       ctx.font = `800 18px ${FONT}`;

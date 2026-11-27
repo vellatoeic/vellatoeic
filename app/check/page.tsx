@@ -68,7 +68,8 @@ export default async function Check() {
   try {
     // 출석은 하루 한 번이면 돼요. 이미 찍었으면 그대로 두고 안내만 해요.
     // 이번 달 출석 기록만 한 번 읽어요 (숙제 기록은 읽지 않아요)
-    const attendance = await listAttendance(classToday.map((a) => a.id), `${today.slice(0, 7)}-01`);
+    const from = [`${today.slice(0, 7)}-01`, ...calendars.filter((c) => classToday.includes(c.a)).map((c) => c.days[0]).filter(Boolean)].sort()[0];
+    const attendance = await listAttendance(classToday.map((a) => a.id), from);
     already = attendance.some((x) => x.day === today);
     if (!already) await Promise.all(classToday.map((a) => addAttendance(a.id, today)));
     days = new Set([...attendance.map((a) => a.day), today]);

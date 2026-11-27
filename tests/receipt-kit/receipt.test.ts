@@ -190,6 +190,11 @@ describe("OCR 이 흔히 틀리는 꼴", () => {
     expect(p.courseMonth).toBeNull();
     expect(p.startMonth).toBe(12);
   });
+  it("앞달 말 개강(22일 이후)은 다음 달 과정 — 12월반 11/30 개강, 1월반 12/28 개강", () => {
+    expect(parseReceipt(card({ month: "", days: "[4주-11/30] 월화수목 (월16회)" })).startMonth).toBe(12);
+    expect(parseReceipt(card({ month: "", days: "[4주-12/28] 월화수목 (월16회)" })).startMonth).toBe(1);
+    expect(parseReceipt(card({ month: "", days: "[4주-12/07] 월화수목 (월16회)" })).startMonth).toBe(12);
+  });
   it("수강시간 칸 밖에 시간이 여럿이면 칸의 값만 쓴다", () => {
     const p = parseReceipt(card({ extra: "다음 특강 10:00~12:00" }));
     expect(p.time?.timeBlock).toBe("18:00~20:10");

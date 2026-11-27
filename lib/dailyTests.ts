@@ -3,7 +3,7 @@ import { listCohortApplications, listTestDoubles, listTestOverrides, listTestRes
 import { canWatch } from "./access";
 import { scheduleClassFor, type ScheduleClass } from "./schedule";
 import { classDaysOf as calendarDays, scheduleDays } from "./classCalendar";
-import { earlyTestDay, testPlan, testsForClassDay, type TestSpec } from "./tests";
+import { earlyTestDay, testMonthOpen, testPlan, testsForClassDay, type TestSpec } from "./tests";
 import { studentDays } from "./studentDays";
 
 // 문풀반·속성반(속성반도 문풀반 수업을 들어요) 납부 완료 학생만 테스트를 봐요. 시작반은 X
@@ -29,9 +29,9 @@ export async function studentTests(a: Application, today: string) {
   const all: TestSlotView[] = classDays
     .filter((d) => d <= today)
     .flatMap((d) => testsForClassDay(plan, classDays, d).map((spec) => ({ day: d, spec, result: find(d, spec) })));
-  const sameMonth = today.slice(0, 7) === a.cohort;
+  const sameMonth = testMonthOpen(a.cohort, allDays, today); // 그 달 안 (앞달 말 개강이면 첫 수업일부터)
   // 다음 수업일 테스트는 미리 낼 수 있어요 (그날 23:59까지 수정)
-  const early = sameMonth ? earlyTestDay(classDays, today) : null;
+  const early = sameMonth ? earlyTestDay(classDays, today, a.cohort) : null;
   const next: TestSlotView[] = early ? testsForClassDay(plan, classDays, early).map((spec) => ({ day: early, spec, result: find(early, spec) })) : [];
   return {
     today: all.filter((t) => t.day === today),
