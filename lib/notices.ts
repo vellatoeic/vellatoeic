@@ -22,6 +22,7 @@ export type Notice = {
   pinned: boolean;
   repeat_monthly?: boolean; // 매달 반복: 학생 반 개강일(중간 등록생은 첫 수업일)부터 repeat_days일 동안
   repeat_days?: number | null;
+  cohort?: string | null; // 대상 수강 월 (예: 2026-12 = 12월 수강생만, 비어 있으면 모든 달 · 반복 공지는 늘 비어 있음, SQL 48)
   created_at: string;
 };
 
@@ -51,12 +52,17 @@ function ruleMatches(r: NoticeTarget, s: Student) {
     && (!r.slots?.length || (s.slot !== null && r.slots.includes(s.slot)));
 }
 
-export const isForEveryone = (n: Pick<Notice, "targets">) => n.targets.length === 0;
+// 전체 공지 = 조건 없음 + 모든 달 (로그인 안 한 방문자에게도 보여요). 수강 월을 고른 공지는 그 달 수강생만.
+export const isForEveryone = (n: Pick<Notice, "targets" | "cohort">) => n.targets.length === 0 && !n.cohort;
 
 // 학생(신청 여러 개면 하나라도)이 대상인지. 로그인 안 한 방문자(students 빈 배열)는 '전체' 공지만.
-export function noticeMatches(n: Pick<Notice, "targets">, students: Student[]) {
-  if (isForEveryone(n)) return true;
-  return students.some((s) => n.targets.some((r) => ruleMatches(r, s)));
+// 수강 월을 고른 공지(2026-11-28 Vella: 신규생에게 지난달 공지는 안 보여요)는 그 달 신청으로만 판단해요.
+// others = 수업 기수가 아닌 다른 달 신청(예: 11월 수업 중인 학생의 12월 신청) — 수강 월 공지에서만 같이 봐요.
+export function noticeMatches(n: Pick<Notice, "targets" | "cohort">, students: Student[], others: Student[] = []) {
+  const pool = n.cohort ? [...students, ...others].filter((s) => s.cohort === n.cohort) : students;
+  if (n.cohort && pool.length === 0) return false;
+  if (n.targets.length === 0) return true;
+  return pool.some((s) => n.targets.some((r) => ruleMatches(r, s)));
 }
 
 export const isLive = (n: Pick<Notice, "starts_on" | "ends_on">, today: string) => n.starts_on <= today && today <= n.ends_on;
@@ -70,9 +76,9 @@ export function liveFor(n: Notice, students: Student[], today: string) {
 }
 
 // 지금 띄울 팝업: 게시 중 · 팝업 · 대상 · 아직 확인 안 함. 최신순 (상단 고정 먼저)
-export function popupNotices<N extends Notice>(all: N[], students: Student[], readIds: Set<string>, today: string) {
+export function popupNotices<N extends Notice>(all: N[], students: Student[], readIds: Set<string>, today: string, others: Student[] = []) {
   const cohort = students[0]?.cohort;
-  return sortNotices(all.filter((n) => n.popup && liveFor(n, students, today) && noticeMatches(n, students) && !readIds.has(readKey(n, cohort))));
+  return sortNotices(all.filter((n) => n.popup && liveFor(n, students, today) && noticeMatches(n, students, others) && !readIds.has(readKey(n, cohort))));
 }
 
 export function sortNotices<N extends Notice>(list: N[]) {
@@ -83,6 +89,6 @@ export function sortNotices<N extends Notice>(list: N[]) {
 export const noticeEnded = (n: Pick<Notice, "ends_on" | "repeat_monthly">, today: string) => !n.repeat_monthly && n.ends_on < today;
 
 // 공지 목록(🔔): 시작했고 아직 끝나지 않은 공지 중 본인 대상 (끝난 일반 공지는 안 보여요, 기록은 보관)
-export function myNotices<N extends Notice>(all: N[], students: Student[], today: string) {
-  return sortNotices(all.filter((n) => n.starts_on <= today && !noticeEnded(n, today) && noticeMatches(n, students)));
+export function myNotices<N extends Notice>(all: N[], students: Student[], today: string, others: Student[] = []) {
+  return sortNotices(all.filter((n) => n.starts_on <= today && !noticeEnded(n, today) && noticeMatches(n, students, others)));
 }

@@ -17,7 +17,9 @@ import AdminTabs from "./AdminTabs";
 import CloseOnSubmitForm from "./CloseOnSubmitForm";
 import SelectAll from "./SelectAll";
 import { autoCleanupAudios } from "@/lib/audio";
-import { md, monthlyChecklist } from "@/lib/monthlyChecklist";
+import { md, monthlyChecklist, targetCohort } from "@/lib/monthlyChecklist";
+import { chatCodeKey, chatUrlKey } from "@/lib/preCourse";
+import { shiftMonth } from "@/lib/signupMonths";
 import { visibleToAdmin } from "@/lib/cancellations";
 import { reviewHolds } from "@/lib/deposits";
 import { currentAltIssues } from "@/lib/altIssuesServer";
@@ -221,14 +223,16 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
   const { k = "all", p = "all", b = "all", t = "all", q = "", c = now, ra = "", mv = "", linked = "", r = "all" } = await searchParams;
   // 30분 자동 취소(timeout)는 관리 화면 어디에도 안 보여요. 관리자 취소(admin)는 '취소' 필터에서만.
   const everything = (await listApplications()).filter(visibleToAdmin);
-  const [account, cafeHomeworkUrl, cafeUrl, blogUrl, studyBoardUrl, chatUrl, chatCode, rawCohort, kakaoChannel, receiptMenu] = await Promise.all([
+  // 단톡방은 달마다 새로 열어요: 준비할 달(이번 달 개강 전이면 이번 달, 아니면 다음 달)과 그 앞달 두 칸
+  const chatPrep = await targetCohort();
+  const chatMonths = [shiftMonth(chatPrep, -1), chatPrep];
+  const chatRooms = await Promise.all(chatMonths.map(async (m) => ({ month: m, url: await getSetting(chatUrlKey(m)), code: await getSetting(chatCodeKey(m)) })));
+  const [account, cafeHomeworkUrl, cafeUrl, blogUrl, studyBoardUrl, rawCohort, kakaoChannel, receiptMenu] = await Promise.all([
     getSetting("bank_account"),
     getSetting("cafe_homework_url"),
     getSetting("cafe_url"),
     getSetting("blog_url"),
     getSetting("study_board_url"),
-    getSetting("chat_url"),
-    getSetting("chat_code"),
     getSetting("current_cohort"),
     getSetting("kakao_channel_url"),
     getSetting("receipt_menu"),
@@ -528,14 +532,16 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Pa
             <span className="label">네이버 카페 숙제 게시판 주소</span>
             <input type="url" name="cafe_homework_url" defaultValue={cafeHomeworkUrl} className="input" placeholder="https://cafe.naver.com/..." />
           </label>
-          <label className="sm:col-span-3">
-            <span className="label"><Icon name="chat" size={20} className="mr-1" />단톡방 오픈채팅 링크 <span className="font-normal text-slate-400">(비우면 강의실에서 숨겨요)</span></span>
-            <input type="url" name="chat_url" defaultValue={chatUrl} className="input" placeholder="https://open.kakao.com/..." />
-          </label>
-          <label>
-            <span className="label">단톡방 참여코드</span>
-            <input name="chat_code" defaultValue={chatCode} className="input" placeholder="예: 1234" />
-          </label>
+          <div className="space-y-2 rounded-2xl bg-[#fff9e0] p-3 sm:col-span-4">
+            <p className="label !mb-0"><Icon name="chat" size={20} className="mr-1" />단톡방 (매달 새로 열어요) <span className="font-normal text-slate-500">· 학생은 자기 수강 달 방만, 그 반 개강 전날부터 그 달 열람 마감일까지 보여요 · 비우면 &apos;링크가 곧 올라와요&apos;</span></p>
+            {chatRooms.map((r) => (
+              <div key={r.month} className="grid gap-2 sm:grid-cols-[6rem_1fr_8rem] sm:items-center">
+                <span className="font-jua text-sky-ink">{Number(r.month.slice(5, 7))}월 단톡방</span>
+                <input type="url" name={`chat_url__${r.month}`} defaultValue={r.url} className="input" placeholder="https://open.kakao.com/..." aria-label={`${Number(r.month.slice(5, 7))}월 단톡방 오픈채팅 링크`} />
+                <input name={`chat_code__${r.month}`} defaultValue={r.code} className="input" placeholder="참여코드" aria-label={`${Number(r.month.slice(5, 7))}월 단톡방 참여코드`} />
+              </div>
+            ))}
+          </div>
           <label className="sm:col-span-4">
             <span className="label"><Icon name="gift" size={20} className="mr-1" />벨라토익 카톡 채널 주소 <span className="font-normal text-slate-400">(선물 결과 카드의 [카톡 채널 열기] 버튼, 비우면 버튼 숨김)</span></span>
             <input type="url" name="kakao_channel_url" defaultValue={kakaoChannel} className="input" placeholder="https://pf.kakao.com/..." />

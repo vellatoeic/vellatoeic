@@ -12,14 +12,15 @@ import LoginForm from "../LoginForm";
 import CloseOnSubmitForm from "../CloseOnSubmitForm";
 import NoticeEditor from "./NoticeEditor";
 import { classCohortNow } from "@/lib/classCohort";
+import { shiftMonth } from "@/lib/signupMonths";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "공지 · vella_toeic", robots: { index: false } };
 
 const COURSE_LABEL = { start: "시작반", solve: "문풀반", intensive: "속성반" } as const;
 
-function describe(targets: NoticeTarget[]) {
-  if (targets.length === 0) return "전체 (방문자 포함)";
+function describe(targets: NoticeTarget[], cohort?: string | null) {
+  if (targets.length === 0) return cohort ? "모든 반" : "전체 (방문자 포함)";
   return targets.map((t) => [
     t.courses?.length ? t.courses.map((c) => COURSE_LABEL[c]).join("·") : "모든 반",
     t.tracks?.length ? t.tracks.map((x) => TRACK_GROUP_LABEL[x]).join("·") : "",
@@ -36,8 +37,12 @@ export default async function NoticesAdmin({ searchParams }: { searchParams: Pro
   const monthEnd = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
   const cohort = await classCohortNow(); // 공지 대상: 지금 수업 중인 기수
   const [notices, apps, reads] = await Promise.all([listNotices(), listCohortApplications(cohort), listNoticeReads()]);
-  // 대상 인원: 수업 기수의 환불되지 않은 신청 (학생 1명 = 신청 1건)
+  // 대상 인원: 수업 기수의 환불되지 않은 신청 (학생 1명 = 신청 1건). 수강 월을 고른 공지는 그 달 신청으로 세요.
   const people = apps.filter(isActive);
+  const noticeMonths = [...new Set(notices.flatMap((n) => (n.cohort && n.cohort !== cohort ? [n.cohort] : [])))];
+  const peopleByMonth = new Map<string, typeof people>([[cohort, people], ...await Promise.all(noticeMonths.map(async (m) => [m, (await listCohortApplications(m)).filter(isActive)] as [string, typeof people]))]);
+  // 공지 편집기 '대상 수강 월': 지난달 · 수업 중 · 다음 달 (기본 = 지금 수업 중인 달)
+  const months = [shiftMonth(cohort, -1), cohort, shiftMonth(cohort, 1)];
   // 끝난 일반 공지는 기본으로 숨겨요 (기록은 보관, '지난 공지 보기'로만)
   const ended = notices.filter((n) => noticeEnded(n, today));
   const shown = old ? notices : notices.filter((n) => !noticeEnded(n, today));
@@ -48,7 +53,7 @@ export default async function NoticesAdmin({ searchParams }: { searchParams: Pro
 
       <details className="card">
         <summary className="font-jua cursor-pointer text-lg text-sky-ink">+ 새 공지 쓰기</summary>
-        <div className="mt-4"><NoticeEditor today={today} monthEnd={monthEnd} /></div>
+        <div className="mt-4"><NoticeEditor today={today} monthEnd={monthEnd} months={months} defaultCohort={cohort} /></div>
       </details>
 
       {ended.length > 0 && (
@@ -61,7 +66,7 @@ export default async function NoticesAdmin({ searchParams }: { searchParams: Pro
       {shown.length === 0 && <p className="card text-center text-slate-500">{notices.length === 0 ? "아직 공지가 없어요." : "게시 중이거나 예정된 공지가 없어요."}</p>}
 
       {sortNotices(shown).map((n) => {
-        const audience = people.filter((a) => noticeMatches(n, [a]));
+        const audience = (n.cohort ? peopleByMonth.get(n.cohort) ?? [] : people).filter((a) => noticeMatches(n, [a]));
         // 매달 반복 공지는 이번 기수에 확인한 기록만 세요
         const readSet = new Set(reads.filter((r) => r.notice_id === n.id && (!n.repeat_monthly || r.cohort === cohort)).map((r) => r.app_id));
         const unread = audience.filter((a) => !readSet.has(a.id));
@@ -75,7 +80,7 @@ export default async function NoticesAdmin({ searchParams }: { searchParams: Pro
                     ? <><Icon name="repeat" size={16} className="mr-1" />매달 반복 · 개강일부터 {n.repeat_days ?? 7}일 · {specialDay(n.starts_on)}부터</>
                     : <>{specialDay(n.starts_on)} ~ {specialDay(n.ends_on)} · {isLive(n, today) ? "게시 중" : n.starts_on > today ? "게시 예정" : "게시 끝"}</>} · {n.popup ? "팝업 O" : "팝업 X"}
                 </p>
-                <p className="text-sm text-slate-500">대상: {describe(n.targets)}</p>
+                <p className="text-sm text-slate-500">대상: {n.cohort && <b className="mr-1 rounded-full bg-sky-soft px-2 py-0.5 text-sky-ink">{Number(n.cohort.slice(5, 7))}월 수강생</b>}{describe(n.targets, n.cohort)}</p>
               </div>
               <p className="text-right text-sm text-slate-500">확인 <b className="font-jua text-2xl text-sky-ink">{audience.length - unread.length}</b> / {audience.length}명</p>
             </div>
@@ -87,7 +92,7 @@ export default async function NoticesAdmin({ searchParams }: { searchParams: Pro
             )}
             <details>
               <summary className="cursor-pointer text-sm text-slate-500">수정</summary>
-              <div className="mt-3"><NoticeEditor notice={n} today={today} monthEnd={monthEnd} /></div>
+              <div className="mt-3"><NoticeEditor notice={n} today={today} monthEnd={monthEnd} months={months} defaultCohort={cohort} /></div>
             </details>
             <details className="text-sm">
               <summary className="cursor-pointer text-red-400">삭제</summary>

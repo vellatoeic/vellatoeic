@@ -1,6 +1,6 @@
 import "server-only";
 import { todayKST } from "./config";
-import { getSetting, getSpecialRegistrationsFor, listAudios, listLectures, listMissions, listSpecialLectures, listStamps, type Application } from "./db";
+import { getSpecialRegistrationsFor, listAudios, listLectures, listMissions, listSpecialLectures, listStamps, type Application } from "./db";
 import { activeStudentApps } from "./student";
 import { canWatch, liveLinkFor } from "./access";
 import { classAppsFor } from "./classCohort";
@@ -16,7 +16,7 @@ import { publicSpecials } from "./specialPlan";
 import { deadlineBadge, specialDay, specialRegistrationOpen } from "./special";
 import { isHomeworkStickerEligible } from "./schedule";
 import { safe } from "./safe";
-import { chatGateFor, type ChatGate } from "./preCourse";
+import { chatRoomFor, type ChatRoom } from "./preCourse";
 
 // ── 학생 대시보드 (로그인한 이번 달 수강생의 첫 화면 /) ──
 // 강의실과 같은 규칙을 그대로 써요: 수업 기수(lib/classCohort) · 열람 기간(lib/viewWindow) · 수업일(lib/classCalendar, 공휴일 제외)
@@ -55,8 +55,7 @@ export type Dashboard = {
   audio: { count: number; end: string; left: number; start: string } | null;
   mission: number; // 0~4
   specials: { date: string; label: string; state: "confirmed" | "pending" | "open"; badge: string | null }[];
-  chat: { url: string; code: string } | null;
-  chatGate: ChatGate; // 단톡방은 학생 반 개강 전날부터 (lib/preCourse.ts)
+  chat: ChatRoom; // 그 달 단톡방: 학생 반 개강 전날 ~ 열람 마감일 (lib/preCourse.ts)
 };
 
 export async function studentDashboard(today = todayKST()): Promise<Dashboard | null> {
@@ -72,7 +71,7 @@ export async function studentDashboard(today = todayKST()): Promise<Dashboard | 
   const done = days.filter((d) => d <= today).length;
   const next = days.find((d) => d > today) ?? null;
 
-  const [lectures, stamps, tests, audio, missions, specials, chatUrl, chatCode] = await Promise.all([
+  const [lectures, stamps, tests, audio, missions, specials, chat] = await Promise.all([
     safe("dash.lectures", () => listLectures([cohort]), []),
     safe("dash.stamps", () => listStamps([app.id]), { attendance: [], homework: [] }),
     takesTests(app) ? safe("dash.tests", () => studentTests(app, today), null) : Promise.resolve(null),
@@ -98,8 +97,7 @@ export async function studentDashboard(today = todayKST()): Promise<Dashboard | 
           return [];
         });
     }, [] as Dashboard["specials"]),
-    safe("dash.chatUrl", () => getSetting("chat_url"), ""),
-    safe("dash.chatCode", () => getSetting("chat_code"), ""),
+    safe("dash.chat", () => chatRoomFor(apps, today), null as ChatRoom),
   ]);
 
   const state = liveState(app, days);
@@ -111,8 +109,6 @@ export async function studentDashboard(today = todayKST()): Promise<Dashboard | 
 
   const myAttendance = stamps.attendance.filter((s) => s.app_id === app.id && days.includes(s.day));
   const myHomework = stamps.homework.filter((s) => s.app_id === app.id && days.includes(s.day) && isHomeworkStickerEligible(s.day, s.created_at));
-  // 단톡방: 이번 달·다음 달 납부 완료 신청 중 개강 전날이 지난 것이 있을 때만 링크·코드 (그 전에는 '○일부터 열려요')
-  const chatGate = chatUrl ? await safe("dash.chatGate", () => chatGateFor(apps, today), { open: true } as ChatGate) : null;
 
   return {
     app,
@@ -142,7 +138,6 @@ export async function studentDashboard(today = todayKST()): Promise<Dashboard | 
     audio,
     mission: missionCount(missionFor(app.id, missions)),
     specials,
-    chat: chatUrl && chatGate?.open ? { url: chatUrl, code: chatCode } : null,
-    chatGate,
+    chat,
   };
 }

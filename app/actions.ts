@@ -36,6 +36,7 @@ import { expireUnpaid } from "@/lib/cancellations";
 import { syncSpecialDrafts, weekdayKey } from "@/lib/specialDrafts";
 import { saveTimetableData } from "@/lib/timetableServer";
 import { inRange as timetableInRange, specialInMonth } from "@/lib/timetable";
+import { chatCodeKey, chatUrlKey } from "@/lib/preCourse";
 import { altFixResult, altTrackError, findPrevAlt, planBooks } from "@/lib/altContinue";
 import { currentAltIssues } from "@/lib/altIssuesServer";
 import { adjustedBooks } from "@/lib/manualLink";
@@ -468,14 +469,13 @@ export async function saveSettings(fd: FormData) {
   }
   // 교재 신청서의 'YBM 수강증 불러오는 방법' ② 메뉴 위치 (예: YBM어학원 앱 → 마이페이지 → 수강증)
   if (fd.has("receipt_menu")) await setSetting("receipt_menu", clean(fd.get("receipt_menu")).slice(0, 80));
-  if (fd.has("chat_url")) {
-    const chatUrl = clean(fd.get("chat_url"));
-    if (!chatUrl || /^https:\/\//.test(chatUrl)) await setSetting("chat_url", chatUrl);
-    const code = clean(fd.get("chat_code")).slice(0, 20);
-    if (code !== (await getSetting("chat_code"))) {
-      await setSetting("chat_code", code);
-      await setSetting("chat_code_changed_on", todayKST());
-    }
+  // 단톡방은 달마다 새로 열어요 (2026-11-28 Vella): 기본 설정의 달마다 칸 → settings chat_url:기수 · chat_code:기수
+  for (const key of fd.keys()) {
+    const m = /^chat_url__(\d{4}-\d{2})$/.exec(key);
+    if (!m) continue;
+    const chatUrl = clean(fd.get(key));
+    if (!chatUrl || /^https:\/\//.test(chatUrl)) await setSetting(chatUrlKey(m[1]), chatUrl);
+    await setSetting(chatCodeKey(m[1]), clean(fd.get(`chat_code__${m[1]}`)).slice(0, 20));
   }
   // 교재 회차는 여기서 저장하지 않아요 (모집 기수를 바꾸며 저장하면 다른 기수 회차를 덮어쓰던 문제). [회차 저장]에서 따로.
   const cafeLink = clean(fd.get("cafe_homework_url"));
@@ -790,6 +790,8 @@ export async function saveNoticeAction(fd: FormData) {
     pinned: !!fd.get("pinned"),
     repeat_monthly,
     repeat_days,
+    // 대상 수강 월: 그 달 수강생에게만 (비우면 모든 달). 매달 반복 공지는 모든 달.
+    cohort: !repeat_monthly && /^\d{4}-(0[1-9]|1[0-2])$/.test(clean(fd.get("cohort"))) ? clean(fd.get("cohort")) : null,
   };
   const id = clean(fd.get("id"));
   if (id) await updateNotice(id, fields);

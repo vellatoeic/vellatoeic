@@ -14,11 +14,13 @@ import { classAppsFor, classCohortNow } from "./classCohort";
 import { safe } from "./safe";
 
 // 공지를 판단할 때 쓰는 학생 신청: 이번 모집 기수 신청(없으면 가장 최근 기수)
-export async function noticeIdentity(): Promise<{ loggedIn: boolean; apps: Application[] }> {
+// others = 수업 기수가 아닌 다른 달 신청 (수강 월을 고른 공지에서만 같이 봐요: 11월 수업 중인 학생의 12월 신청 등)
+export async function noticeIdentity(): Promise<{ loggedIn: boolean; apps: Application[]; others: Application[] }> {
   const { loggedIn, apps } = await activeStudentApps();
-  if (apps.length === 0) return { loggedIn, apps: [] };
+  if (apps.length === 0) return { loggedIn, apps: [], others: [] };
   // 수업 기수(날짜 기준)의 신청으로 공지 대상을 판단해요
-  return { loggedIn, apps: (await safe("noticeIdentity.classAppsFor", () => classAppsFor(apps), { cohort: null, apps })).apps };
+  const mine = (await safe("noticeIdentity.classAppsFor", () => classAppsFor(apps), { cohort: null, apps })).apps;
+  return { loggedIn, apps: mine, others: apps.filter((a) => !mine.includes(a)) };
 }
 
 // '@study' 링크는 관리자 설정의 스터디 인증 게시판 주소로 바꿔요. (주소가 없으면 버튼을 숨겨요)
@@ -30,7 +32,7 @@ export async function withLinks(list: Notice[]) {
 // 홈·강의실·🔔에서 쓰는 공지 묶음
 export async function noticeSummary() {
   const today = todayKST();
-  const [{ loggedIn, apps }, all] = await Promise.all([noticeIdentity(), listCurrentNotices(today)]); // 게시 중인 공지만 읽어요
+  const [{ loggedIn, apps, others }, all] = await Promise.all([noticeIdentity(), listCurrentNotices(today)]); // 게시 중인 공지만 읽어요
   if (!loggedIn || apps.length === 0) {
     // 로그인 안 한 방문자: '전체' 공지만, 기기당 한 번 (확인 여부는 브라우저에 저장)
     // (매달 반복 공지는 개강일을 알 수 없는 방문자에게는 띄우지 않아요)
@@ -46,13 +48,13 @@ export async function noticeSummary() {
   const students = await safe("notice.studentStart", () => Promise.all(apps.map(async (a) => ({ ...a, start: studentStartDay(await classDaysOf(a), a.created_at) }))), apps.map((a) => ({ ...a, start: null as string | null })));
   const cohort = apps[0].cohort;
   const reads = new Set((await listNoticeReads({ appIds: apps.map((a) => a.id) })).flatMap((r) => (r.cohort ? [r.notice_id, `${r.notice_id}:${r.cohort}`] : [r.notice_id])));
-  const mine = myNotices(all, students, today);
+  const mine = myNotices(all, students, today, others);
   return {
     loggedIn: true, cohort,
     popups: [
       ...(await safe("courseEndPopups", () => courseEndPopups(today), [])),
       ...(await safe("specialPopups", () => specialPopups(), [])),
-      ...(await withLinks(popupNotices(all, students, reads, today))),
+      ...(await withLinks(popupNotices(all, students, reads, today, others))),
     ],
     unread: mine.filter((n) => liveFor(n, students, today) && !reads.has(readKey(n, cohort))).length,
     visitorKeys: [] as string[],

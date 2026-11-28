@@ -4,11 +4,11 @@ import Icon from "@/components/Icon";
 import { CLASSROOM, COURSES, DESK, KINDS, TIME_SLOTS, TRACKS } from "@/lib/config";
 import { timeBlockOf } from "@/lib/receipt/classes";
 import { dayLabelKo } from "@/lib/viewWindow";
-import type { ChatGate, PreCourse } from "@/lib/preCourse";
+import type { ChatRoom, PreCourse } from "@/lib/preCourse";
 
 type Row = { icon: string; done: boolean; title: string; sub: string };
 
-export default function PreCourseCard({ pre, chat }: { pre: PreCourse; chat: ChatGate }) {
+export default function PreCourseCard({ pre, chat }: { pre: PreCourse; chat: ChatRoom }) {
   const a = pre.app;
   const month = Number(a.cohort.slice(5, 7));
   const time = a.slot ? timeBlockOf(a, a.slot) : "";
@@ -26,9 +26,12 @@ export default function PreCourseCard({ pre, chat }: { pre: PreCourse; chat: Cha
     const when = a.pickup_date ? `${dayLabelKo(a.pickup_date)}${a.pickup_time ? ` ${a.pickup_time}` : ""}` : "수령 희망일";
     rows.push({ icon: "parcel", done: a.status === "shipped", title: `교재 ${DESK} 수령`, sub: a.status === "shipped" ? "받았어요" : `${when}에 ${DESK}에서 받아요` });
   }
+  // 단톡방은 달마다 새로 열어요: 이 달(개강 전) 방만 안내 (지난달 방이 열려 있어도 이 줄은 이 달 방 기준)
+  const opensOn = dayLabelKo(new Date(Date.parse(`${pre.first}T00:00:00Z`) - 86400000).toISOString().slice(0, 10));
+  const mine = chat && chat.cohort === a.cohort ? chat : null;
   rows.push({
-    icon: "chat", done: chat?.open === true, title: "단톡방",
-    sub: chat && !chat.open ? `${dayLabelKo(chat.opensOn)}부터 이 화면에 입장 버튼이 생겨요` : chat?.open ? "아래 단톡방 카드로 들어와 주세요" : "개강 전날부터 이 화면에 입장 버튼이 생겨요",
+    icon: "chat", done: mine?.state === "open", title: `${month}월 단톡방`,
+    sub: mine?.state === "open" ? "아래 단톡방 카드로 들어와 주세요" : mine?.state === "waiting" ? "단톡방 링크가 곧 이 화면에 올라와요" : `${opensOn}부터 이 화면에 입장 버튼이 생겨요`,
   });
   rows.push(a.kind === "online"
     ? { icon: "live", done: false, title: "첫 라이브", sub: `${dayLabelKo(pre.first)}${time ? ` ${time.split("~")[0]}` : ""} · 수업 10분 전 이 화면 맨 위 [라이브 입장]` }

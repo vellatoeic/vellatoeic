@@ -30,11 +30,10 @@ export async function targetCohort(today = todayKST()) {
 export async function monthlyChecklist(today = todayKST()): Promise<{ cohort: string; first: string; items: CheckItem[] }> {
   const cohort = await targetCohort(today);
   const first = await firstClassDay(cohort);
-  const thisMonth = today.slice(0, 7);
   const running = await classCohortNow(today);
-  const [audios, specials, lectures, apps, confirmed, holidays, kicked, codeChanged] = await Promise.all([
+  const [audios, specials, lectures, apps, confirmed, holidays, kicked, chatLink] = await Promise.all([
     listAudios(cohort), listSpecialLectures(), listLectures(), listApplications(),
-    getSetting(`schedule_confirmed:${cohort}`), holidaysOf(cohort), getSetting(`chat_kicked:${running}`), getSetting("chat_code_changed_on"),
+    getSetting(`schedule_confirmed:${cohort}`), holidaysOf(cohort), getSetting(`chat_kicked:${running}`), getSetting(`chat_url:${cohort}`),
   ]);
   const mon = `${Number(cohort.slice(5, 7))}월`;
   const gate = (from: string, done: boolean, rest: Omit<CheckItem, "state" | "from">): CheckItem =>
@@ -80,6 +79,7 @@ export async function monthlyChecklist(today = todayKST()): Promise<{ cohort: st
     key: "kick", title: `단톡방: 이번 달 환불 학생 ${toKick.length}명 내보내기`, state: toKick.length === 0 ? "done" : "todo", action: "kick",
     detail: toKick.length ? toKick.map((a) => a.name).join(", ") : refunded.length ? "모두 내보냈어요" : "환불 학생 없음",
   });
-  items.push({ key: "code", title: "단톡방 참여코드 바꾸기 (매달 1일)", state: codeChanged >= `${thisMonth}-01` ? "done" : "todo", detail: codeChanged ? `마지막 변경 ${md(codeChanged)}` : "기본 설정에서 바꿔요", href: "/admin#settings" });
+  // 단톡방은 달마다 새로 열어요: 다음 달 방 링크·참여코드 넣기 (개강 7일 전부터, 학생에게는 개강 전날부터 보여요)
+  items.push(gate(addDays(first, -7), !!chatLink, { key: "chat", title: `${mon} 단톡방 링크 넣기`, detail: chatLink ? "넣었어요 · 학생에게는 개강 전날부터 보여요" : "새 오픈채팅을 만들고 기본 설정에 넣어요", href: "/admin#settings" }));
   return { cohort, first, items };
 }

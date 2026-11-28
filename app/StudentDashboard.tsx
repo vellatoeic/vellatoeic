@@ -89,7 +89,7 @@ export default function StudentDashboard({ d, profileTodo = false }: { d: Dashbo
       )}
 
       {/* 개강 전: '○월 수업 준비 중' 카드 (지난달 안내와 헷갈리지 않게, lib/preCourse.ts) */}
-      {d.dStart !== null && d.first && <PreCourseCard pre={{ app: a, first: d.first, dStart: d.dStart }} chat={d.chatGate} />}
+      {d.dStart !== null && d.first && <PreCourseCard pre={{ app: a, first: d.first, dStart: d.dStart }} chat={d.chat} />}
 
       {/* 컴퓨터(1024px 이상)에서는 왼쪽: 라이브·진행·오늘 할 일 / 오른쪽: 카드·단톡방·메뉴 (휴대폰은 위아래 그대로) */}
       <div className="sd-cols">
@@ -203,17 +203,18 @@ export default function StudentDashboard({ d, profileTodo = false }: { d: Dashbo
         )}
       </div>
 
-      {d.chat && (
+      {/* 그 달 단톡방 (달마다 새 방, 개강 전날 ~ 열람 마감일, lib/preCourse.ts) */}
+      {d.chat?.state === "open" && (
         <a href={d.chat.url} target="_blank" rel="noreferrer" className="sd-card sd-notice">
           <Icon name="chat" size={36} />
-          <span className="sd-row-txt"><b>벨라토익 단톡방</b><small>{d.chat.code ? `참여코드 ${d.chat.code}` : "눌러서 들어가요"}</small></span>
+          <span className="sd-row-txt"><b>{Number(d.chat.cohort.slice(5, 7))}월 벨라토익 단톡방</b><small>{d.chat.code ? `참여코드 ${d.chat.code}` : "눌러서 들어가요"}</small></span>
           <Icon name="external" size={16} className="sd-chev" />
         </a>
       )}
-      {!d.chat && d.chatGate && !d.chatGate.open && (
+      {d.chat && d.chat.state !== "open" && (
         <div className="sd-card sd-notice opacity-80">
           <Icon name="chat" size={36} />
-          <span className="sd-row-txt"><b>벨라토익 단톡방</b><small>{dayLabelKo(d.chatGate.opensOn)}부터 여기서 들어갈 수 있어요</small></span>
+          <span className="sd-row-txt"><b>{Number(d.chat.cohort.slice(5, 7))}월 벨라토익 단톡방</b><small>{d.chat.state === "soon" ? `${dayLabelKo(d.chat.opensOn)}부터 여기서 들어갈 수 있어요` : "링크가 곧 여기에 올라와요"}</small></span>
         </div>
       )}
 

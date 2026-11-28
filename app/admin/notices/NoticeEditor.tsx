@@ -19,10 +19,11 @@ const COURSE_LABEL = { start: "시작반", solve: "문풀반", intensive: "속�
 const KIND_LABEL = { onsite: "현장", online: "불라방" } as const;
 const SLOT_LABEL = { am: "오전반", pm: "저녁반" } as const;
 
-type Props = { notice?: Notice; today: string; monthEnd: string };
+// months = 고를 수 있는 수강 월(지난달·수업 중·다음 달), defaultCohort = 새 공지 기본값(지금 수업 중인 달)
+type Props = { notice?: Notice; today: string; monthEnd: string; months: string[]; defaultCohort: string };
 
 // 공지 쓰기·고치기. 섹션과 대상 조건은 여러 개 추가할 수 있어요. 오른쪽(아래)에 미리보기가 보여요.
-export default function NoticeEditor({ notice, today, monthEnd }: Props) {
+export default function NoticeEditor({ notice, today, monthEnd, months, defaultCohort }: Props) {
   const [title, setTitle] = useState(notice?.title ?? "");
   const [toLabel, setToLabel] = useState(notice?.to_label ?? "");
   const [lead, setLead] = useState(notice?.lead ?? "");
@@ -98,6 +99,15 @@ export default function NoticeEditor({ notice, today, monthEnd }: Props) {
           <button type="button" onClick={() => setTargets((l) => [...l, {}])} className="btn-ghost !py-2 text-sm">+ 대상 조건 추가</button>
           {targets.length === 0 && <p className="text-xs text-amber-600">조건이 없으면 전체 공지예요 (로그인 안 한 방문자에게도 기기당 한 번 떠요).</p>}
         </div>
+
+        {/* 대상 수강 월 (2026-11-28 Vella: 신규생에게 지난달 공지는 안 보여요). 매달 반복 공지는 모든 달로 저장돼요. */}
+        <label className="block">
+          <span className="label">대상 수강 월 <span className="font-normal text-slate-400">(그 달 수강생에게만 보여요 · 매달 반복 공지는 &apos;모든 달&apos;로 저장돼요)</span></span>
+          <select name="cohort" defaultValue={notice ? notice.cohort ?? "" : defaultCohort} className="input !py-2">
+            {[...new Set([...months, ...(notice?.cohort ? [notice.cohort] : [])])].sort().map((m) => <option key={m} value={m}>{Number(m.slice(5, 7))}월 수강생</option>)}
+            <option value="">모든 달 (매달 같은 안내 · 조건이 없으면 방문자에게도)</option>
+          </select>
+        </label>
 
         <div className="grid grid-cols-2 gap-2">
           <label><span className="label">게시 시작</span><input type="date" name="starts_on" defaultValue={notice?.starts_on ?? today} required className="input !py-2" /></label>

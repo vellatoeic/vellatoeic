@@ -45,7 +45,8 @@ import { canViewNow, dayLabelKo, isOpened, openLabel, viewOpen, viewPhase, viewa
 import { signupMonths } from "@/lib/signupMonthsServer";
 import { safe } from "@/lib/safe";
 import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
-import { chatGateFor, preCourseFor, type ChatGate } from "@/lib/preCourse";
+import { chatRoomFor, preCourseFor, type ChatRoom } from "@/lib/preCourse";
+import ChatRoomCard from "@/components/ChatRoomCard";
 import PreCourseCard from "@/components/PreCourseCard";
 
 const nextMonthOf = (today: string) => shiftMonth(today.slice(0, 7), 1);
@@ -80,7 +81,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
   // 스티커판: 같은 기수·같은 수업 학생들의 출석 날짜 = 수업일
   // 수업 기수(날짜 기준): 모집 기수를 다음 달로 바꿔도 이번 달 라이브·테스트는 그대로 열려요
   const { cohort } = await safe("classAppsFor", () => classAppsFor(paid), { cohort: paid[0]?.cohort ?? null, apps: paid });
-  const [cafeUrl, account, chatUrl, chatCode] = await Promise.all([getSetting("cafe_homework_url"), getSetting("bank_account"), getSetting("chat_url"), getSetting("chat_code")]);
+  const [cafeUrl, account] = await Promise.all([getSetting("cafe_homework_url"), getSetting("bank_account")]);
   const pending = apps.filter((a) => a.status === "pending");
   const today = todayKST();
   // 🎁 스티커판 완성 선물: 수업 기수 신청 기준, 학생 1명당 기수마다 1번 (격일반은 선물 없이 축하만)
@@ -162,10 +163,10 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
     }
     return null;
   }, null);
-  // 개강 전 학생: 맨 위 '○월 수업 준비 중' 카드 · 단톡방은 개강 전날부터 (lib/preCourse.ts)
-  const [pre, chatGate] = await Promise.all([
+  // 개강 전 학생: 맨 위 '○월 수업 준비 중' 카드 · 단톡방은 달마다 새 방, 그 반 개강 전날부터 (lib/preCourse.ts)
+  const [pre, chat] = await Promise.all([
     safe("preCourse", () => preCourseFor(apps, today), null),
-    chatUrl ? safe("chatGate", () => chatGateFor(apps, today), { open: true } as ChatGate) : Promise.resolve(null),
+    safe("chatRoom", () => chatRoomFor(apps, today), null as ChatRoom),
   ]);
   const ownSlot: TimeSlot = liveApp?.slot ?? paid[0]?.slot ?? "am";
   const tab: TimeSlot = t === "am" || t === "pm" ? t : ownSlot;
@@ -263,7 +264,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
         </div>
       ))}
 
-      {pre && <PreCourseCard pre={pre} chat={chatGate} />}
+      {pre && <PreCourseCard pre={pre} chat={chat} />}
 
       {/* 컴퓨터(1024px 이상): 왼쪽 탭·라이브·특강·오늘의 테스트 / 오른쪽 미션·안내·연결·단톡방 (휴대폰은 위아래 같은 순서) */}
       <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
@@ -391,22 +392,8 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
 
       {showGift && cohort && <GiftDraw initial={myDraw} month={Number(cohort.slice(5, 7))} channelUrl={kakaoChannel} />}
 
-      {/* 단톡방: 이번 달 또는 다음 달 신청이 납부 완료된 학생, 그 반 개강 전날부터 (링크가 비어 있으면 숨김, lib/preCourse.ts) */}
-      {chatUrl && chatGate && !chatGate.open && (
-        <div className="flex items-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-slate-500">
-          <Icon name="chat" size={24} />
-          <span className="text-sm"><b className="font-jua text-base text-slate-600">벨라토익 단톡방</b> · {dayLabelKo(chatGate.opensOn)}부터 여기서 들어갈 수 있어요</span>
-        </div>
-      )}
-      {chatUrl && chatGate?.open && (
-        <a href={chatUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-2xl border-2 border-[#ffe58a] bg-[#fff9e0] px-4 py-3">
-          <span>
-            <span className="flex items-center gap-1.5 font-jua text-lg text-[#7d6728]"><Icon name="chat" size={24} />벨라토익 단톡방</span>
-            {chatCode && <span className="text-sm text-[#a7741a]">참여코드 <b className="font-jua text-lg tracking-widest">{chatCode}</b></span>}
-          </span>
-          <span className="shrink-0 text-sm font-bold text-[#a7741a]">들어가기 ↗</span>
-        </a>
-      )}
+      {/* 그 달 단톡방: 달마다 새 방, 학생 수강 달 방만 · 개강 전날 ~ 열람 마감일 (lib/preCourse.ts) */}
+      <ChatRoomCard chat={chat} />
 
       </div>
       </div>

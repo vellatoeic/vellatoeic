@@ -14,9 +14,9 @@ export const metadata = { title: "공지 · vella_toeic", robots: { index: false
 // 🔔 공지 목록: 본인 대상 공지만 (끝난 일반 공지는 숨겨요)
 export default async function NoticesPage() {
   const today = todayKST();
-  const [{ loggedIn, apps }, all] = await Promise.all([noticeIdentity(), listCurrentNotices(today)]); // 게시 중인 공지만 읽어요
+  const [{ loggedIn, apps, others }, all] = await Promise.all([noticeIdentity(), listCurrentNotices(today)]); // 게시 중인 공지만 읽어요
   const mine = await withLinks(loggedIn && apps.length
-    ? myNotices(all, apps, today)
+    ? myNotices(all, apps, today, others)
     : sortNotices(all.filter((n) => isForEveryone(n) && n.starts_on <= today && !noticeEnded(n, today))));
   const reads = new Set((await listNoticeReads({ appIds: apps.map((a) => a.id) })).map((r) => r.notice_id));
 
