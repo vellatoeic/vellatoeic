@@ -33,11 +33,12 @@ const specialDepositHandler: DepositHandler = {
       .filter((r) => r.deposit === "pending" && r.created_at >= cutoff && sameName(r.name, d.name))
       .map((r) => ({ target: "special" as const, id: r.id, confirm: () => updateOnsiteRegistrations([r.id], { deposit: "paid", deposit_paid_at: new Date().toISOString() }) }));
   },
-  // 1만 원이면서 최근 이틀 안에 같은 이름 현장 특강 신청이 있을 때만 특강 입금으로 봐요 (없으면 교재비일 수 있어요)
+  // 1만 원이면서 최근 이틀 안에 같은 이름 현장 특강 신청(보증금이 있는 특강)이 있을 때만 특강 입금으로 봐요 (없으면 교재비일 수 있어요)
+  // 12월 특강부터는 보증금이 없어서(deposit 비어 있음) 1만 원 입금은 교재비로만 봐요.
   related: async (d) => {
     if (d.amount !== SPECIAL_DEPOSIT) return false;
     const since = new Date(Date.now() - 2 * 86400000).toISOString();
-    return (await listSpecialRegistrations()).some((r) => r.mode === "onsite" && r.created_at >= since && sameName(r.name, d.name));
+    return (await listSpecialRegistrations()).some((r) => r.mode === "onsite" && r.deposit != null && r.created_at >= since && sameName(r.name, d.name));
   },
 };
 

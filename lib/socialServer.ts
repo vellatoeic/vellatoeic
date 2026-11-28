@@ -1,11 +1,11 @@
 import "server-only";
 import { randomUUID } from "crypto";
-import { appsByAccount, getApplications, getLoginLink, getSetting, linkAccount, saveLoginLink, setSetting, touchLoginLink } from "./db";
+import { appsByAccount, getApplications, getLoginLink, getProspectByAccount, getSetting, linkAccount, saveLoginLink, setSetting, touchLoginLink } from "./db";
 import { getStudentIds, isAdmin, setAccount, setAdmin, setPendingLink, setStudent } from "./auth";
 import { isActive, loginApps } from "./access";
-import { effectiveMode, isAdminLogin, isSignupNext, loginModeOf, parseAdminLogins, planLink, readyProviders, showPinLogin, showSocialLogin, withAdminLogin, type Provider } from "./socialLogin";
+import { effectiveMode, isAdminLogin, isSignupNext, isSpecialNext, loginModeOf, parseAdminLogins, planLink, readyProviders, showPinLogin, showSocialLogin, withAdminLogin, type Provider } from "./socialLogin";
 import type { Profile } from "./socialAuth";
-import { recordLogin } from "./loginActivity";
+import { recordLogin, recordProspectLogin } from "./loginActivity";
 import { safe } from "./safe";
 
 // 지금 학생 로그인 화면에 보여줄 것: 켜진 구글·카카오 버튼 + 이름·비밀번호 칸을 보여줄지
@@ -36,7 +36,8 @@ export async function socialSignIn(p: Provider, prof: Profile, next: string, lin
   }
   if (!link) {
     await setPendingLink(pending);
-    return `/login?next=${encodeURIComponent(next)}`;
+    // 특강 페이지에서 왔으면 그대로 특강 페이지로 (비수강생 신청서 · 예전 수강생은 거기서 '계정 연결하기')
+    return isSpecialNext(next) ? next : `/login?next=${encodeURIComponent(next)}`;
   }
   await touchLoginLink(p, prof.sub, { email: prof.email, nickname: prof.nickname, photo_url: prof.photo ?? null });
   await setAccount(link.account_id);
@@ -48,6 +49,12 @@ export async function socialSignIn(p: Provider, prof: Profile, next: string, lin
   }
   if (r.cancelledId) return `/my/${r.cancelledId}`; // 취소된 신청만 있으면 취소 안내 화면으로
   if (isSignupNext(next)) return next; // 신청서는 학생 번호만 있으면 돼요
+  // 비수강생(특강으로 온 잠재 고객): 학생 번호로 로그인 → 특강 페이지·내 모의고사 성적 (/go가 알맞은 곳으로)
+  const prospect = await safe("socialSignIn.prospect", () => getProspectByAccount(link.account_id), null);
+  if (prospect || isSpecialNext(next)) {
+    if (prospect) await safe("recordLogin.prospect", () => recordProspectLogin(prospect.student_no, p), undefined);
+    return next;
+  }
   // 연결은 됐는데 수강 신청이 없어요 → 예전 신청 찾기 또는 수강 신청 안내
   await setPendingLink({ ...pending, none: true });
   return `/login?next=${encodeURIComponent(next)}`;

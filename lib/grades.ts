@@ -7,8 +7,9 @@ import { isOpened } from "./viewWindow";
 // · 일반: 위 둘 다 아님 (지난달 수강생은 다음 달 개강일 0시에 일반으로 바뀌어요 = 열람 마감일 다음 날)
 // 환불·취소 신청은 등급에 넣지 않아요.
 
-export type Grade = "student" | "pre" | "general";
-export const GRADE_LABEL: Record<Grade, string> = { student: "수강생", pre: "예비수강생", general: "일반" };
+// prospect = 잠재 고객: 수강 신청 없이 특강(비수강생)으로 온 학생 (2026-11-28, 학생 명단에서만 붙여요)
+export type Grade = "student" | "pre" | "general" | "prospect";
+export const GRADE_LABEL: Record<Grade, string> = { student: "수강생", pre: "예비수강생", general: "일반", prospect: "잠재 고객" };
 
 type AppLike = { cohort: string; status: string };
 export type CohortWindow = { openAt: string | null; until: string };

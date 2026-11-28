@@ -1,7 +1,7 @@
 // ── 특강 마감 안내 팝업 (공지 표에 쓰지 않고 코드로 만들어요) ──
 // 공개된 특강마다 마감 전날 00:00(한국) ~ 마감 시각 동안, 그 특강 달 기수에 납부 완료된 수강생 중 아직 신청 안 한 학생에게.
 import { CLASSROOM } from "./config";
-import { deadlineOf, kstLabel, specialDay } from "./special";
+import { SPECIAL_CAPACITY, deadlineOf, kstLabel, needsDeposit, specialDay } from "./special";
 import type { Notice } from "./notices";
 
 type Ev = { id: string; event_date: string; starts_at: string; registration_deadline?: string | null; published?: boolean | null };
@@ -34,7 +34,9 @@ export function specialDeadlineNotices(events: Ev[], apps: App[], regs: Reg[], n
         lead: `특강 신청이 **${deadline}에 마감**돼요. 아직 신청 안 했다면 지금 신청해 주세요 :)`,
         sections: [
           { icon: "clock", title: "신청 마감", body: `**${deadline}까지**` },
-          { icon: "school", title: "현장 참여", body: `신청 후 **30분 안에 보증금 1만 원**을 입금하면 확정돼요. 참석하면 현장에서 100% 돌려드려요. 당일 **10시까지 필기구를 챙겨 ${CLASSROOM}**로 와 주세요.` },
+          { icon: "school", title: "현장 참여", body: needsDeposit(e.event_date)
+            ? `신청 후 **30분 안에 보증금 1만 원**을 입금하면 확정돼요. 참석하면 현장에서 100% 돌려드려요. 당일 **시작 10분 전까지 필기구를 챙겨 ${CLASSROOM}**로 와 주세요.`
+            : `신청하면 **바로 확정**돼요(보증금 없음 · 현장 ${SPECIAL_CAPACITY}명까지). 당일 **시작 10분 전까지 필기구를 챙겨 ${CLASSROOM}**로 와 주세요.` },
           { icon: "laptop", title: "불라방 참여", body: "신청하면 바로 확정돼요. 특강 페이지에 자료와 유튜브 링크가 올라와요." },
           { icon: "check", title: "확정 확인", body: "특강 페이지 아래 **'내 특강 신청'**에서 확인할 수 있어요." },
         ],

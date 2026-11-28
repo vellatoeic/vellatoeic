@@ -1,8 +1,10 @@
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import { activeStudentApps } from "@/lib/student";
-import { examResultsByNos, publishedExamIds, type ExamResultRow } from "@/lib/db";
-import { isViewOnly } from "@/lib/auth";
+import { examResultsByNos, getProspectByAccount, getStudentProfiles, publishedExamIds, type ExamResultRow } from "@/lib/db";
+import { getAccountId, isViewOnly } from "@/lib/auth";
+import { recordSeen } from "@/lib/loginActivity";
+import { after } from "next/server";
 import { ensureStudentNo } from "@/lib/studentNumbers";
 import { PART_NAMES, byExamDesc, isStudentNo, numberForGroup, pct, scoreDeltas, wrongByPart } from "@/lib/mockScores";
 import { specialDay } from "@/lib/special";
@@ -16,12 +18,17 @@ export const metadata = { title: "내 모의고사 성적 · vella_toeic", robot
 // 목록: 회차 카드(시험일 · 회차 · 총점 크게 · LC/RC · 지난 회차 대비) + 회차 2개 이상이면 총점 추이
 // 상세: ① 점수 ② 파트별 정답률(이름 · 맞힌 수/문항 수 · %) ③ 틀린 문항(파트별 개수 → 눌러서 펼침) ④ 총평 · 파트별 코멘트 ⑤ 분석지(있을 때만)
 // 관리자가 [공개]하기 전 회차는 점수 대신 '채점 결과를 정리하고 있어요'. 본인에게 연결된 결과만 보여요.
+// 비수강생(특강으로 온 잠재 고객, 2026-11-28 Vella): 카카오·구글로 로그인하면 특강 신청 때 받은 개인번호의 성적을 봐요.
 export default async function ScoresPage() {
   const { loggedIn, apps } = await activeStudentApps();
-  if (!loggedIn) return <LoginCard next="/class/scores" />;
-  if (apps.length === 0) return <div className="pt-12"><p className="card text-center text-slate-500">수강 정보가 없어요. Vella쌤에게 문의해 주세요.</p></div>;
+  const accountId = apps.length === 0 ? await safe("scores.account", () => getAccountId(), null) : null;
+  const prospect = accountId ? await safe("scores.prospect", () => getProspectByAccount(accountId), null) : null;
+  const guest = apps.length === 0 && !!prospect;
+  if (!loggedIn && !guest) return <LoginCard next="/class/scores" />;
+  if (apps.length === 0 && !guest) return <div className="pt-12"><p className="card text-center text-slate-500">수강 정보가 없어요. Vella쌤에게 문의해 주세요.</p></div>;
   const viewOnly = await isViewOnly();
-  const no = viewOnly ? numberForGroup(apps) : await safe("scores.studentNo", () => ensureStudentNo(apps), numberForGroup(apps));
+  const no = guest ? prospect!.student_no : viewOnly ? numberForGroup(apps) : await safe("scores.studentNo", () => ensureStudentNo(apps), numberForGroup(apps));
+  if (guest && no) after(() => safe("scores.seen", async () => recordSeen(no, (await getStudentProfiles([no]))[0]?.last_seen_at), undefined));
   const nos = [...new Set([no, ...apps.map((a) => a.student_no)].filter(isStudentNo))];
   const results = (await safe("scores.list", () => examResultsByNos(nos), [] as ExamResultRow[])).sort(byExamDesc);
   const published = await safe("scores.published", () => publishedExamIds(results.map((r) => r.exam_id)), new Set<string>());
@@ -31,7 +38,7 @@ export default async function ScoresPage() {
 
   return (
     <div className="stagger wide space-y-5 pt-8">
-      <Link href="/class" className="text-sm text-sky-deep underline">← 강의실로</Link>
+      <Link href={guest ? "/special" : "/class"} className="text-sm text-sky-deep underline">{guest ? "← 특강 페이지로" : "← 강의실로"}</Link>
       <h1 className="flex items-center gap-2 font-jua text-3xl text-sky-ink"><Icon name="trophy" size={36} />내 모의고사 성적</h1>
 
       <section className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-gradient-to-br from-[#4fb3e8] via-sky-deep to-[#1f78ad] p-5 text-white shadow-[0_10px_26px_rgba(43,143,199,0.3)]">
@@ -41,6 +48,16 @@ export default async function ScoresPage() {
         </div>
         <p className="max-w-sm text-sm leading-relaxed opacity-95">모의고사 답안지 앞면 <b>&apos;수험번호&apos; 칸</b>에 이 번호 6자리를 적어요. 다음 달에도 같은 번호예요.</p>
       </section>
+
+      {guest && (
+        <section className="card flex flex-wrap items-center justify-between gap-3 !py-4">
+          <span>
+            <b className="block font-jua text-lg text-sky-ink">내 점수에 맞는 반이 궁금하다면</b>
+            <span className="text-sm text-slate-600">시작반 650+ · 문풀반 750+ · 속성반 750+ 중 3문제로 찾아 드려요.</span>
+          </span>
+          <Link href="/#finder" className="btn !py-2 !text-sm">반 찾기</Link>
+        </section>
+      )}
 
       {results.length === 0 ? (
         <p className="card text-center text-slate-500">아직 받은 모의고사 결과가 없어요.<br /><span className="text-sm">답안지에 개인번호 <b className="text-sky-ink">{no ?? ""}</b>를 적었는지 확인해 주세요.</span></p>

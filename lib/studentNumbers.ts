@@ -1,5 +1,5 @@
 import "server-only";
-import { listApplications, reserveStudentNo, updateApplications, type Application } from "./db";
+import { appsByStudentNos, listApplications, prospectsByNos, reserveStudentNo, updateApplications, type Application } from "./db";
 import { isActive } from "./access";
 import { isStudentNo, numberForGroup } from "./mockScores";
 
@@ -16,6 +16,14 @@ export async function ensureStudentNo(apps: Pick<Application, "id" | "student_no
     for (const a of apps) if (!isStudentNo(a.student_no)) a.student_no = no;
   }
   return no;
+}
+
+// 개인번호 → 그 번호 학생의 이름들 (수강 신청서 이름 + 특강으로 온 비수강생 이름, 모의고사 결과 연결용)
+export async function namesByStudentNo(nos: string[]): Promise<Map<string, string[]>> {
+  const [apps, guests] = await Promise.all([appsByStudentNos(nos), prospectsByNos(nos).catch(() => [])]);
+  const out = new Map<string, string[]>();
+  for (const x of [...apps, ...guests]) if (x.student_no) out.set(x.student_no, [...(out.get(x.student_no) ?? []), x.name]);
+  return out;
 }
 
 // 관리 화면을 열 때: 이번 모집 기수부터(이번·다음 달 신청) 번호가 없는 학생에게 채워요.

@@ -4,12 +4,12 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import {
-  BOOKS, COURSES, PARTS, LECTURE_COURSES, DEPOSIT_MINUTES, YBM_ORDER_AMOUNT, booksFor, isAlt, isTimeSlot, calcAmount, youtubeId, todayKST,
+  BOOKS, COURSES, PARTS, LECTURE_COURSES, DEPOSIT_MINUTES, YBM_ORDER_AMOUNT, CLASSROOM, booksFor, isAlt, isTimeSlot, calcAmount, youtubeId, todayKST,
   type CourseId, type Kind, type Part, type Pickup, type Status, type Track,
 } from "@/lib/config";
 import {
   createApplication, listApplications, deleteApplication, deleteApplications, getApplication, getApplications, addHomeworkSticker, deleteHomeworkSticker, setHomeworkStar, drawGift, getGiftDraw, saveGiftItem, deleteGiftItem, setGiftSent, type GiftDraw, deletePhotosBefore, findApplicationsByName, updateApplication, updateApplications, setSetting, addLecture, updateLecture, deleteLecture, currentCohort, roundFor, addAttendance, getSetting,
-  appsByAccount, getLoginLink, saveLoginLink, linkAccount, deleteLoginLink, reserveStudentNo, appsByStudentNos, updateExamResult, deleteExamResults, saveStudentProfile, listExamResults, listExams, upsertExamInfo, setExamPublished, type Application,
+  appsByAccount, getLoginLink, saveLoginLink, linkAccount, deleteLoginLink, reserveStudentNo, getProspectByAccount, createProspect, updateProspect, specialRegistrationsOfProspect, listSpecialRegistrations, appsByStudentNos, updateExamResult, deleteExamResults, saveStudentProfile, listExamResults, listExams, upsertExamInfo, setExamPublished, type Application,
   getReceiptCheck, findReceiptTwins, updateReceiptChecks, listReceiptChecks, dropReceiptImage,
   saveMission, type Mission, createYbmOrder, listYbmOrders, updateYbmOrders, setAttendanceState, listStamps, createNotice, updateNotice, deleteNotice, markNoticeRead, listTestResults, saveTestResult, saveTestOverride, setTestDouble, deleteTestOverride, listFaq, getFaq, createFaq, updateFaq, deleteFaq, createQuestion, updateQuestion, getQuestion, listAudios, getAudio, createAudioLink, setAudioOrder, deleteAudios, createSpecialMaterialLink, createSpecialLecture, createSpecialRegistration, updateOnsiteRegistrations, expireSpecialDeposits, updateDepositEvent, listDepositEvents, getSpecialRegistrationsFor, deleteSpecialLecture, deleteSpecialMaterial, deleteSpecialRegistration, getSpecialLecture, updateSpecialLecture, cleanupOrphanSpecialFiles,
 } from "@/lib/db";
@@ -22,7 +22,7 @@ import { noticeIdentity } from "@/lib/noticeView";
 import type { NoticeSection, NoticeTarget } from "@/lib/notices";
 import { activeStudentApps } from "@/lib/student";
 import { SCHEDULE_CLASSES, holidayKey, homeworkAssignmentDays, isHomeworkStickerEligible, parseHolidays, parseSchoolDays, previousMonth, scheduleKey, scheduleClassFor, schoolDaysFor, shiftSchoolDays, type ScheduleClass } from "@/lib/schedule";
-import { specialRegistrationOpen } from "@/lib/special";
+import { SPECIAL_CAPACITY, needsDeposit, onsiteTaken, specialRegistrationOpen, specialWhen } from "@/lib/special";
 import { MISSION_STEPS, studentMission, type MissionStep } from "@/lib/mission";
 import { audioExpiresOn, autoCleanupAudios, isAudioBook } from "@/lib/audio";
 import { cleanMaterialLink, cleanMaterialTitle } from "@/lib/materialLink";
@@ -45,7 +45,7 @@ import { isStudentNo, matchResult, numberForGroup } from "@/lib/mockScores";
 import { cleanPhone, cleanReasons, cleanTarget } from "@/lib/profile";
 import { LINK_LATER_COOKIE } from "@/lib/profileServer";
 import { cookies } from "next/headers";
-import { ensureStudentNo } from "@/lib/studentNumbers";
+import { ensureStudentNo, namesByStudentNo } from "@/lib/studentNumbers";
 import { recordLogin } from "@/lib/loginActivity";
 import { BOARD_ROWS, dateLabel, defaultTitle, sessionNo, targetsOf } from "@/lib/lectureBoard";
 import { scheduleDays } from "@/lib/classCalendar";
@@ -160,7 +160,9 @@ export async function submitApplication(_: FormState, fd: FormData): Promise<For
     redirect(`/my/${existing.id}?again=1`);
   }
   // 개인번호 6자리: 같은 학생(같은 이름+비밀번호 또는 같은 카카오·구글 계정)의 예전 신청 번호를 그대로, 없으면 새로 (만들지 못해도 신청은 받고 나중에 채워요)
-  const studentNo = numberForGroup(sameStudent) ?? (await safe("reserveStudentNo", () => reserveStudentNo(), null));
+  // 특강으로 먼저 온 비수강생(같은 카카오·구글 계정)이면 그때 받은 번호를 이어서 써요 (모의고사 성적이 그대로 이어져요)
+  const guestNo = account ? (await safe("guestNo", () => getProspectByAccount(account), null))?.student_no ?? null : null;
+  const studentNo = numberForGroup(sameStudent) ?? guestNo ?? (await safe("reserveStudentNo", () => reserveStudentNo(), null));
 
   const id = await createApplication({
     cohort,
@@ -1015,12 +1017,20 @@ export async function markMission(fd: FormData) {
   revalidatePath("/class");
 }
 
-// ── 특강 신청 (그 달 납부 완료 수강생만, 이름 + 강의실 비밀번호로 확인) ──────
+// ── 특강 신청 ──────────────────────────────
+// 수강생: 그 달 납부 완료 신청으로 (이름 + 강의실 비밀번호, 또는 로그인한 학생) · 현장/불라방
+// 비수강생(2026-11-28 Vella): 학원 문자 → 카카오·구글 로그인 + 이름·휴대폰 → 현장만 (registerGuestSpecial)
+// 12월 특강부터 보증금 없음(바로 확정), 현장 정원 90명 (lib/special.ts)
 const validTime = (v: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
 const validDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+const FULL_MSG = `현장 자리가 다 찼어요(${SPECIAL_CAPACITY}명).`;
+const onsiteFull = async (eventId: string) => onsiteTaken(await listSpecialRegistrations(eventId)) >= SPECIAL_CAPACITY;
+const confirmedOnsiteMsg = (event: { event_date: string; starts_at: string; ends_at: string | null }) =>
+  `신청이 확정됐어요. ${specialWhen(event)} · 시작 10분 전까지 필기구를 챙겨 ${CLASSROOM}로 와 주세요.`;
 
 export async function registerSpecialLecture(_: FormState, fd: FormData): Promise<FormState> {
   if (await isViewOnly()) return { error: VIEW_ONLY };
+  if (clean(fd.get("guest")) === "1") return registerGuestSpecial(fd);
   const eventId = clean(fd.get("event_id"));
   const mode = clean(fd.get("mode"));
   const name = clean(fd.get("name"));
@@ -1040,7 +1050,7 @@ export async function registerSpecialLecture(_: FormState, fd: FormData): Promis
   const month = mine.filter((a) => a.cohort === event.event_date.slice(0, 7));
   if (month.length === 0) {
     await sleep(800);
-    return { error: social ? "이번 달 수강 신청 내역이 없어요. 수강 신청을 먼저 해 주세요." : "이름 또는 강의실 비밀번호가 맞지 않아요. 이번 달 수강 신청 내역을 확인해 주세요." };
+    return { error: social ? "이 달 수강 신청 내역이 없어요. 수강생이 아니면 '수강생이 아니에요'로 신청해 주세요." : "이름 또는 강의실 비밀번호가 맞지 않아요. 이 달 수강생이 아니면 '수강생이 아니에요'로 신청해 주세요." };
   }
   const paid = month.filter(canWatch);
   if (paid.length === 0) return { error: "수강 신청 후에 특강을 신청할 수 있어요." };
@@ -1052,14 +1062,79 @@ export async function registerSpecialLecture(_: FormState, fd: FormData): Promis
   // 입금 기한이 지나 취소된 신청은 지우고 새로 받아요.
   for (const r of existing.filter((x) => x.deposit === "cancelled")) await deleteSpecialRegistration(r.id);
   const already = existing.some((r) => r.deposit !== "cancelled");
-  if (!already) await createSpecialRegistration({ special_lecture_id: eventId, application_id: paid[0].id, mode, name: paid[0].name, deposit: mode === "onsite" ? "pending" : null });
+  if (already) {
+    revalidatePath("/special");
+    return { ok: "이미 신청한 특강이에요. 아래에서 신청 내용을 확인해 주세요." };
+  }
+  if (mode === "onsite" && (await onsiteFull(eventId))) return { error: `${FULL_MSG} 불라방으로 신청해 주세요.` };
+  const deposit = needsDeposit(event.event_date);
+  await createSpecialRegistration({ special_lecture_id: eventId, application_id: paid[0].id, mode, name: paid[0].name, deposit: mode === "onsite" && deposit ? "pending" : null });
   revalidatePath("/special");
-  if (already) return { ok: "이미 신청한 특강이에요. 아래에서 신청 내용을 확인해 주세요." };
   return {
-    ok: mode === "onsite"
-      ? "신청이 완료됐어요. 보증금 1만 원을 본인 이름으로 입금해 주세요. 특강에 참여하면 현장에서 100% 돌려드려요. 계좌는 아래 '내 특강 신청'에 있어요."
-      : "신청이 완료됐어요. 자료는 특강 하루 전, 참여 링크는 특강 시작 전에 이 페이지에 올라와요.",
+    ok: mode === "online"
+      ? "신청이 완료됐어요. 자료는 특강 하루 전, 참여 링크는 특강 시작 전에 이 페이지에 올라와요."
+      : deposit
+        ? "신청이 완료됐어요. 보증금 1만 원을 본인 이름으로 입금해 주세요. 특강에 참여하면 현장에서 100% 돌려드려요. 계좌는 아래 '내 특강 신청'에 있어요."
+        : confirmedOnsiteMsg(event),
   };
+}
+
+// 비수강생 특강 신청: 카카오·구글 로그인(처음이면 이 신청으로 계정이 만들어져요) + 이름·휴대폰 + 개인정보 동의(필수) + '벨라토익 소식 받을게요'(선택)
+// 개인번호를 받아요(모의고사 답안지 수험번호 칸). 예전에 수강한 학생이면 그 번호를 그대로 써요.
+async function registerGuestSpecial(fd: FormData): Promise<FormState> {
+  const eventId = clean(fd.get("event_id"));
+  const name = clean(fd.get("guest_name")).replace(/\s/g, "");
+  const phone = cleanPhone(clean(fd.get("guest_phone")));
+  const optIn = clean(fd.get("news")) === "1";
+  const event = await getSpecialLecture(eventId);
+  if (!event || event.published === false) return { error: "신청할 특강을 선택해 주세요." };
+  if (!specialRegistrationOpen(event)) return { error: "신청이 마감됐어요." };
+  if (name.length < 2) return { error: "이름을 입력해 주세요." };
+  if (!phone) return { error: "휴대폰 번호를 확인해 주세요. (예: 010-1234-5678)" };
+  if (clean(fd.get("agree")) !== "1") return { error: "개인정보 수집·이용에 동의해 주세요." };
+
+  // 계정: 로그인한 카카오·구글 학생 번호, 처음 로그인이면 지금 만들어요
+  let account = await getAccountId();
+  if (!account) {
+    const pending = await getPendingLink();
+    if (!pending || pending.none) return { error: "먼저 카카오 또는 구글로 로그인해 주세요." };
+    const existingLink = await getLoginLink(pending.p, pending.sub);
+    account = existingLink?.account_id ?? randomUUID();
+    if (!existingLink) await saveLoginLink({ provider: pending.p, subject: pending.sub, account_id: account, email: pending.email, nickname: pending.nick, photo_url: pending.photo ?? null });
+    await setAccount(account);
+    await clearPendingLink();
+  }
+  // 이 달 수강생이면 수강생 신청으로 받아요 (같은 계정에 그 달 납부 완료 신청)
+  const apps = (await appsByAccount(account)).filter(isActive);
+  const monthPaid = apps.filter((a) => a.cohort === event.event_date.slice(0, 7) && canWatch(a));
+  if (monthPaid.length > 0) {
+    await setStudent(apps.map((a) => a.id));
+    revalidatePath("/special");
+    return { error: "이 달 수강생이에요. 새로고침한 뒤 '수강생이에요'로 신청해 주세요." };
+  }
+
+  let prospect = await getProspectByAccount(account);
+  const now = new Date().toISOString();
+  if (!prospect) {
+    const no = numberForGroup(apps) ?? (await reserveStudentNo());
+    prospect = await createProspect({ account_id: account, student_no: no, name, phone, news_opt_in: optIn });
+  } else {
+    const patch: Parameters<typeof updateProspect>[2] = { name, phone, news_opt_in: optIn, news_opt_in_at: optIn ? (prospect.news_opt_in ? prospect.news_opt_in_at : now) : null };
+    if (!prospect.student_no) patch.student_no = numberForGroup(apps) ?? (await reserveStudentNo());
+    await updateProspect(prospect.id, account, patch);
+    prospect = { ...prospect, ...patch };
+  }
+  const mine = (await specialRegistrationsOfProspect(prospect.id)).filter((r) => r.special_lecture_id === eventId);
+  for (const r of mine.filter((x) => x.deposit === "cancelled")) await deleteSpecialRegistration(r.id);
+  if (mine.some((r) => r.deposit !== "cancelled")) {
+    revalidatePath("/special");
+    return { ok: `이미 신청한 특강이에요. 개인번호 ${prospect.student_no}` };
+  }
+  if (await onsiteFull(eventId)) return { error: `${FULL_MSG} 다음 특강에 만나요!` };
+  const deposit = needsDeposit(event.event_date);
+  await createSpecialRegistration({ special_lecture_id: eventId, application_id: null, prospect_id: prospect.id, mode: "onsite", name, phone, deposit: deposit ? "pending" : null });
+  revalidatePath("/special");
+  return { ok: `${deposit ? "신청이 완료됐어요. 보증금 1만 원을 본인 이름으로 입금해 주세요." : confirmedOnsiteMsg(event)} 개인번호 ${prospect.student_no}` };
 }
 
 // 특강 페이지에서 강의실 계정으로 로그인 (강의실과 같은 이름·비밀번호)
@@ -1641,7 +1716,7 @@ export async function linkExamResults(fd: FormData) {
     if (key.startsWith("typed:")) pairs.set(key.slice(6), v); // 직접 적은 번호가 우선
   }
   if (pairs.size === 0) return;
-  const real = new Set((await appsByStudentNos([...pairs.values()])).map((a) => a.student_no)); // 실제로 있는 학생 번호만
+  const real = new Set((await namesByStudentNo([...pairs.values()])).keys()); // 실제로 있는 학생 번호만 (비수강생 포함)
   for (const [id, no] of pairs) if (real.has(no)) await updateExamResult(id, { linked_no: no, match_status: "manual", match_note: "선생님 연결" });
   revalidatePath("/admin/scores");
   revalidatePath("/class/scores");
@@ -1726,9 +1801,7 @@ export async function rejudgeExamReview(fd: FormData) {
   if (!(await isAdmin())) return;
   const examId = clean(fd.get("exam_id"));
   const review = (await listExamResults()).filter((r) => r.match_status === "review" && (!examId || r.exam_id === examId));
-  const apps = await appsByStudentNos(review.flatMap((r) => (r.student_no ? [r.student_no] : [])));
-  const namesByNo = new Map<string, string[]>();
-  for (const a of apps) if (a.student_no) namesByNo.set(a.student_no, [...(namesByNo.get(a.student_no) ?? []), a.name]);
+  const namesByNo = await namesByStudentNo(review.flatMap((r) => (r.student_no ? [r.student_no] : [])));
   let matched = 0;
   for (const r of review) {
     const m = matchResult(r, namesByNo);

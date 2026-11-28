@@ -37,12 +37,14 @@ export const showSocialLogin = (m: LoginMode) => m !== "pin";
 
 // 로그인 뒤 돌아갈 주소: 사이트 안의 정해진 화면만 (다른 사이트로 보내지 않아요)
 // 정해지지 않았으면 /go → 관리자 / 신청 후 / 신청 전 중 알맞은 화면 (lib/zones.ts)
-const NEXT_OK = [/^\/go$/, /^\/class$/, /^\/class\/tests$/, /^\/class\/scores$/, /^\/welcome$/, /^\/me$/, /^\/check(\?[\w=&%.-]*)?$/, /^\/mission$/, /^\/faq$/, /^\/special$/, /^\/guide\/(onsite|online)$/];
+const NEXT_OK = [/^\/go$/, /^\/class$/, /^\/class\/tests$/, /^\/class\/scores$/, /^\/welcome$/, /^\/me$/, /^\/check(\?[\w=&%.-]*)?$/, /^\/mission$/, /^\/faq$/, /^\/special(\?guest=1)?$/, /^\/guide\/(onsite|online)$/];
 export function safeNext(next: string | null | undefined): string {
   const v = (next ?? "").trim();
   return NEXT_OK.some((re) => re.test(v)) ? v : "/go";
 }
 export const isSignupNext = (next: string) => /^\/guide\/(onsite|online)$/.test(next);
+// 특강 페이지에서 로그인: 연결 전 계정도 '처음 연결' 화면 대신 특강 페이지로 돌아가요(비수강생 신청, 2026-11-28)
+export const isSpecialNext = (next: string) => /^\/special(\?guest=1)?$/.test(next);
 
 // 카톡·인스타·네이버 앱 안의 브라우저: 구글은 이런 곳에서 로그인을 막아요(403 disallowed_useragent)
 export function inAppBrowser(ua: string): "kakaotalk" | "other" | null {

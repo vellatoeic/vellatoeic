@@ -15,6 +15,13 @@ export async function recordLogin(apps: Pick<Application, "id" | "student_no" | 
   await saveStudentProfile(no, { last_login_at: now, last_login_via: via, last_seen_at: now });
 }
 
+// 비수강생(잠재 고객): 개인번호로 같은 기록을 남겨요
+export async function recordProspectLogin(no: string | null, via: LoginVia) {
+  if (!no) return;
+  const now = new Date().toISOString();
+  await saveStudentProfile(no, { last_login_at: now, last_login_via: via, last_seen_at: now });
+}
+
 // 한국 날짜 (YYYY-MM-DD)
 export const kstDay = (iso: string | null | undefined) => (iso ? new Date(Date.parse(iso) + 9 * 3600 * 1000).toISOString().slice(0, 10) : null);
 

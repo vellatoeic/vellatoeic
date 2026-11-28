@@ -7,7 +7,7 @@ import { getApplication, getSpecialRegistrationsFor, isPreview, listApplications
 import { isAdmin } from "@/lib/auth";
 import { classDaysOf, holidaysOf } from "@/lib/classCalendar";
 import { isHomeworkStickerEligible } from "@/lib/schedule";
-import { specialDay } from "@/lib/special";
+import { needsDeposit, specialDay } from "@/lib/special";
 import { TEST_LABEL } from "@/lib/tests";
 import { missionCount } from "@/lib/mission";
 import { watchSummary } from "@/lib/watchlist";
@@ -251,7 +251,7 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
                   return (
                     <li key={r.id} className="flex flex-wrap items-center gap-2 py-2">
                       <b className="text-sky-ink">{e ? `${specialDay(e.event_date)} ${e.title}` : "특강"}</b>
-                      <span className="text-slate-500">{r.mode === "onsite" ? `현장 · ${DEPOSIT[r.deposit ?? "pending"]}` : "불라방"}</span>
+                      <span className="text-slate-500">{r.mode === "onsite" ? `현장 · ${r.deposit == null && e && !needsDeposit(e.event_date) ? "확정" : DEPOSIT[r.deposit ?? "pending"]}` : "불라방"}</span>
                       {r.deposit_refunded_at && <span className={`${chip} bg-emerald-100 text-emerald-700`}>보증금 환불 완료</span>}
                     </li>
                   );

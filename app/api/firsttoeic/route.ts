@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createHash, timingSafeEqual } from "crypto";
 import { allow, count } from "@/lib/rateLimit";
 import { carryManualLinks, matchResult, parsePayload, staleResultIds } from "@/lib/mockScores";
-import { appsByStudentNos, deleteExamResults, examRowsOf, getExamResults, upsertExamInfo, upsertExamResults, type ExamResultRow } from "@/lib/db";
+import { namesByStudentNo } from "@/lib/studentNumbers";
+import { deleteExamResults, examRowsOf, getExamResults, upsertExamInfo, upsertExamResults, type ExamResultRow } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -47,9 +48,8 @@ export async function POST(req: NextRequest) {
 
   try {
     // 개인번호 → 그 번호 학생의 신청서 이름들
-    const apps = await appsByStudentNos(results.flatMap((r) => (r.student_no ? [r.student_no] : [])));
-    const namesByNo = new Map<string, string[]>();
-    for (const a of apps) if (a.student_no) namesByNo.set(a.student_no, [...(namesByNo.get(a.student_no) ?? []), a.name]);
+    // (특강으로 온 비수강생 개인번호도 함께, lib/studentNumbers.ts)
+    const namesByNo = await namesByStudentNo(results.flatMap((r) => (r.student_no ? [r.student_no] : [])));
     const existing = new Map((await getExamResults(results.map((r) => r.result_id))).map((r) => [r.result_id, r]));
     const examRows = await examRowsOf(exam.id);
     const stale = staleResultIds(examRows.map((r) => r.result_id), results.map((r) => r.result_id));

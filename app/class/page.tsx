@@ -12,7 +12,7 @@ import BookReceived from "@/components/BookReceived";
 import TestForm from "@/components/tests/TestForm";
 import { studentTests, takesTests } from "@/lib/dailyTests";
 import { TEST_LABEL } from "@/lib/tests";
-import { specialDay } from "@/lib/special";
+import { specialConfirmed, specialDay } from "@/lib/special";
 import { listAudios, listLectures, listMissions, listStamps, getSetting, getSpecialRegistrationsFor, listSpecialLectures } from "@/lib/db";
 import { missionCount, missionFor } from "@/lib/mission";
 import { audioBooksFor, dayDiff, studentAudioWindow } from "@/lib/audio";
@@ -292,7 +292,7 @@ export default async function ClassRoom({ searchParams }: { searchParams: Promis
       )}
 
       {mySpecials.map(({ r, e }) => {
-        const ok = r.mode === "online" || r.deposit === "paid";
+        const ok = specialConfirmed(r, e.event_date);
         return (
           <Link key={r.id} href="/special" className={`flex items-center justify-between gap-2 rounded-2xl border-2 px-4 py-3 text-sm ${ok ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
             <span className="inline-flex flex-wrap items-center gap-1 font-bold text-slate-700"><Icon name="mic" size={20} />{specialDay(e.event_date)} 특강 · <span className={`inline-flex items-center gap-1 ${ok ? "text-emerald-700" : "text-amber-700"}`}><Icon name={ok ? "check" : "hourglass"} size={18} />{ok ? "신청 확정" : "보증금 입금 대기"}</span></span>

@@ -5,7 +5,7 @@ import { addSpecialMaterialLink, cleanupSpecialFiles, publishSpecials, markDepos
 import { DEPOSIT_MINUTES, DEPOSIT_LABEL, SPECIAL_DEPOSIT, won, type DepositStatus } from "@/lib/config";
 import SmsTest from "./SmsTest";
 import SelectAll from "../SelectAll";
-import { deadlineOf, kstLabel, specialDay, specialRegistrationOpen, specialWhen } from "@/lib/special";
+import { SPECIAL_CAPACITY, deadlineOf, kstLabel, needsDeposit, onsiteTaken, specialDay, specialRegistrationOpen, specialWhen } from "@/lib/special";
 import { specialRefundsDue } from "@/lib/specialRefunds";
 import AdminTabs from "../AdminTabs";
 import LoginForm from "../LoginForm";
@@ -49,7 +49,8 @@ const DEPOSIT_TONE: Record<DepositStatus, string> = {
 };
 const kst = (iso: string) => new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
-function Roster({ title, items, onsiteForm, refunded }: { title: string; items: SpecialRegistration[]; onsiteForm?: string; refunded: Set<string> }) {
+// deposit=false: 12월부터 보증금 없는 특강 (보증금 칩·입금 확정 없음). 비수강생(prospect_id)은 '비수강생' 칩 + 휴대폰(당일 안내용)
+function Roster({ title, items, onsiteForm, refunded, deposit = true }: { title: string; items: SpecialRegistration[]; onsiteForm?: string; refunded: Set<string>; deposit?: boolean }) {
   const sorted = [...items].sort((a, b) => b.created_at.localeCompare(a.created_at)); // 최신 신청이 위
   return (
     <div className="mt-3">
@@ -63,9 +64,11 @@ function Roster({ title, items, onsiteForm, refunded }: { title: string; items: 
                 <span className="flex flex-wrap items-center gap-1.5">
                   {onsiteForm && <input type="checkbox" name="ids" value={r.id} form={onsiteForm} aria-label={`${r.name} 선택`} className="h-4 w-4 accent-sky-deep" />}
                   {r.application_id ? <a href={`/admin/students/${r.application_id}`} className="font-bold text-sky-ink underline decoration-sky-main underline-offset-2">{r.name}</a> : <b className="text-sky-ink">{r.name}</b>}
+                  {r.prospect_id && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-700">비수강생</span>}
+                  {r.prospect_id && r.phone && <span className="text-xs text-slate-500">{r.phone.replace(/^(\d{3})(\d{3,4})(\d{4})$/, "$1-$2-$3")}</span>}
                   {r.application_id && refunded.has(r.application_id) && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-600">수강 환불</span>}
                   {r.deposit_refunded_at && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">보증금 환불 완료</span>}
-                  {onsiteForm && <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${DEPOSIT_TONE[d]}`}>{d === "review" ? "입금 대기" : DEPOSIT_LABEL[d]}</span>}
+                  {onsiteForm && deposit && <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${DEPOSIT_TONE[d]}`}>{d === "review" ? "입금 대기" : DEPOSIT_LABEL[d]}</span>}
                   <span className="text-xs text-slate-400">신청 {kst(r.created_at)}</span>
                 </span>
                 <details className="text-sm">
@@ -304,8 +307,9 @@ export default async function SpecialAdminPage({ searchParams }: { searchParams:
                 <h3 className="font-jua text-lg text-sky-ink">신청 명단 {registrations.length}명</h3>
                 <a href={`/admin/special/csv?id=${event.id}`} className="btn-ghost !py-2 text-sm">CSV 받기</a>
               </div>
-              <Roster title="현장" items={onsite} onsiteForm={`onsite-${event.id}`} refunded={refunded} />
-              {onsite.length > 0 && (
+              <Roster title={`현장 (정원 ${onsiteTaken(onsite)}/${SPECIAL_CAPACITY} · 비수강생 ${onsite.filter((r) => r.prospect_id && r.deposit !== "cancelled").length})`} items={onsite} onsiteForm={needsDeposit(event.event_date) ? `onsite-${event.id}` : undefined} deposit={needsDeposit(event.event_date)} refunded={refunded} />
+              {!needsDeposit(event.event_date) && <p className="mt-1 text-xs text-slate-500">12월 특강부터 보증금이 없어요 · 신청하면 바로 확정돼요.</p>}
+              {needsDeposit(event.event_date) && onsite.length > 0 && (
                 <CloseOnSubmitForm id={`onsite-${event.id}`} action={bulkSpecialOnsite} className="mt-2 space-y-2 rounded-2xl bg-amber-50 p-3 text-sm">
                   <p className="text-slate-600">
                     보증금 {won(SPECIAL_DEPOSIT)} · 입금 대기 {onsite.filter((r) => !r.deposit || r.deposit === "pending" || r.deposit === "review").length}명 · 확정 {onsite.filter((r) => r.deposit === "paid").length}명

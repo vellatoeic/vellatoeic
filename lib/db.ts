@@ -180,6 +180,8 @@ export type SpecialRegistration = {
   deposit: DepositStatus | null; // 현장 신청 보증금 (불라방은 없음)
   deposit_paid_at: string | null;
   deposit_refunded_at?: string | null; // 수강 환불로 보증금을 돌려준 시각
+  prospect_id?: string | null; // 비수강생 신청 (SQL 49, prospects)
+  phone?: string | null; // 비수강생 휴대폰 (특강 당일 안내용)
   created_at: string;
 };
 
@@ -231,6 +233,7 @@ type Mem = {
   examResults?: ExamResultRow[];
   profiles?: StudentProfile[];
   exams?: ExamInfoRow[];
+  prospects?: Prospect[];
 };
 const g = globalThis as unknown as { __vellaMem?: Mem };
 const mem: Mem = (g.__vellaMem ??= { apps: [], lectures: [], settings: {}, attendance: [], homework: [], photos: {}, specialLectures: [], specialRegistrations: [], specialMaterials: [], missions: [], audios: [], faq: [], questions: [], depositEvents: [], testResults: [], testOverrides: [], testDoubles: [], notices: [], noticeReads: [], ybmOrders: [], loginLinks: [], receiptChecks: [] });
@@ -1244,7 +1247,7 @@ export async function updateDepositEvent(id: string, patch: Partial<Pick<Deposit
   if (e) Object.assign(e, patch);
 }
 
-export async function createSpecialRegistration(registration: Pick<SpecialRegistration, "special_lecture_id" | "application_id" | "mode" | "name" | "deposit">): Promise<string> {
+export async function createSpecialRegistration(registration: Pick<SpecialRegistration, "special_lecture_id" | "application_id" | "mode" | "name" | "deposit"> & { prospect_id?: string | null; phone?: string | null }): Promise<string> {
   if (sb) {
     const { data, error } = await sb.from("special_lecture_registrations").insert(registration).select("id").single();
     if (error) throw error;
@@ -1960,6 +1963,92 @@ export async function saveStudentProfile(no: string, patch: Partial<Omit<Student
   const old = list.find((p) => p.student_no === no);
   if (old) Object.assign(old, row);
   else list.push({ phone: null, target_score: null, reasons: [], reason_note: null, ...row });
+}
+
+// ── 비수강생(잠재 고객, SQL 49) ──────────────────
+// 카카오·구글 계정으로 특강을 신청한 비수강생. 개인번호를 받아 모의고사 성적을 봐요. 나중에 수강 등록하면 같은 번호로 이어져요.
+export type Prospect = {
+  id: string;
+  account_id: string;
+  student_no: string | null;
+  name: string;
+  phone: string | null;
+  news_opt_in: boolean; // '벨라토익 소식 받을게요'
+  news_opt_in_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function getProspectByAccount(accountId: string | null): Promise<Prospect | null> {
+  if (!accountId || !isUuid(accountId)) return null;
+  return memo(`prospect:${accountId}`, async () => {
+    if (sb) {
+      const { data, error } = await sb.from("prospects").select("*").eq("account_id", accountId).maybeSingle();
+      if (error) throw error;
+      return (data as Prospect | null) ?? null;
+    }
+    return (mem.prospects ?? []).find((x) => x.account_id === accountId) ?? null;
+  });
+}
+
+export async function listProspects(): Promise<Prospect[]> {
+  if (sb) {
+    const db = sb;
+    return allRows<Prospect>((from, to) => db.from("prospects").select("*").order("created_at", { ascending: false }).order("id").range(from, to));
+  }
+  return [...(mem.prospects ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+export async function prospectsByNos(nos: string[]): Promise<Prospect[]> {
+  const ok = [...new Set(nos.filter((n) => /^[0-9]{6}$/.test(n)))];
+  if (ok.length === 0) return [];
+  if (sb) {
+    const db = sb;
+    return inChunks(ok, async (chunk) => {
+      const { data, error } = await db.from("prospects").select("*").in("student_no", chunk);
+      if (error) throw error;
+      return data as Prospect[];
+    });
+  }
+  return (mem.prospects ?? []).filter((x) => x.student_no && ok.includes(x.student_no));
+}
+
+export async function createProspect(row: Pick<Prospect, "account_id" | "student_no" | "name" | "phone" | "news_opt_in">): Promise<Prospect> {
+  const now = new Date().toISOString();
+  const full = { ...row, news_opt_in_at: row.news_opt_in ? now : null };
+  forget(`prospect:${row.account_id}`);
+  if (sb) {
+    const { data, error } = await sb.from("prospects").insert(full).select("*").single();
+    if (error) throw error;
+    return data as Prospect;
+  }
+  const created: Prospect = { ...full, id: crypto.randomUUID(), created_at: now, updated_at: now };
+  (mem.prospects ??= []).push(created);
+  return created;
+}
+
+export async function updateProspect(id: string, accountId: string, patch: Partial<Pick<Prospect, "name" | "phone" | "news_opt_in" | "news_opt_in_at" | "student_no">>) {
+  if (!isUuid(id)) return;
+  const row = { ...patch, updated_at: new Date().toISOString() };
+  forget(`prospect:${accountId}`);
+  if (sb) {
+    const { error } = await sb.from("prospects").update(row).eq("id", id);
+    if (error) throw error;
+    return;
+  }
+  const old = (mem.prospects ?? []).find((x) => x.id === id);
+  if (old) Object.assign(old, row);
+}
+
+// 비수강생의 특강 신청
+export async function specialRegistrationsOfProspect(prospectId: string): Promise<SpecialRegistration[]> {
+  if (!isUuid(prospectId)) return [];
+  if (sb) {
+    const { data, error } = await sb.from("special_lecture_registrations").select("*").eq("prospect_id", prospectId).order("created_at");
+    if (error) throw error;
+    return data as SpecialRegistration[];
+  }
+  return mem.specialRegistrations.filter((r) => r.prospect_id === prospectId);
 }
 
 // 1.1: 이 회차에 지금 저장된 결과 (지울 것·이어받을 연결 찾기용, 이름·연결만)

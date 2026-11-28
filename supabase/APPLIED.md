@@ -52,6 +52,7 @@
 | `46_exam_publish.sql` | 완료 · 2026-11-27 · npm run sql | 모의고사 회차별 '공개' 스위치(결과화면 가이드 2장): 회차 표(firsttoeic_exams)만 새로 만들어요. 여러 번 실행해도 안전해요. |
 | `47_login_activity.sql` | 완료 · 2026-11-27 · npm run sql | 학생 명단용 기록: 카카오·구글 프로필 사진(login_links.photo_url)과 학생별 마지막 로그인·접속(student_profiles)에 빈 칸만 추가해요. 여러 번 실행해도 안전해요. |
 | `48_notice_cohort_monthly_chat.sql` | 완료 · 2026-11-28 · npm run sql | 공지 '대상 수강 월'(site_notices.cohort, 비우면 모든 달) + 단톡방을 달마다 따로(지금 단톡방 = 11월 방 → chat_url:2026-11) |
+| `49_special_guests.sql` | 완료 · 2026-11-28 · npm run sql | 비수강생 특강 신청(잠재 고객): 카카오·구글 계정 + 이름·휴대폰 + '벨라토익 소식 받을게요' 동의를 저장하는 표와, 특강 신청에 연결하는 칸을 추가해요. 여러 번 실행해도 안전해요. |
 
 > 2026-11-13 새 Supabase 프로젝트(서울)로 이사: `scripts/migrate-db.mjs --run`으로 옛 DB의 public 구조·데이터·권한·RLS·보관함 설정을 그대로 복사했어요. 위 기록(1~32)은 새 DB에도 그대로 들어 있어요.
 > `33_speed_cleanup.sql`: 옛 DB 확인 결과 ①인덱스 4개만 들어 있고 ②10월 이전 정리는 실행되지 않은 상태로 이사됐어요(완료로 기록하지 않음). 정리는 `35_october_cleanup.sql`로 따로 해요.

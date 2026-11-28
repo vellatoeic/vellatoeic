@@ -2,7 +2,7 @@ import Icon from "@/components/Icon";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { KINDS, classSlotLabel, cohortLabel } from "@/lib/config";
-import { isPreview, listApplications } from "@/lib/db";
+import { isPreview, listApplications, listProspects } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { summariesFor } from "@/lib/studentSummary";
 import { todayKST } from "@/lib/config";
@@ -24,13 +24,13 @@ export default async function StudentSearch({ searchParams }: { searchParams: Pr
   const raw = (sp.q ?? "").trim();
   if (!raw) {
     const { rows, cohorts } = await buildRoster();
-    const g = sp.g === "student" || sp.g === "pre" || sp.g === "general" ? sp.g : "all";
+    const g = sp.g === "student" || sp.g === "pre" || sp.g === "general" || sp.g === "prospect" ? sp.g : "all";
     return (
       <div className="space-y-5 pt-8">
         <AdminTabs active="students" />
         <div>
           <h2 className="flex flex-wrap items-center gap-1.5 font-jua text-2xl text-sky-ink"><Icon name="people" size={28} />학생 명단 <span className="text-base text-slate-500">· {rows.length}명</span></h2>
-          <p className="mt-1 text-sm text-slate-500">등급은 날짜로 자동으로 바뀌어요 · 예비수강생은 개강일 오전 9시에 수강생이 되고, 수강생은 다음 달 개강일 0시에 일반이 돼요.</p>
+          <p className="mt-1 text-sm text-slate-500">등급은 날짜로 자동으로 바뀌어요 · 예비수강생은 개강일 오전 9시에 수강생이 되고, 수강생은 다음 달 개강일 0시에 일반이 돼요. 잠재 고객 = 수강 신청 없이 특강(비수강생)으로 온 학생.</p>
         </div>
         <RosterTable rows={rows} cohorts={cohorts} today={todayKST()} initialGrade={g} />
       </div>
@@ -43,14 +43,31 @@ export default async function StudentSearch({ searchParams }: { searchParams: Pr
         .filter((a) => `${a.name}${a.depositor}${a.phone ?? ""}${a.student_no ?? ""}`.replace(/\s/g, "").includes(q))
         .sort((a, b) => b.cohort.localeCompare(a.cohort) || b.created_at.localeCompare(a.created_at))
     : [];
-  if (found.length === 1) redirect(`/admin/students/${found[0].id}`);
+  // 수강 신청 없이 특강으로 온 비수강생(잠재 고객)도 찾아요
+  const guests = (await listProspects().catch(() => [])).filter((x) => `${x.name}${x.phone ?? ""}${x.student_no ?? ""}`.replace(/\s/g, "").includes(q) && !found.some((a) => a.student_no && a.student_no === x.student_no));
+  if (found.length === 1 && guests.length === 0) redirect(`/admin/students/${found[0].id}`);
   const summary = await summariesFor(found);
 
   return (
     <div className="space-y-5 pt-8">
       <AdminTabs active="students" />
       <h2 className="flex flex-wrap items-center gap-1.5 font-jua text-2xl text-sky-ink"><Icon name="search" size={26} />&apos;{raw}&apos; 찾기 <span className="text-base text-slate-500">· {found.length}건 (최근 달이 위)</span></h2>
-      {!q ? <p className="card text-center text-slate-500">위 검색창에 이름을 입력해 주세요.</p> : found.length === 0 ? <p className="card text-center text-slate-500">찾는 학생이 없어요.</p> : (
+      {guests.length > 0 && (
+        <div className="card !p-4 text-sm">
+          <p className="font-jua text-lg text-violet-700">잠재 고객(비수강생) {guests.length}명</p>
+          <ul className="mt-1 divide-y divide-sky-soft">
+            {guests.map((x) => (
+              <li key={x.id} className="flex flex-wrap items-center gap-2 py-2">
+                <b className="text-sky-ink">{x.name}</b>
+                {x.student_no && <span className="text-xs font-bold tracking-wider text-slate-400">#{x.student_no}</span>}
+                <span className="text-slate-500">{x.phone ? x.phone.replace(/(\d{3})(\d{3,4})(\d{4})/, "$1-$2-$3") : "-"}</span>
+                {x.news_opt_in && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">소식 동의</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {!q ? <p className="card text-center text-slate-500">위 검색창에 이름을 입력해 주세요.</p> : found.length === 0 && guests.length > 0 ? null : found.length === 0 ? <p className="card text-center text-slate-500">찾는 학생이 없어요.</p> : (
         <div className="card overflow-x-auto !p-4">
           <table className="min-w-full text-sm">
             <thead>

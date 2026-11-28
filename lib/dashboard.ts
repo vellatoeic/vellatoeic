@@ -13,7 +13,7 @@ import { studentTests, takesTests } from "./dailyTests";
 import { audioBooksFor, dayDiff, studentAudioWindow } from "./audio";
 import { missionCount, missionFor } from "./mission";
 import { publicSpecials } from "./specialPlan";
-import { deadlineBadge, specialDay, specialRegistrationOpen } from "./special";
+import { deadlineBadge, specialConfirmed, specialDay, specialRegistrationOpen } from "./special";
 import { isHomeworkStickerEligible } from "./schedule";
 import { safe } from "./safe";
 import { chatRoomFor, type ChatRoom } from "./preCourse";
@@ -92,7 +92,7 @@ export async function studentDashboard(today = todayKST()): Promise<Dashboard | 
         .sort((a, b) => a.event_date.localeCompare(b.event_date))
         .flatMap((e): Dashboard["specials"] => {
           const r = mine.find((x) => x.special_lecture_id === e.id);
-          if (r) return [{ date: e.event_date, label: specialDay(e.event_date), state: r.mode === "online" || r.deposit === "paid" ? "confirmed" : "pending", badge: null }];
+          if (r) return [{ date: e.event_date, label: specialDay(e.event_date), state: specialConfirmed(r, e.event_date) ? "confirmed" : "pending", badge: null }];
           if (specialRegistrationOpen(e)) return [{ date: e.event_date, label: specialDay(e.event_date), state: "open", badge: deadlineBadge(e) ?? null }];
           return [];
         });
